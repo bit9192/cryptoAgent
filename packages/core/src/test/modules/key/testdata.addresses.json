@@ -1,0 +1,343 @@
+{
+  "sourceFile": "src/test/modules/key/testdata.md",
+  "generatedAt": "2026-04-20T11:13:40.902Z",
+  "strict": false,
+  "keysTotal": 7,
+  "keysWithConfig": 3,
+  "warnings": [
+    "第 7 行地址规则无效，已忽略: 缺少 path 字段",
+    "第 17 行地址规则无效，已忽略: BTC 规则缺少合法 type（p2pkh/p2sh-p2wpkh/p2wpkh/p2tr）",
+    "第 18 行地址规则无效，已忽略: path 范围无效: [10,1]",
+    "第 30 行的密钥未找到名称，已自动命名为 \"unnamed_f3a4c5d6\"",
+    "key 哈哈 未配置 @address-config",
+    "key btc 未配置 @address-config",
+    "BTC 地址规则 type/path 不匹配: type=p2tr, 期望 purpose=86', 实际 path=m/84'/0'/0'/0/3",
+    "BTC 地址规则 type/path 不匹配: type=p2tr, 期望 purpose=86', 实际 path=m/84'/0'/0'/0/4",
+    "key test-comment-ignore 未配置 @address-config",
+    "key unnamed_f3a4c5d6 未配置 @address-config",
+    "BTC 地址规则 type/path 不匹配: type=p2pkh, 期望 purpose=44', 实际 path=m/84'/0'/0'/0/1",
+    "BTC 地址规则 type/path 不匹配: type=p2pkh, 期望 purpose=44', 实际 path=m/84'/0'/0'/0/2",
+    "BTC 地址规则 type/path 不匹配: type=p2sh-p2wpkh, 期望 purpose=49', 实际 path=m/84'/0'/0'/0/1",
+    "BTC 地址规则 type/path 不匹配: type=p2sh-p2wpkh, 期望 purpose=49', 实际 path=m/84'/0'/0'/0/2",
+    "BTC 地址规则 type/path 不匹配: type=p2tr, 期望 purpose=86', 实际 path=m/84'/0'/0'/0/1",
+    "BTC 地址规则 type/path 不匹配: type=p2tr, 期望 purpose=86', 实际 path=m/84'/0'/0'/0/2"
+  ],
+  "results": [
+    {
+      "keyId": "48b7117a0fa84c00054deb95",
+      "keyName": "哈哈",
+      "type": "privateKey",
+      "derivedCount": 0,
+      "items": [],
+      "warnings": [
+        "第 7 行地址规则无效，已忽略: 缺少 path 字段",
+        "第 17 行地址规则无效，已忽略: BTC 规则缺少合法 type（p2pkh/p2sh-p2wpkh/p2wpkh/p2tr）",
+        "第 18 行地址规则无效，已忽略: path 范围无效: [10,1]",
+        "第 30 行的密钥未找到名称，已自动命名为 \"unnamed_f3a4c5d6\"",
+        "key 哈哈 未配置 @address-config"
+      ]
+    },
+    {
+      "keyId": "b6eb170080b10483e9bc8655",
+      "keyName": "btc",
+      "type": "privateKey",
+      "derivedCount": 0,
+      "items": [],
+      "warnings": [
+        "第 7 行地址规则无效，已忽略: 缺少 path 字段",
+        "第 17 行地址规则无效，已忽略: BTC 规则缺少合法 type（p2pkh/p2sh-p2wpkh/p2wpkh/p2tr）",
+        "第 18 行地址规则无效，已忽略: path 范围无效: [10,1]",
+        "第 30 行的密钥未找到名称，已自动命名为 \"unnamed_f3a4c5d6\"",
+        "key btc 未配置 @address-config"
+      ]
+    },
+    {
+      "keyId": "fc08921315b1cd6fc26ca2da",
+      "keyName": "ik",
+      "type": "privateKey",
+      "derivedCount": 6,
+      "items": [
+        {
+          "keyId": "fc08921315b1cd6fc26ca2da",
+          "keyName": "ik",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2wpkh",
+          "path": "m/84'/0'/0'/0/1",
+          "name": "btc-troop-1",
+          "address": "bc1qzr6etyf5yy72j22umcrftq50rk9qzpm0qp5cl8"
+        },
+        {
+          "keyId": "fc08921315b1cd6fc26ca2da",
+          "keyName": "ik",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2wpkh",
+          "path": "m/84'/0'/0'/0/2",
+          "name": "btc-troop-2",
+          "address": "bc1qzr6etyf5yy72j22umcrftq50rk9qzpm0qp5cl8"
+        },
+        {
+          "keyId": "fc08921315b1cd6fc26ca2da",
+          "keyName": "ik",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2wpkh",
+          "path": "m/84'/0'/0'/0/3",
+          "name": "btc-troop-3",
+          "address": "bc1qzr6etyf5yy72j22umcrftq50rk9qzpm0qp5cl8"
+        },
+        {
+          "keyId": "fc08921315b1cd6fc26ca2da",
+          "keyName": "ik",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2tr",
+          "path": "m/86'/0'/0'/0/2",
+          "name": "taproot-2",
+          "address": "bc1p2zgh6se8lqrlx4wtehxkf0r4fwfncaq04dr0w6ae44mtm5gfywtszcdcd2"
+        },
+        {
+          "keyId": "fc08921315b1cd6fc26ca2da",
+          "keyName": "ik",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2tr",
+          "path": "m/86'/0'/0'/0/3",
+          "name": "taproot-3",
+          "address": "bc1p2zgh6se8lqrlx4wtehxkf0r4fwfncaq04dr0w6ae44mtm5gfywtszcdcd2"
+        },
+        {
+          "keyId": "fc08921315b1cd6fc26ca2da",
+          "keyName": "ik",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2tr",
+          "path": "m/86'/0'/0'/0/4",
+          "name": "taproot-4",
+          "address": "bc1p2zgh6se8lqrlx4wtehxkf0r4fwfncaq04dr0w6ae44mtm5gfywtszcdcd2"
+        }
+      ],
+      "warnings": [
+        "第 7 行地址规则无效，已忽略: 缺少 path 字段",
+        "第 17 行地址规则无效，已忽略: BTC 规则缺少合法 type（p2pkh/p2sh-p2wpkh/p2wpkh/p2tr）",
+        "第 18 行地址规则无效，已忽略: path 范围无效: [10,1]",
+        "第 30 行的密钥未找到名称，已自动命名为 \"unnamed_f3a4c5d6\""
+      ]
+    },
+    {
+      "keyId": "782e9feb9a77975581b528fe",
+      "keyName": "t43",
+      "type": "mnemonic",
+      "derivedCount": 7,
+      "items": [
+        {
+          "keyId": "782e9feb9a77975581b528fe",
+          "keyName": "t43",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2wpkh",
+          "path": "m/84'/0'/0'/0/1",
+          "name": "t43-btc-main",
+          "address": "bc1q33x37r5sh23vjratc32pmpn67vtdcdjtjdgglk"
+        },
+        {
+          "keyId": "782e9feb9a77975581b528fe",
+          "keyName": "t43",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2sh-p2wpkh",
+          "path": "m/49'/0'/0'/0/1",
+          "name": "t43-nested-1",
+          "address": "3Lv7BizfJSwoNo5GmZvFky6js3zhpGAgUU"
+        },
+        {
+          "keyId": "782e9feb9a77975581b528fe",
+          "keyName": "t43",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2sh-p2wpkh",
+          "path": "m/49'/0'/0'/0/2",
+          "name": "t43-nested-2",
+          "address": "3BmSHDYkFngUcnzzgk4mwDZRtAQsCC6K68"
+        },
+        {
+          "keyId": "782e9feb9a77975581b528fe",
+          "keyName": "t43",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2wpkh",
+          "path": "m/84'/0'/0'/0/3",
+          "name": "t43-multi-p2wpkh-3",
+          "address": "bc1qwe0rvuf7jga7gzsep40stlxam0vlzvnfqdawr8"
+        },
+        {
+          "keyId": "782e9feb9a77975581b528fe",
+          "keyName": "t43",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2wpkh",
+          "path": "m/84'/0'/0'/0/4",
+          "name": "t43-multi-p2wpkh-4",
+          "address": "bc1qgrvltsswvjeeaq9n934m7jxg494n9gupn95032"
+        },
+        {
+          "keyId": "782e9feb9a77975581b528fe",
+          "keyName": "t43",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2tr",
+          "path": "m/84'/0'/0'/0/3",
+          "name": "t43-multi-p2tr-3",
+          "address": "bc1pvxawj58v97a26fmt55zrct43xf6ykalth8yfmcfsmeqjz28atzes8k6tlp"
+        },
+        {
+          "keyId": "782e9feb9a77975581b528fe",
+          "keyName": "t43",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2tr",
+          "path": "m/84'/0'/0'/0/4",
+          "name": "t43-multi-p2tr-4",
+          "address": "bc1pzx0nldqdtu8wqzn2zwqcxl95s2h9p6exrpuhxy3umnmsf23cycjqkd42r0"
+        }
+      ],
+      "warnings": [
+        "第 7 行地址规则无效，已忽略: 缺少 path 字段",
+        "第 17 行地址规则无效，已忽略: BTC 规则缺少合法 type（p2pkh/p2sh-p2wpkh/p2wpkh/p2tr）",
+        "第 18 行地址规则无效，已忽略: path 范围无效: [10,1]",
+        "第 30 行的密钥未找到名称，已自动命名为 \"unnamed_f3a4c5d6\"",
+        "BTC 地址规则 type/path 不匹配: type=p2tr, 期望 purpose=86', 实际 path=m/84'/0'/0'/0/3",
+        "BTC 地址规则 type/path 不匹配: type=p2tr, 期望 purpose=86', 实际 path=m/84'/0'/0'/0/4"
+      ]
+    },
+    {
+      "keyId": "e53027b4ae627a8c713b9639",
+      "keyName": "test-comment-ignore",
+      "type": "privateKey",
+      "derivedCount": 0,
+      "items": [],
+      "warnings": [
+        "第 7 行地址规则无效，已忽略: 缺少 path 字段",
+        "第 17 行地址规则无效，已忽略: BTC 规则缺少合法 type（p2pkh/p2sh-p2wpkh/p2wpkh/p2tr）",
+        "第 18 行地址规则无效，已忽略: path 范围无效: [10,1]",
+        "第 30 行的密钥未找到名称，已自动命名为 \"unnamed_f3a4c5d6\"",
+        "key test-comment-ignore 未配置 @address-config"
+      ]
+    },
+    {
+      "keyId": "921609b6d76e2f47961d5397",
+      "keyName": "unnamed_f3a4c5d6",
+      "type": "privateKey",
+      "derivedCount": 0,
+      "items": [],
+      "warnings": [
+        "第 7 行地址规则无效，已忽略: 缺少 path 字段",
+        "第 17 行地址规则无效，已忽略: BTC 规则缺少合法 type（p2pkh/p2sh-p2wpkh/p2wpkh/p2tr）",
+        "第 18 行地址规则无效，已忽略: path 范围无效: [10,1]",
+        "第 30 行的密钥未找到名称，已自动命名为 \"unnamed_f3a4c5d6\"",
+        "key unnamed_f3a4c5d6 未配置 @address-config"
+      ]
+    },
+    {
+      "keyId": "7f63fc6968a8b1bfca998839",
+      "keyName": "wallet-main1",
+      "type": "privateKey",
+      "derivedCount": 8,
+      "items": [
+        {
+          "keyId": "7f63fc6968a8b1bfca998839",
+          "keyName": "wallet-main1",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2pkh",
+          "path": "m/84'/0'/0'/0/1",
+          "name": "missing-type-1-p2pkh",
+          "address": "17KeHc15T9iNU91MenxJ8NDk7tsPFKM4t5"
+        },
+        {
+          "keyId": "7f63fc6968a8b1bfca998839",
+          "keyName": "wallet-main1",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2pkh",
+          "path": "m/84'/0'/0'/0/2",
+          "name": "missing-type-2-p2pkh",
+          "address": "17KeHc15T9iNU91MenxJ8NDk7tsPFKM4t5"
+        },
+        {
+          "keyId": "7f63fc6968a8b1bfca998839",
+          "keyName": "wallet-main1",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2sh-p2wpkh",
+          "path": "m/84'/0'/0'/0/1",
+          "name": "missing-type-1-p2sh-p2wpkh",
+          "address": "39qMgonxSCCtaJp9G6p7ukpANfkL5YZbg9"
+        },
+        {
+          "keyId": "7f63fc6968a8b1bfca998839",
+          "keyName": "wallet-main1",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2sh-p2wpkh",
+          "path": "m/84'/0'/0'/0/2",
+          "name": "missing-type-2-p2sh-p2wpkh",
+          "address": "39qMgonxSCCtaJp9G6p7ukpANfkL5YZbg9"
+        },
+        {
+          "keyId": "7f63fc6968a8b1bfca998839",
+          "keyName": "wallet-main1",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2wpkh",
+          "path": "m/84'/0'/0'/0/1",
+          "name": "missing-type-1-p2wpkh",
+          "address": "bc1qg4t4mafk3ewlz6mr7hvdq8k3rrghht5jyz35kw"
+        },
+        {
+          "keyId": "7f63fc6968a8b1bfca998839",
+          "keyName": "wallet-main1",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2wpkh",
+          "path": "m/84'/0'/0'/0/2",
+          "name": "missing-type-2-p2wpkh",
+          "address": "bc1qg4t4mafk3ewlz6mr7hvdq8k3rrghht5jyz35kw"
+        },
+        {
+          "keyId": "7f63fc6968a8b1bfca998839",
+          "keyName": "wallet-main1",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2tr",
+          "path": "m/84'/0'/0'/0/1",
+          "name": "missing-type-1-p2tr",
+          "address": "bc1pce2hw07vvayrcq64n42vl9g09xt57kd0cayt5qwaexflhsetap4qwdk6gt"
+        },
+        {
+          "keyId": "7f63fc6968a8b1bfca998839",
+          "keyName": "wallet-main1",
+          "chain": "btc",
+          "network": "mainnet",
+          "addressType": "p2tr",
+          "path": "m/84'/0'/0'/0/2",
+          "name": "missing-type-2-p2tr",
+          "address": "bc1pce2hw07vvayrcq64n42vl9g09xt57kd0cayt5qwaexflhsetap4qwdk6gt"
+        }
+      ],
+      "warnings": [
+        "第 7 行地址规则无效，已忽略: 缺少 path 字段",
+        "第 17 行地址规则无效，已忽略: BTC 规则缺少合法 type（p2pkh/p2sh-p2wpkh/p2wpkh/p2tr）",
+        "第 18 行地址规则无效，已忽略: path 范围无效: [10,1]",
+        "第 30 行的密钥未找到名称，已自动命名为 \"unnamed_f3a4c5d6\"",
+        "BTC 地址规则 type/path 不匹配: type=p2pkh, 期望 purpose=44', 实际 path=m/84'/0'/0'/0/1",
+        "BTC 地址规则 type/path 不匹配: type=p2pkh, 期望 purpose=44', 实际 path=m/84'/0'/0'/0/2",
+        "BTC 地址规则 type/path 不匹配: type=p2sh-p2wpkh, 期望 purpose=49', 实际 path=m/84'/0'/0'/0/1",
+        "BTC 地址规则 type/path 不匹配: type=p2sh-p2wpkh, 期望 purpose=49', 实际 path=m/84'/0'/0'/0/2",
+        "BTC 地址规则 type/path 不匹配: type=p2tr, 期望 purpose=86', 实际 path=m/84'/0'/0'/0/1",
+        "BTC 地址规则 type/path 不匹配: type=p2tr, 期望 purpose=86', 实际 path=m/84'/0'/0'/0/2"
+      ]
+    }
+  ]
+}

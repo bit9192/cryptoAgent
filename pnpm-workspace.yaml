@@ -1,0 +1,7 @@
+packages:
+  - "packages/*"
+allowBuilds:
+  core-js: false
+  esbuild: false
+  keccak: false
+  secp256k1: false

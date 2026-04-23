@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+set -eu
+
+# Block commits that contain local machine paths or host fingerprints.
+UNIX_HOME_PREFIX='/Users/'
+WIN_HOME_PREFIX='[A-Za-z]:\\\\Users\\\\'
+HOST_HINT='zhangyideMacBook'
+USER_HINT='zhangyi@'
+PATTERN="${UNIX_HOME_PREFIX}|${WIN_HOME_PREFIX}|${HOST_HINT}|${USER_HINT}"
+
+DIFF_CONTENT="$(git diff --cached --unified=0 --no-color)"
+SCANNED_DIFF="$(git diff --cached --unified=0 --no-color -- . ':(exclude).githooks/pre-commit')"
+if printf '%s\n' "$SCANNED_DIFF" | grep -E "^\+.*(${PATTERN})" >/dev/null; then
+	echo "[pre-commit] Blocked: detected local machine info in staged changes."
+	echo "[pre-commit] Please replace absolute/local identifiers with placeholders."
+	echo
+	printf '%s\n' "$SCANNED_DIFF" | grep -nE "^\+.*(${PATTERN})" || true
+	exit 1
+fi
+
+exit 0

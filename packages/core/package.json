@@ -1,0 +1,32 @@
+{
+  "name": "@ch/core",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "New architecture",
+  "scripts": {
+    "dev": "node src/index.mjs",
+    "contracts:compile": "node contracts/compile.mjs --profile production",
+    "contracts:compile:all": "node contracts/compile.mjs --profile all",
+    "key": "node src/cli/key.mjs",
+    "ex:lon": "node src/cli/lon.mjs",
+    "ex:lon:dev": "node src/cli/lon.mjs --mode dev --autoConfirm",
+    "ex:lon:watch": "LON_EXIT_WATCHER_ON_CLOSE=1 node --watch --watch-path src/execute --watch-path src/tasks src/cli/lon.mjs --mode dev --autoConfirm",
+    "fork": "node scripts/runtime/start-fork.mjs",
+    "btc:node": "node scripts/runtime/btc-node.mjs"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "bech32": "^2.0.0",
+    "bitcoinjs-lib": "^7.0.1",
+    "bs58": "^6.0.0",
+    "dotenv": "^17.4.0",
+    "ecpair": "^3.0.1",
+    "ethers": "^6.16.0",
+    "prompts": "^2.4.2",
+    "qrcode": "^1.5.4",
+    "shamirs-secret-sharing": "^2.0.1",
+    "solc": "^0.8.34",
+    "tiny-secp256k1": "^2.2.4"
+  }
+}

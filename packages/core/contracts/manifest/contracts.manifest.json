@@ -1,0 +1,199 @@
+{
+  "generatedAt": "2026-04-05T06:40:00.907Z",
+  "profile": "production",
+  "compilerVersion": "0.8.34+commit.80d5c536.Emscripten.clang",
+  "sourceDir": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/src",
+  "outDir": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts",
+  "abiDir": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi",
+  "entries": [
+    {
+      "contractName": "ISwapERC20",
+      "sourceName": "interfaces/ISwap.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/interfaces/ISwap/ISwapERC20.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/interfaces/ISwap/ISwapERC20.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "ISwapV2Factory",
+      "sourceName": "interfaces/ISwap.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/interfaces/ISwap/ISwapV2Factory.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/interfaces/ISwap/ISwapV2Factory.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "ISwapV2Pair",
+      "sourceName": "interfaces/ISwap.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/interfaces/ISwap/ISwapV2Pair.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/interfaces/ISwap/ISwapV2Pair.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "ISwapV2Router",
+      "sourceName": "interfaces/ISwap.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/interfaces/ISwap/ISwapV2Router.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/interfaces/ISwap/ISwapV2Router.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "ISwapV3Factory",
+      "sourceName": "interfaces/ISwap.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/interfaces/ISwap/ISwapV3Factory.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/interfaces/ISwap/ISwapV3Factory.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "ISwapV3Pool",
+      "sourceName": "interfaces/ISwap.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/interfaces/ISwap/ISwapV3Pool.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/interfaces/ISwap/ISwapV3Pool.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "ISwapV3PositionManager",
+      "sourceName": "interfaces/ISwap.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/interfaces/ISwap/ISwapV3PositionManager.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/interfaces/ISwap/ISwapV3PositionManager.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "ISwapV3Quoter",
+      "sourceName": "interfaces/ISwap.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/interfaces/ISwap/ISwapV3Quoter.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/interfaces/ISwap/ISwapV3Quoter.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "ISwapV3QuoterV2",
+      "sourceName": "interfaces/ISwap.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/interfaces/ISwap/ISwapV3QuoterV2.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/interfaces/ISwap/ISwapV3QuoterV2.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "ISwapV3Router",
+      "sourceName": "interfaces/ISwap.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/interfaces/ISwap/ISwapV3Router.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/interfaces/ISwap/ISwapV3Router.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "ISwapWETH",
+      "sourceName": "interfaces/ISwap.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/interfaces/ISwap/ISwapWETH.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/interfaces/ISwap/ISwapWETH.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "Trade",
+      "sourceName": "protocols/Trade.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/protocols/Trade/Trade.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/protocols/Trade/Trade.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "ABDKMathQuad",
+      "sourceName": "utils/ABDK.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/ABDK/ABDKMathQuad.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/ABDK/ABDKMathQuad.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "AssetCustody",
+      "sourceName": "utils/AssetCustody.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/AssetCustody/AssetCustody.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/AssetCustody/AssetCustody.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "IAssetCustody",
+      "sourceName": "utils/AssetCustody.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/AssetCustody/IAssetCustody.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/AssetCustody/IAssetCustody.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "AssetMap",
+      "sourceName": "utils/AssetMap.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/AssetMap/AssetMap.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/AssetMap/AssetMap.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "BatchSender",
+      "sourceName": "utils/BatchSend.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/BatchSend/BatchSender.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/BatchSend/BatchSender.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "BokkyPooBahsDateTimeLibrary",
+      "sourceName": "utils/DateTime.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/DateTime/BokkyPooBahsDateTimeLibrary.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/DateTime/BokkyPooBahsDateTimeLibrary.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "ERC20",
+      "sourceName": "utils/ERC20.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/ERC20/ERC20.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/ERC20/ERC20.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "Invite",
+      "sourceName": "utils/Invite.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/Invite/Invite.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/Invite/Invite.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "Math64x64",
+      "sourceName": "utils/Math64x64.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/Math64x64/Math64x64.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/Math64x64/Math64x64.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "MultiCall",
+      "sourceName": "utils/MultiCall.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/MultiCall/MultiCall.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/MultiCall/MultiCall.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "Multicall3",
+      "sourceName": "utils/Multicall3.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/Multicall3/Multicall3.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/Multicall3/Multicall3.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "Permissions",
+      "sourceName": "utils/Permissions.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/Permissions/Permissions.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/Permissions/Permissions.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "ERC20Interface",
+      "sourceName": "utils/SafeToken.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/SafeToken/ERC20Interface.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/SafeToken/ERC20Interface.abi.json",
+      "hasBytecode": false
+    },
+    {
+      "contractName": "SafeToken",
+      "sourceName": "utils/SafeToken.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/SafeToken/SafeToken.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/SafeToken/SafeToken.abi.json",
+      "hasBytecode": true
+    },
+    {
+      "contractName": "SlippageERC20",
+      "sourceName": "utils/SlippageERC20.sol",
+      "artifactPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/artifacts/utils/SlippageERC20/SlippageERC20.json",
+      "abiPath": "/Users/zhangyi/Desktop/contractHelper/packages/core/contracts/manifest/abi/utils/SlippageERC20/SlippageERC20.abi.json",
+      "hasBytecode": true
+    }
+  ]
+}

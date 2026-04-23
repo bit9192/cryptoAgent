@@ -1,0 +1,1770 @@
+{
+  "schemaVersion": 1,
+  "chainId": 31337,
+  "network": "fork",
+  "contracts": {
+    "TEST11111": {
+      "contractName": "TEST11111",
+      "address": "0xD0FA581A3d8F8662C0072DE777E85d8232261a12",
+      "txHash": "0xaa7bde4c8266d9354c22ac5d4bad7d0254371880d252f0a68ea916a729f71d24",
+      "sourceName": "dev/Test.sol",
+      "artifactPath": "contracts/artifacts/dev/Test/TEST11111.json",
+      "deploymentKey": "TEST11111",
+      "updatedAt": "2026-04-05T08:18:06.390Z",
+      "createdAt": "2026-04-05T08:15:44.258Z"
+    },
+    "TEST11111#2": {
+      "contractName": "TEST11111",
+      "address": "0x3527cdF3bD698a102e8d1D970285B49A8bE00aEe",
+      "txHash": "0xdcbefcb779382d23540d7f424d89ffd5962546a92e247a5167ee438b63aec4cb",
+      "sourceName": "dev/Test.sol",
+      "artifactPath": "contracts/artifacts/dev/Test/TEST11111.json",
+      "deploymentKey": "TEST11111#2",
+      "updatedAt": "2026-04-05T08:24:20.123Z",
+      "createdAt": "2026-04-05T08:24:20.123Z"
+    },
+    "TEST11111#3": {
+      "contractName": "TEST11111",
+      "address": "0xE04A1E233e2AdB5591a0fA667EdFE2AA090588F9",
+      "txHash": "0x841538b67ae62c5545436bf83238b8117a5392c8cff747220a366938cbd3c31b",
+      "sourceName": "dev/Test.sol",
+      "artifactPath": "contracts/artifacts/dev/Test/TEST11111.json",
+      "deploymentKey": "TEST11111#3",
+      "updatedAt": "2026-04-05T08:24:36.190Z",
+      "createdAt": "2026-04-05T08:24:36.190Z"
+    },
+    "TEST11111#4": {
+      "contractName": "TEST11111",
+      "address": "0xaBfb666BB4b2588D3259D8744e6971d74Aa55e9f",
+      "txHash": "0xe2495cdd3531394aa2f298ca6b9698fe21cf8d3395371aa985071c7ceb3bd9ec",
+      "sourceName": "dev/Test.sol",
+      "artifactPath": "contracts/artifacts/dev/Test/TEST11111.json",
+      "deploymentKey": "TEST11111#4",
+      "updatedAt": "2026-04-05T08:24:56.967Z",
+      "createdAt": "2026-04-05T08:24:56.967Z"
+    },
+    "WETH": {
+      "contractName": "WETH",
+      "address": "0x85F734a2F4e474BAAe62a510f95274B8a81E210d",
+      "txHash": "0x4348ed0198bd7fd55c2cc36886426c0fd828e2e39ff2ffb3119730e027fd7e3c",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH",
+      "updatedAt": "2026-04-06T05:20:57.465Z",
+      "createdAt": "2026-04-06T05:20:57.465Z"
+    },
+    "UniFactory": {
+      "contractName": "UniFactory",
+      "address": "0x22e21F5f0de781d5a379CCd1eABEa7E6761a318c",
+      "txHash": "0x3fd1d3aab5b61685a80b7ed146dee67476c0728a1e8fdc58f47261908aeaadea",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory",
+      "updatedAt": "2026-04-06T05:20:58.328Z",
+      "createdAt": "2026-04-06T05:20:58.328Z"
+    },
+    "WETH#2": {
+      "contractName": "WETH",
+      "address": "0x94eaA603Ae061FDEDf3a68a0F8360F4E960A3763",
+      "txHash": "0xc1b9899ee46add5915374c266c5a556b41790ebc4283b5e108d041f40a3a58b4",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#2",
+      "updatedAt": "2026-04-06T05:20:58.502Z",
+      "createdAt": "2026-04-06T05:20:58.502Z"
+    },
+    "UniswapV3Factory": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x6133B86927eDBD933c1257228D52fF199eCb39F2",
+      "txHash": "0xe051984bef362b083a3ef1aeee3e6b3132d030f4f8dbe348be03ee51d9795500",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory",
+      "updatedAt": "2026-04-06T05:20:58.702Z",
+      "createdAt": "2026-04-06T05:20:58.702Z"
+    },
+    "WETH#3": {
+      "contractName": "WETH",
+      "address": "0x645D571EbDe1BA58B0068a660D6C8Cc2844a449E",
+      "txHash": "0xcfa535b9b692a32de92711a57791985241f2eb5fa105f728d473011d8fa7beba",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#3",
+      "updatedAt": "2026-04-06T05:21:20.788Z",
+      "createdAt": "2026-04-06T05:21:20.788Z"
+    },
+    "UniFactory#2": {
+      "contractName": "UniFactory",
+      "address": "0x4E34fCEE9D99Bc7bf2309464BB6FCf4b24002ed2",
+      "txHash": "0xc2bf7847cdc5069dd42f5a285bca19d03076d8aab205f10a10e7df89a4390bd7",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#2",
+      "updatedAt": "2026-04-06T05:21:20.990Z",
+      "createdAt": "2026-04-06T05:21:20.990Z"
+    },
+    "WETH#4": {
+      "contractName": "WETH",
+      "address": "0x3a67a786536c741672e734F85860b0B1E47CC63b",
+      "txHash": "0xb6273ab27663558dd07b8f536616d8d58764c72f0b2e2b0d247fdc8f22630cd1",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#4",
+      "updatedAt": "2026-04-06T05:21:21.160Z",
+      "createdAt": "2026-04-06T05:21:21.160Z"
+    },
+    "UniswapV3Factory#2": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x432e0A1BC8e07F83d2D33DCbE9a7525E535c9337",
+      "txHash": "0xc0fc65152f70c716f0b75d0edc7c26881c85263c7275d264476c6693ba49951b",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#2",
+      "updatedAt": "2026-04-06T05:21:21.344Z",
+      "createdAt": "2026-04-06T05:21:21.344Z"
+    },
+    "WETH#5": {
+      "contractName": "WETH",
+      "address": "0xDAfbd598466Db157ce95E3167d35e0100Cc91201",
+      "txHash": "0x7ac9e84462b0a2081b7309864dcace13ee978dc39b65e9f65320e819b6001a40",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#5",
+      "updatedAt": "2026-04-06T05:21:40.619Z",
+      "createdAt": "2026-04-06T05:21:40.619Z"
+    },
+    "UniFactory#3": {
+      "contractName": "UniFactory",
+      "address": "0xf977c4F8fd60b792325A2cD11D6d0A8Bb7A4A09C",
+      "txHash": "0x80071633b91659ffa9b83bad41739da6e28c53869941869c139f93ba54b5e72a",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#3",
+      "updatedAt": "2026-04-06T05:21:40.834Z",
+      "createdAt": "2026-04-06T05:21:40.834Z"
+    },
+    "WETH#6": {
+      "contractName": "WETH",
+      "address": "0xed23528C9EA82cCC50d1d342B2141AF0A6303544",
+      "txHash": "0x2b9c258923a5cd7076340b57daf410ea6702741aaab48a3131e164167838e9a1",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#6",
+      "updatedAt": "2026-04-06T05:21:41.006Z",
+      "createdAt": "2026-04-06T05:21:41.006Z"
+    },
+    "UniswapV3Factory#3": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x584F2b598B3D9f6ED7e37928D140cD198d65719e",
+      "txHash": "0x04e99c8807e42609420f0e78b05169f182adace3b295b7f3c3498f35e18b24da",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#3",
+      "updatedAt": "2026-04-06T05:21:41.211Z",
+      "createdAt": "2026-04-06T05:21:41.211Z"
+    },
+    "WETH#7": {
+      "contractName": "WETH",
+      "address": "0xa6dF566fAc80De993c0515c37b5BeF913f29FCa6",
+      "txHash": "0x6eed68f1b9c011ba0eb99c65a4de14c970703f81bfb6654a611bacd2873a746e",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#7",
+      "updatedAt": "2026-04-06T05:22:48.116Z",
+      "createdAt": "2026-04-06T05:22:48.116Z"
+    },
+    "UniFactory#4": {
+      "contractName": "UniFactory",
+      "address": "0x5194DeA68461c00B738E22f0c59d3619c66E30Be",
+      "txHash": "0x507801ccc188a2eeb41c98f3c3bd83cdad440df1686a8c2681deb82bd22f7961",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#4",
+      "updatedAt": "2026-04-06T05:22:48.326Z",
+      "createdAt": "2026-04-06T05:22:48.326Z"
+    },
+    "WETH#8": {
+      "contractName": "WETH",
+      "address": "0x8c311b86584aB6998149E90AdDa676045ac1B99c",
+      "txHash": "0x171fb15822cb9971133b74f6189cb4fa21d2b131812058c080a3283dbd16feba",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#8",
+      "updatedAt": "2026-04-06T05:22:48.777Z",
+      "createdAt": "2026-04-06T05:22:48.777Z"
+    },
+    "UniswapV3Factory#4": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x205Afa71148db8690AffCf62D74B352D73b870C4",
+      "txHash": "0x919ca4dd1a29a516e48e2ec8c343cd880f6272f3a369075fca16ac5ef595307b",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#4",
+      "updatedAt": "2026-04-06T05:22:48.988Z",
+      "createdAt": "2026-04-06T05:22:48.988Z"
+    },
+    "WETH#9": {
+      "contractName": "WETH",
+      "address": "0x7Ba1BfcBC3159223b915998B594658D6262B06d8",
+      "txHash": "0x72da7a44314778b6688caf3e79f06de8c72c0dfdcd490888709f52ab48287470",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#9",
+      "updatedAt": "2026-04-06T05:23:09.949Z",
+      "createdAt": "2026-04-06T05:23:09.949Z"
+    },
+    "UniFactory#5": {
+      "contractName": "UniFactory",
+      "address": "0xA4bD1022309236f0b0EF3da9A582d71461F94288",
+      "txHash": "0xa989fcae1abdf2dcc68da7a2f12c54e8af71b76f2cbcdeedc4c741a28c40921e",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#5",
+      "updatedAt": "2026-04-06T05:23:10.164Z",
+      "createdAt": "2026-04-06T05:23:10.164Z"
+    },
+    "WETH#10": {
+      "contractName": "WETH",
+      "address": "0x06AB3c6aE9B0E3Abdd2fE4404Bf74D1C0f073e83",
+      "txHash": "0x8ddb4ac57c8b4bdfb865ba8e1a3f181329f7057b17c6237094cc21c13a274d12",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#10",
+      "updatedAt": "2026-04-06T05:23:10.580Z",
+      "createdAt": "2026-04-06T05:23:10.580Z"
+    },
+    "UniswapV3Factory#5": {
+      "contractName": "UniswapV3Factory",
+      "address": "0xA39cccfCa302019843b2ECC7A4ea3142E6fA9157",
+      "txHash": "0x33a5b505cc63509d77452eb04182889c7b5228d6cb83d8337d91f054401e4b11",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#5",
+      "updatedAt": "2026-04-06T05:23:10.771Z",
+      "createdAt": "2026-04-06T05:23:10.771Z"
+    },
+    "WETH#11": {
+      "contractName": "WETH",
+      "address": "0x8a335f0e9909049EfFf6F852A82359af48C8e64A",
+      "txHash": "0x575771075bd966863171c53fa75f72339fb03f128cf2799a0977585dbe796ba1",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#11",
+      "updatedAt": "2026-04-06T05:23:30.685Z",
+      "createdAt": "2026-04-06T05:23:30.685Z"
+    },
+    "UniFactory#6": {
+      "contractName": "UniFactory",
+      "address": "0x7f0097A33D10015bc94201976739D97D11c73232",
+      "txHash": "0xea91ee5369c433ea583b146f51ec561122d385b35ce9ea7164fc9323dce59418",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#6",
+      "updatedAt": "2026-04-06T05:23:30.928Z",
+      "createdAt": "2026-04-06T05:23:30.928Z"
+    },
+    "WETH#12": {
+      "contractName": "WETH",
+      "address": "0x261Fd761b76415518E036210e630374A1eB0E5a7",
+      "txHash": "0x70ec17763bd47e9221753a797a29ee883e974bb86006b46d1467f06e1da2159a",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#12",
+      "updatedAt": "2026-04-06T05:23:31.376Z",
+      "createdAt": "2026-04-06T05:23:31.376Z"
+    },
+    "UniswapV3Factory#6": {
+      "contractName": "UniswapV3Factory",
+      "address": "0xb5956E975323d8fA17dC84B9c48DE083831E100c",
+      "txHash": "0x6d23f50c3835cad8f101f5bddd1583c4e50bc841bba8f592ba68768592cb6f98",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#6",
+      "updatedAt": "2026-04-06T05:23:31.595Z",
+      "createdAt": "2026-04-06T05:23:31.595Z"
+    },
+    "WETH#13": {
+      "contractName": "WETH",
+      "address": "0x51254cf30e25F595B820a3001d250106868c26fB",
+      "txHash": "0xa14c64746f7c40fac5160a7320dcc8e0bb22fcc13ce4421c8a1f029d53713d8c",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#13",
+      "updatedAt": "2026-04-06T05:23:50.946Z",
+      "createdAt": "2026-04-06T05:23:50.946Z"
+    },
+    "UniFactory#7": {
+      "contractName": "UniFactory",
+      "address": "0x122e0d74498F2225Ac29c6f8Ea0A566f82d1AAF4",
+      "txHash": "0x487e8f10d2a4cc3701f70d45547447d9e57e5cc712a57fda3380fa6050059fc6",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#7",
+      "updatedAt": "2026-04-06T05:23:51.166Z",
+      "createdAt": "2026-04-06T05:23:51.166Z"
+    },
+    "WETH#14": {
+      "contractName": "WETH",
+      "address": "0x86cadb8860E4f66C6D99f5D950f28972b4aefd81",
+      "txHash": "0x0a420387f109019639c2b10b6b9f42fddec266f193918dcbfbf109e69b8657a6",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#14",
+      "updatedAt": "2026-04-06T05:23:51.574Z",
+      "createdAt": "2026-04-06T05:23:51.574Z"
+    },
+    "UniswapV3Factory#7": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x8D9122bE7973F68646dB36bFD9f3981402439421",
+      "txHash": "0x7efb296872dfea37d7af4307cdb324af93755aaab51ec7faeed795bc125861c6",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#7",
+      "updatedAt": "2026-04-06T05:23:51.781Z",
+      "createdAt": "2026-04-06T05:23:51.781Z"
+    },
+    "WETH#15": {
+      "contractName": "WETH",
+      "address": "0x690E753eD7D928b22EF9E8eca09BEcFAe9F53C36",
+      "txHash": "0xe024fc6a37ebbfbc12a87a0737aa63810e5cc12d2e978dca15e26c0228c93225",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#15",
+      "updatedAt": "2026-04-06T05:24:10.119Z",
+      "createdAt": "2026-04-06T05:24:10.119Z"
+    },
+    "UniFactory#8": {
+      "contractName": "UniFactory",
+      "address": "0x7AEa64e089Ae8db4a21619e6D3132c2D943f26DA",
+      "txHash": "0x96fee00a55a06ff899077e6e0ae73b61c6d2d09811cc101411cb6f2395a58da1",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#8",
+      "updatedAt": "2026-04-06T05:24:10.333Z",
+      "createdAt": "2026-04-06T05:24:10.333Z"
+    },
+    "WETH#16": {
+      "contractName": "WETH",
+      "address": "0xcE2bCd8cE79cBF959dDa44e03c0F4DD352274cFD",
+      "txHash": "0x274e3a486681490777aedcc411d900687e78fba22c9233a04ca5d242356cde37",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#16",
+      "updatedAt": "2026-04-06T05:24:10.734Z",
+      "createdAt": "2026-04-06T05:24:10.734Z"
+    },
+    "UniswapV3Factory#8": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x893E0aF4284c8a5824161262E81341f633B43039",
+      "txHash": "0xd8f6b86013d14043bb4fb6602295c017b510ab7c9f928e65375068b2ed8e3fa2",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#8",
+      "updatedAt": "2026-04-06T05:24:10.929Z",
+      "createdAt": "2026-04-06T05:24:10.929Z"
+    },
+    "WETH#17": {
+      "contractName": "WETH",
+      "address": "0x6CE8AD4768E0bB22bA7e0caE626625e9174118f7",
+      "txHash": "0x27b750f7482c61e327840b8d3bc1e877f26e81f1d4f439552f78ecce259a3efb",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#17",
+      "updatedAt": "2026-04-06T05:24:29.279Z",
+      "createdAt": "2026-04-06T05:24:29.279Z"
+    },
+    "UniFactory#9": {
+      "contractName": "UniFactory",
+      "address": "0xf8F88E462AD79764B3EF31D1F4D66fC91cf94cf4",
+      "txHash": "0xcdf7627c1dacb995a4e4790990ae4c68dc61fe80de25557559437ea7af275ed0",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#9",
+      "updatedAt": "2026-04-06T05:24:29.486Z",
+      "createdAt": "2026-04-06T05:24:29.486Z"
+    },
+    "WETH#18": {
+      "contractName": "WETH",
+      "address": "0x421DC8b983A1C21951279A959A2d7E3bd36F5661",
+      "txHash": "0xa79d2a983b6697e3e76f985e63d259dccbb35eb4327881a6646f964181e48023",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#18",
+      "updatedAt": "2026-04-06T05:24:29.962Z",
+      "createdAt": "2026-04-06T05:24:29.962Z"
+    },
+    "UniswapV3Factory#9": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x6CF64277a1921382110eAAcBC1e61BAa94800698",
+      "txHash": "0xd8bec8fe6722dfcfc5abf4eb30f5d0f445ca131921c67c3205f85c6d0d96b77b",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#9",
+      "updatedAt": "2026-04-06T05:24:30.145Z",
+      "createdAt": "2026-04-06T05:24:30.145Z"
+    },
+    "WETH#19": {
+      "contractName": "WETH",
+      "address": "0xD9249870c4DeF4395cEA195B4B657C35F8b8C57a",
+      "txHash": "0x119dcf1534c84842c8ccbc7191ea04031deaaa385bd9880982565762763ba77d",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#19",
+      "updatedAt": "2026-04-06T05:24:56.543Z",
+      "createdAt": "2026-04-06T05:24:56.543Z"
+    },
+    "UniFactory#10": {
+      "contractName": "UniFactory",
+      "address": "0x8c3a383f6E2b1F9309Acd9AC325518D0C1e40236",
+      "txHash": "0xfe36cfa8f97a5c717ba0f072e62030523d3b9b5d6e2f287d3db022a88f5c56c2",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#10",
+      "updatedAt": "2026-04-06T05:24:56.760Z",
+      "createdAt": "2026-04-06T05:24:56.760Z"
+    },
+    "WETH#20": {
+      "contractName": "WETH",
+      "address": "0x303bD252b57090fEe9AFb2cc3209C4ed866031B6",
+      "txHash": "0xeaeab789a367e0f5b3fdea22036873a52224f5f47731599fe82bdcc33193ff2d",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#20",
+      "updatedAt": "2026-04-06T05:24:57.175Z",
+      "createdAt": "2026-04-06T05:24:57.175Z"
+    },
+    "UniswapV3Factory#10": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x0385c81B516Fd662e9a9A64b8F55A472cbD69938",
+      "txHash": "0xd9eee978f2e14567074b956e9f8faa44d03eb14409fcfbdee881ee51b01a9366",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#10",
+      "updatedAt": "2026-04-06T05:24:57.377Z",
+      "createdAt": "2026-04-06T05:24:57.377Z"
+    },
+    "WETH#21": {
+      "contractName": "WETH",
+      "address": "0xdE0d65656c17506C433D2Ac543f45ebf0fB36937",
+      "txHash": "0x6b228986ff77945a9166e72ed11076009ebfa3584cff284d6ecfda3930a0f4e0",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#21",
+      "updatedAt": "2026-04-06T05:25:16.395Z",
+      "createdAt": "2026-04-06T05:25:16.395Z"
+    },
+    "UniFactory#11": {
+      "contractName": "UniFactory",
+      "address": "0x0f9561AaFB4131df20E02bD7Ce3363f577332704",
+      "txHash": "0xfaebb1ce09820f0f207b0264a030e6c4daff243c41dd9ebfd44f6ca368a0d842",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#11",
+      "updatedAt": "2026-04-06T05:25:16.611Z",
+      "createdAt": "2026-04-06T05:25:16.611Z"
+    },
+    "WETH#22": {
+      "contractName": "WETH",
+      "address": "0xff0322f513184653c3eD9717c1194fA53a446a90",
+      "txHash": "0xfb466ac3e87b62f6e7596f9370290c05edbff07133c527e1d01613bedb5c0918",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#22",
+      "updatedAt": "2026-04-06T05:25:17.021Z",
+      "createdAt": "2026-04-06T05:25:17.021Z"
+    },
+    "UniswapV3Factory#11": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x1A10027fB427B001DF4a23c5beBa7885Fcb17572",
+      "txHash": "0x41f40ddc2684ce8777989214abd46a8be8ed8650ddf056b13f17e2eede233306",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#11",
+      "updatedAt": "2026-04-06T05:25:17.235Z",
+      "createdAt": "2026-04-06T05:25:17.235Z"
+    },
+    "WETH#23": {
+      "contractName": "WETH",
+      "address": "0x50cA07b73C5E46d18950371ca58629530e2641f3",
+      "txHash": "0xd6d7b10f44044f8ed085bd70665abbcc576256533af620ae46727500845c99e3",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#23",
+      "updatedAt": "2026-04-06T05:25:37.550Z",
+      "createdAt": "2026-04-06T05:25:37.550Z"
+    },
+    "UniFactory#12": {
+      "contractName": "UniFactory",
+      "address": "0x7B04FF682707b58A66639bC4C311a7a9bE854563",
+      "txHash": "0x3fc89760c305a270bfccd44132c70ab151fa1e2e33bf920657cab729555e25aa",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#12",
+      "updatedAt": "2026-04-06T05:25:37.781Z",
+      "createdAt": "2026-04-06T05:25:37.781Z"
+    },
+    "WETH#24": {
+      "contractName": "WETH",
+      "address": "0x35D267c772A0B0391E5583E108eBbF22327E546f",
+      "txHash": "0xd53c1a04c258ef15b07eb049ddab5d1d1a10e04e7a9d5f0bf3bb264ecdc21af1",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#24",
+      "updatedAt": "2026-04-06T05:25:38.197Z",
+      "createdAt": "2026-04-06T05:25:38.197Z"
+    },
+    "UniswapV3Factory#12": {
+      "contractName": "UniswapV3Factory",
+      "address": "0xBbd547A92e84Fb0f8DA6361871A587289d5Bc358",
+      "txHash": "0x3adbc9b93dde3aa9034deec4c767f5f1f414d9527f2340671861ce6108bbedc8",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#12",
+      "updatedAt": "2026-04-06T05:25:38.405Z",
+      "createdAt": "2026-04-06T05:25:38.405Z"
+    },
+    "WETH#25": {
+      "contractName": "WETH",
+      "address": "0x36ad54F5642E26B4D8c1553395b35702c60D9Cbe",
+      "txHash": "0xdd11a6d1025b823fc36aaf315334f186ff48d354f1ed54b116b896a379d5ae43",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#25",
+      "updatedAt": "2026-04-06T05:25:58.185Z",
+      "createdAt": "2026-04-06T05:25:58.185Z"
+    },
+    "UniFactory#13": {
+      "contractName": "UniFactory",
+      "address": "0x2f5cBC301BBB1b773BBc509106dC8Bb500A65008",
+      "txHash": "0xaf71a7afb01ccbc6bb8636719307bc01007ac6a07963c68c7a3b56a1182a26f5",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#13",
+      "updatedAt": "2026-04-06T05:25:58.401Z",
+      "createdAt": "2026-04-06T05:25:58.401Z"
+    },
+    "WETH#26": {
+      "contractName": "WETH",
+      "address": "0xb0B11001E1BdaeC2e0dFa46EC2A58f212FD73903",
+      "txHash": "0x3a37e1848dd90578a7955ff4142015c491af83bf61c7a165b3e51d3c3fa15c73",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#26",
+      "updatedAt": "2026-04-06T05:25:58.857Z",
+      "createdAt": "2026-04-06T05:25:58.857Z"
+    },
+    "UniswapV3Factory#13": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x0195711Da251A33828a258F0D9669AD67C3842b5",
+      "txHash": "0x3b050aa7189f2e4777cc1cb4e02be9436a956087013701a3644c112b7e49dcb5",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#13",
+      "updatedAt": "2026-04-06T05:25:59.060Z",
+      "createdAt": "2026-04-06T05:25:59.060Z"
+    },
+    "WETH#27": {
+      "contractName": "WETH",
+      "address": "0x22e21F5f0de781d5a379CCd1eABEa7E6761a318c",
+      "txHash": "0x7c2e7ab4595937aeff269b654f44636d257cb9347ff09aa8515b028141a925fd",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#27",
+      "updatedAt": "2026-04-06T05:28:01.871Z",
+      "createdAt": "2026-04-06T05:28:01.871Z"
+    },
+    "UniFactory#14": {
+      "contractName": "UniFactory",
+      "address": "0x94eaA603Ae061FDEDf3a68a0F8360F4E960A3763",
+      "txHash": "0x931c51e2514e2b9dca9abed005901cb1891aa76cc4e8bcfbe13325d5b21d653a",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#14",
+      "updatedAt": "2026-04-06T05:28:53.266Z",
+      "createdAt": "2026-04-06T05:28:53.266Z"
+    },
+    "WETH#28": {
+      "contractName": "WETH",
+      "address": "0x645D571EbDe1BA58B0068a660D6C8Cc2844a449E",
+      "txHash": "0x131a0190a34478a6f43b5840ff888bf0912edaf0aae4daed03ed138a84028330",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#28",
+      "updatedAt": "2026-04-06T05:28:53.661Z",
+      "createdAt": "2026-04-06T05:28:53.661Z"
+    },
+    "UniswapV3Factory#14": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x4E34fCEE9D99Bc7bf2309464BB6FCf4b24002ed2",
+      "txHash": "0x19e0c2199e3a88c9ef4e1cd90528edc75b983ff98a8323892783200953787c50",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#14",
+      "updatedAt": "2026-04-06T05:28:53.845Z",
+      "createdAt": "2026-04-06T05:28:53.845Z"
+    },
+    "WETH#29": {
+      "contractName": "WETH",
+      "address": "0x432e0A1BC8e07F83d2D33DCbE9a7525E535c9337",
+      "txHash": "0xe5dd9ea811397c67305e1ddaa57c7bde34c273d5f3d3d215c297152d7b549415",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#29",
+      "updatedAt": "2026-04-06T05:29:14.619Z",
+      "createdAt": "2026-04-06T05:29:14.619Z"
+    },
+    "UniFactory#15": {
+      "contractName": "UniFactory",
+      "address": "0xDAfbd598466Db157ce95E3167d35e0100Cc91201",
+      "txHash": "0xd2d9b0301b98e6d3a425ca2f9cfa321f2123bc7c143ab62a2da736eaeaca2dad",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#15",
+      "updatedAt": "2026-04-06T05:29:14.803Z",
+      "createdAt": "2026-04-06T05:29:14.803Z"
+    },
+    "WETH#30": {
+      "contractName": "WETH",
+      "address": "0xed23528C9EA82cCC50d1d342B2141AF0A6303544",
+      "txHash": "0x5711a7aee949bd4d1447b5eca70a21d65a5462e0c1085fb9da48bbc8db118d76",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#30",
+      "updatedAt": "2026-04-06T05:29:15.156Z",
+      "createdAt": "2026-04-06T05:29:15.156Z"
+    },
+    "UniswapV3Factory#15": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x584F2b598B3D9f6ED7e37928D140cD198d65719e",
+      "txHash": "0x106570163224aa6aec776032b64ee1a9d01c7070e66f10e2a27f831bd0dcf026",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#15",
+      "updatedAt": "2026-04-06T05:29:15.339Z",
+      "createdAt": "2026-04-06T05:29:15.339Z"
+    },
+    "WETH#31": {
+      "contractName": "WETH",
+      "address": "0xa6dF566fAc80De993c0515c37b5BeF913f29FCa6",
+      "txHash": "0x492984fce40d6f620765c0ea53f78459de9c2d267b6e52f2b84bd71f5ca79299",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#31",
+      "updatedAt": "2026-04-06T05:29:35.473Z",
+      "createdAt": "2026-04-06T05:29:35.473Z"
+    },
+    "UniFactory#16": {
+      "contractName": "UniFactory",
+      "address": "0x5194DeA68461c00B738E22f0c59d3619c66E30Be",
+      "txHash": "0x818d9d8abf0cb2106c1cd4543163432029441df83b5c5f84d6b56df39a80c339",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#16",
+      "updatedAt": "2026-04-06T05:29:35.681Z",
+      "createdAt": "2026-04-06T05:29:35.681Z"
+    },
+    "WETH#32": {
+      "contractName": "WETH",
+      "address": "0x8c311b86584aB6998149E90AdDa676045ac1B99c",
+      "txHash": "0x86db87fbef8d749850d7e013c93bb14ac0ac636dfbcb88f4f152d7cadad2c06c",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#32",
+      "updatedAt": "2026-04-06T05:29:36.045Z",
+      "createdAt": "2026-04-06T05:29:36.045Z"
+    },
+    "UniswapV3Factory#16": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x205Afa71148db8690AffCf62D74B352D73b870C4",
+      "txHash": "0xd9fcf20b0152eb2283039d22fd8e3b6a4d1a3b2a77d7262760915265e0780213",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#16",
+      "updatedAt": "2026-04-06T05:29:36.204Z",
+      "createdAt": "2026-04-06T05:29:36.204Z"
+    },
+    "WETH#33": {
+      "contractName": "WETH",
+      "address": "0x7Ba1BfcBC3159223b915998B594658D6262B06d8",
+      "txHash": "0xf9c6d1715a2c3d4b8d5437dddb7cd0b3da3f78d13a4a49e4de898441b7cadbeb",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#33",
+      "updatedAt": "2026-04-06T05:29:55.188Z",
+      "createdAt": "2026-04-06T05:29:55.188Z"
+    },
+    "UniFactory#17": {
+      "contractName": "UniFactory",
+      "address": "0xA4bD1022309236f0b0EF3da9A582d71461F94288",
+      "txHash": "0x61885ba947059fc61d9f384419d9e58f959934bffa2d4163b1f7d7df3348a0a2",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#17",
+      "updatedAt": "2026-04-06T05:29:55.387Z",
+      "createdAt": "2026-04-06T05:29:55.387Z"
+    },
+    "WETH#34": {
+      "contractName": "WETH",
+      "address": "0x06AB3c6aE9B0E3Abdd2fE4404Bf74D1C0f073e83",
+      "txHash": "0x67e6671767fe86d7f297c5c9ce3d0ff21463e3d97fab8ac4ba78fdafde159dfa",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#34",
+      "updatedAt": "2026-04-06T05:29:55.720Z",
+      "createdAt": "2026-04-06T05:29:55.720Z"
+    },
+    "UniswapV3Factory#17": {
+      "contractName": "UniswapV3Factory",
+      "address": "0xA39cccfCa302019843b2ECC7A4ea3142E6fA9157",
+      "txHash": "0xa8c7a95206fbd5c9640b5092ad243782f299bd72d231d57b251b62f90d3132b0",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#17",
+      "updatedAt": "2026-04-06T05:29:55.876Z",
+      "createdAt": "2026-04-06T05:29:55.876Z"
+    },
+    "WETH#35": {
+      "contractName": "WETH",
+      "address": "0x8a335f0e9909049EfFf6F852A82359af48C8e64A",
+      "txHash": "0x64056df9a9b6d48bc973bda5610841e04839b562ac389a0240cc4b0167935daf",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#35",
+      "updatedAt": "2026-04-06T05:30:16.336Z",
+      "createdAt": "2026-04-06T05:30:16.336Z"
+    },
+    "UniFactory#18": {
+      "contractName": "UniFactory",
+      "address": "0x7f0097A33D10015bc94201976739D97D11c73232",
+      "txHash": "0x49325326c1aa4860d85caf5b8e591029548ba6d747acdbae955f5285968c1887",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#18",
+      "updatedAt": "2026-04-06T05:30:16.538Z",
+      "createdAt": "2026-04-06T05:30:16.538Z"
+    },
+    "WETH#36": {
+      "contractName": "WETH",
+      "address": "0x261Fd761b76415518E036210e630374A1eB0E5a7",
+      "txHash": "0xdda33e365378be260ba58c5bfe651050ed633c2f1db99744b78bc46cb100cd9c",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#36",
+      "updatedAt": "2026-04-06T05:30:16.930Z",
+      "createdAt": "2026-04-06T05:30:16.930Z"
+    },
+    "UniswapV3Factory#18": {
+      "contractName": "UniswapV3Factory",
+      "address": "0xb5956E975323d8fA17dC84B9c48DE083831E100c",
+      "txHash": "0xf6cc0c059a93b9647afe25faf32f590469c87325071ed04604469740c37f673c",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#18",
+      "updatedAt": "2026-04-06T05:30:17.115Z",
+      "createdAt": "2026-04-06T05:30:17.115Z"
+    },
+    "WETH#37": {
+      "contractName": "WETH",
+      "address": "0x51254cf30e25F595B820a3001d250106868c26fB",
+      "txHash": "0x64f3ab17ee90e181850bc42a3eea0f2862d06fc25e8cea5b46e98eb1212e8854",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#37",
+      "updatedAt": "2026-04-06T05:30:37.113Z",
+      "createdAt": "2026-04-06T05:30:37.113Z"
+    },
+    "UniFactory#19": {
+      "contractName": "UniFactory",
+      "address": "0x122e0d74498F2225Ac29c6f8Ea0A566f82d1AAF4",
+      "txHash": "0x1f46c715a4c506fb2ff9a26b73e70e74239e37dfd8f8c0c70f8b8c9a4773828c",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#19",
+      "updatedAt": "2026-04-06T05:30:37.293Z",
+      "createdAt": "2026-04-06T05:30:37.293Z"
+    },
+    "WETH#38": {
+      "contractName": "WETH",
+      "address": "0x86cadb8860E4f66C6D99f5D950f28972b4aefd81",
+      "txHash": "0xddd27412741d7a8d3e2f3b0180af16ec69a5ba704da171834f6a5fbf9eaf6380",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#38",
+      "updatedAt": "2026-04-06T05:30:37.635Z",
+      "createdAt": "2026-04-06T05:30:37.635Z"
+    },
+    "UniswapV3Factory#19": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x8D9122bE7973F68646dB36bFD9f3981402439421",
+      "txHash": "0x0433ed85fe141721c8587fe2b4d49a12d45463eb98d1a7b4617f63a745db9a0a",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#19",
+      "updatedAt": "2026-04-06T05:30:37.785Z",
+      "createdAt": "2026-04-06T05:30:37.785Z"
+    },
+    "WETH#39": {
+      "contractName": "WETH",
+      "address": "0x690E753eD7D928b22EF9E8eca09BEcFAe9F53C36",
+      "txHash": "0xe719e0ef977a8606837793c4c739cc6707db75a8620baaa75c7cbf3900907976",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#39",
+      "updatedAt": "2026-04-06T05:30:51.497Z",
+      "createdAt": "2026-04-06T05:30:51.497Z"
+    },
+    "UniFactory#20": {
+      "contractName": "UniFactory",
+      "address": "0x7AEa64e089Ae8db4a21619e6D3132c2D943f26DA",
+      "txHash": "0x788096d162a8de7a8aefec7778e46066da3180e3f941d74c2384eb957cb8a31b",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#20",
+      "updatedAt": "2026-04-06T05:30:51.704Z",
+      "createdAt": "2026-04-06T05:30:51.704Z"
+    },
+    "WETH#40": {
+      "contractName": "WETH",
+      "address": "0xcE2bCd8cE79cBF959dDa44e03c0F4DD352274cFD",
+      "txHash": "0xabac01b547e26f83893a7691aaaca718d076c53bc3083fd2606f14f33d85e91b",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#40",
+      "updatedAt": "2026-04-06T05:30:52.018Z",
+      "createdAt": "2026-04-06T05:30:52.018Z"
+    },
+    "UniswapV3Factory#20": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x893E0aF4284c8a5824161262E81341f633B43039",
+      "txHash": "0xa96c76bbda227e0779d131ef3feb561b71e8cf13c55edad4b656ef62865b0321",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#20",
+      "updatedAt": "2026-04-06T05:30:52.181Z",
+      "createdAt": "2026-04-06T05:30:52.181Z"
+    },
+    "WETH#41": {
+      "contractName": "WETH",
+      "address": "0x22e21F5f0de781d5a379CCd1eABEa7E6761a318c",
+      "txHash": "0x6bb3f9a8ed8d14261670ed5172734c5b3b61f5e27654df4b5594f7f138635025",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#41",
+      "updatedAt": "2026-04-06T05:39:22.992Z",
+      "createdAt": "2026-04-06T05:39:22.992Z"
+    },
+    "UniFactory#21": {
+      "contractName": "UniFactory",
+      "address": "0x94eaA603Ae061FDEDf3a68a0F8360F4E960A3763",
+      "txHash": "0x9d56030ffa121cbf1074b69c5d1d608b11f98349d6eb13c5ccdbc661ae59083e",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#21",
+      "updatedAt": "2026-04-06T05:40:03.085Z",
+      "createdAt": "2026-04-06T05:40:03.085Z"
+    },
+    "WETH#42": {
+      "contractName": "WETH",
+      "address": "0x645D571EbDe1BA58B0068a660D6C8Cc2844a449E",
+      "txHash": "0x85b149980b03f36d57f795db58ead20a9afe52192f5a70e294896d3f1fb7d0c7",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#42",
+      "updatedAt": "2026-04-06T05:40:03.421Z",
+      "createdAt": "2026-04-06T05:40:03.421Z"
+    },
+    "UniswapV3Factory#21": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x4E34fCEE9D99Bc7bf2309464BB6FCf4b24002ed2",
+      "txHash": "0x81019a55d91f6ed7d6c4591e660dea78aee7e69713a62cbf5dcd8551373e3032",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#21",
+      "updatedAt": "2026-04-06T05:40:03.607Z",
+      "createdAt": "2026-04-06T05:40:03.607Z"
+    },
+    "WETH#43": {
+      "contractName": "WETH",
+      "address": "0x432e0A1BC8e07F83d2D33DCbE9a7525E535c9337",
+      "txHash": "0x8d0892015530e14f53ab397b1ee0da32f79d13e9a6081b696a970466435043c4",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#43",
+      "updatedAt": "2026-04-06T05:40:25.219Z",
+      "createdAt": "2026-04-06T05:40:25.219Z"
+    },
+    "UniFactory#22": {
+      "contractName": "UniFactory",
+      "address": "0xDAfbd598466Db157ce95E3167d35e0100Cc91201",
+      "txHash": "0x3d6d72b8ecabbe3c880faab31f5f64893f86768b00e944326bafa899e9ac445c",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#22",
+      "updatedAt": "2026-04-06T05:40:25.415Z",
+      "createdAt": "2026-04-06T05:40:25.415Z"
+    },
+    "WETH#44": {
+      "contractName": "WETH",
+      "address": "0xed23528C9EA82cCC50d1d342B2141AF0A6303544",
+      "txHash": "0x18bbdf2614f0134f22ddee6d0ebb8c23c3a51c0f6a43d4853aa7550243e2631f",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#44",
+      "updatedAt": "2026-04-06T05:40:25.773Z",
+      "createdAt": "2026-04-06T05:40:25.773Z"
+    },
+    "UniswapV3Factory#22": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x584F2b598B3D9f6ED7e37928D140cD198d65719e",
+      "txHash": "0x9ff613f319a992558d7b92540c9d82255b3114fd45d93028248737efcb386660",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#22",
+      "updatedAt": "2026-04-06T05:40:25.932Z",
+      "createdAt": "2026-04-06T05:40:25.932Z"
+    },
+    "WETH#45": {
+      "contractName": "WETH",
+      "address": "0xa6dF566fAc80De993c0515c37b5BeF913f29FCa6",
+      "txHash": "0x4ed2cbce3d559465c1fb0d2254da43aa15acad6ba467f2272d0e5eb0d8fb27c4",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#45",
+      "updatedAt": "2026-04-06T05:40:45.806Z",
+      "createdAt": "2026-04-06T05:40:45.806Z"
+    },
+    "UniFactory#23": {
+      "contractName": "UniFactory",
+      "address": "0x5194DeA68461c00B738E22f0c59d3619c66E30Be",
+      "txHash": "0x5e9b5bbfa6e41d442d61d2a908b592c509a30f567b1d40042a5061b56a7c4231",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#23",
+      "updatedAt": "2026-04-06T05:40:46.015Z",
+      "createdAt": "2026-04-06T05:40:46.015Z"
+    },
+    "WETH#46": {
+      "contractName": "WETH",
+      "address": "0x8c311b86584aB6998149E90AdDa676045ac1B99c",
+      "txHash": "0x22784a475d09cc31fb452b6d05d2e55427be659a1547adbe39e5afaaba10bfdc",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#46",
+      "updatedAt": "2026-04-06T05:40:46.377Z",
+      "createdAt": "2026-04-06T05:40:46.377Z"
+    },
+    "UniswapV3Factory#23": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x205Afa71148db8690AffCf62D74B352D73b870C4",
+      "txHash": "0x3630091e338281461cd33468b303c0bdfd9c0ef1708b4d8ebb6c1304c67f38c4",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#23",
+      "updatedAt": "2026-04-06T05:40:46.550Z",
+      "createdAt": "2026-04-06T05:40:46.550Z"
+    },
+    "WETH#47": {
+      "contractName": "WETH",
+      "address": "0x7Ba1BfcBC3159223b915998B594658D6262B06d8",
+      "txHash": "0x22961bbb292e9c987e235bdc96d9941ff1f88c771909c09baaf07dd5926170bf",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#47",
+      "updatedAt": "2026-04-06T05:41:08.419Z",
+      "createdAt": "2026-04-06T05:41:08.419Z"
+    },
+    "UniFactory#24": {
+      "contractName": "UniFactory",
+      "address": "0xA4bD1022309236f0b0EF3da9A582d71461F94288",
+      "txHash": "0x692efeae79ec0dc21d4b5b443de2a422714222e04a793e43db5dec348cac6979",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#24",
+      "updatedAt": "2026-04-06T05:41:08.613Z",
+      "createdAt": "2026-04-06T05:41:08.613Z"
+    },
+    "WETH#48": {
+      "contractName": "WETH",
+      "address": "0x06AB3c6aE9B0E3Abdd2fE4404Bf74D1C0f073e83",
+      "txHash": "0xd486db759940ec85812974165c82d76ec9ec71c2b1f498859976354969a0a33e",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#48",
+      "updatedAt": "2026-04-06T05:41:08.944Z",
+      "createdAt": "2026-04-06T05:41:08.944Z"
+    },
+    "UniswapV3Factory#24": {
+      "contractName": "UniswapV3Factory",
+      "address": "0xA39cccfCa302019843b2ECC7A4ea3142E6fA9157",
+      "txHash": "0xa322e564c81f1bb15c9c7292399c1ee04bb6d40b9c849a2e4baee6eb10b71230",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#24",
+      "updatedAt": "2026-04-06T05:41:09.100Z",
+      "createdAt": "2026-04-06T05:41:09.100Z"
+    },
+    "WETH#49": {
+      "contractName": "WETH",
+      "address": "0x8B1288A6CC0E63Ee398860CC67fd8C52d8bf3cC8",
+      "txHash": "0xd330071ea67919873b65473daa76c2376ef80608bbf1b1ecb0f1d07152a01fb2",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#49",
+      "updatedAt": "2026-04-06T05:49:34.229Z",
+      "createdAt": "2026-04-06T05:49:34.229Z"
+    },
+    "UniFactory#25": {
+      "contractName": "UniFactory",
+      "address": "0x1a4b57934d0ED0B547A8C0C4F821e43A4dc58460",
+      "txHash": "0x1cdf3a0183aba65589fe2dc13e544997d87081c07f11a76c2ed5bea5475f9321",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#25",
+      "updatedAt": "2026-04-06T05:49:34.407Z",
+      "createdAt": "2026-04-06T05:49:34.407Z"
+    },
+    "WETH#50": {
+      "contractName": "WETH",
+      "address": "0x3EF5DDbaF1c643e59e082cDEec6F2256Ce8EFFF5",
+      "txHash": "0xbe65f34218d3566756d2cc76491eed9a303353f421fe5e5fc7553cd91dbe4119",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#50",
+      "updatedAt": "2026-04-06T05:49:50.918Z",
+      "createdAt": "2026-04-06T05:49:50.918Z"
+    },
+    "UniswapV3Factory#25": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x18316Eccb995480f440ca9971595555E38Cf00Dc",
+      "txHash": "0xdbb56c999ebe68c2ade22f20a45c8357cd9b8b2fe3be6fc69e2a4f3b229b2ae7",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#25",
+      "updatedAt": "2026-04-06T05:49:51.102Z",
+      "createdAt": "2026-04-06T05:49:51.102Z"
+    },
+    "WETH#51": {
+      "contractName": "WETH",
+      "address": "0xbaa57cd8DECD30e6536018953EDd784Bc4e1c791",
+      "txHash": "0xccaa5303e595fcdb4cfc99b11e638d40fa12541180ede9d5f44984b175785c95",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#51",
+      "updatedAt": "2026-04-06T05:50:34.251Z",
+      "createdAt": "2026-04-06T05:50:34.251Z"
+    },
+    "UniFactory#26": {
+      "contractName": "UniFactory",
+      "address": "0xA3A48039d4DdB481D40aC6fafD753cC5101689Be",
+      "txHash": "0xfb4a40828f963c01403911fa85eaa74a110a913b3756b040fc3b2b7b649e9c42",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#26",
+      "updatedAt": "2026-04-06T05:50:34.454Z",
+      "createdAt": "2026-04-06T05:50:34.454Z"
+    },
+    "WETH#52": {
+      "contractName": "WETH",
+      "address": "0xF6fd599270d786C685b42A82868634f6a427e44e",
+      "txHash": "0x49a0a2c3be6377a6aef937f096736c9c8304cea8070e634b3bdd0a9e9f25bd55",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#52",
+      "updatedAt": "2026-04-06T05:50:49.701Z",
+      "createdAt": "2026-04-06T05:50:49.701Z"
+    },
+    "UniswapV3Factory#26": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x203b10933d0889981E65107f46071Aa3a6E3B98A",
+      "txHash": "0xa9b046d17825d7099ea08318bbf18bbcd03bfdb363f55122b11b208e16dae8e0",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#26",
+      "updatedAt": "2026-04-06T05:50:49.886Z",
+      "createdAt": "2026-04-06T05:50:49.886Z"
+    },
+    "WETH#53": {
+      "contractName": "WETH",
+      "address": "0xdD7579c6D7E55683eFaCa86e9A9ACA4B84Ccc3aA",
+      "txHash": "0xd5dc659582441aeb86f4f8eb1bee131e072a6e2e93df95c47d068c4d19b4d78a",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#53",
+      "updatedAt": "2026-04-06T05:51:24.540Z",
+      "createdAt": "2026-04-06T05:51:24.540Z"
+    },
+    "UniFactory#27": {
+      "contractName": "UniFactory",
+      "address": "0x6316fe4DB2e9A0f22c2C4C6B4AE5A63C5113D9e3",
+      "txHash": "0x4d0ccb82f8f78d73258818b21a857295368ca07a80be5fc345e830353e5a6e4f",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#27",
+      "updatedAt": "2026-04-06T05:51:24.710Z",
+      "createdAt": "2026-04-06T05:51:24.710Z"
+    },
+    "WETH#54": {
+      "contractName": "WETH",
+      "address": "0x1e4510Df62B0e27E6ff8BEb2B2546Bef7B0D4159",
+      "txHash": "0x7e88add9963be865fab206cb1acbffcaf539d61dde667f67271f7d6c7b84df85",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#54",
+      "updatedAt": "2026-04-06T05:51:56.725Z",
+      "createdAt": "2026-04-06T05:51:56.725Z"
+    },
+    "UniFactory#28": {
+      "contractName": "UniFactory",
+      "address": "0x22491a162130fDeE8B0AdB6b7743859dA9E11Dc9",
+      "txHash": "0xb87302a743f26b50e844ddcaa0e62fbb6ba2e3964517139059a710375e441986",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#28",
+      "updatedAt": "2026-04-06T05:51:56.905Z",
+      "createdAt": "2026-04-06T05:51:56.905Z"
+    },
+    "Router": {
+      "contractName": "Router",
+      "address": "0x1abC0be95A898ddB6468896D4694DCC4d04c658B",
+      "txHash": "0xaee7b85394de4ff6f211fde7e8bd3c1dfb4682e73e79f3fa12c8779d9b469b7a",
+      "sourceName": "mocks/MockUniswapV2Router02.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Router02/Router.json",
+      "deploymentKey": "Router",
+      "updatedAt": "2026-04-06T05:51:57.090Z",
+      "createdAt": "2026-04-06T05:51:57.090Z"
+    },
+    "WETH#55": {
+      "contractName": "WETH",
+      "address": "0x39557bB4915C8Ba0872D466568CbdF1aD0b14E0B",
+      "txHash": "0xd034189f81474c002be8fbbd48ecdcfb5528ea117f599ce11b0bc0a2001e7a55",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#55",
+      "updatedAt": "2026-04-06T05:52:12.995Z",
+      "createdAt": "2026-04-06T05:52:12.995Z"
+    },
+    "UniswapV3Factory#27": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x6f33a5A0D102d6281f37648cb4B8c4e801FbfDa3",
+      "txHash": "0xab8cb73ba3d0476bada08dcbaad092ee4ca93573165dd3e7a31fb47fb08ed676",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#27",
+      "updatedAt": "2026-04-06T05:52:13.192Z",
+      "createdAt": "2026-04-06T05:52:13.192Z"
+    },
+    "SwapRouter": {
+      "contractName": "SwapRouter",
+      "address": "0x2c99b4d949B8cB00a1f5fCaFC2Db22bCD657e981",
+      "txHash": "0xf3013a236d21d054dbd6f449ff5ba3e586c147a9c38e1a67107982c4e8985a9d",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/SwapRouter.json",
+      "deploymentKey": "SwapRouter",
+      "updatedAt": "2026-04-06T05:52:13.669Z",
+      "createdAt": "2026-04-06T05:52:13.669Z"
+    },
+    "Quoter": {
+      "contractName": "Quoter",
+      "address": "0x3E8cd62D8A82fe403193B199016866431565b1b1",
+      "txHash": "0x253802f0e1b38d5ed4fa024491b24b4bf95a93128ce7ffde15c63b575e816561",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/Quoter.json",
+      "deploymentKey": "Quoter",
+      "updatedAt": "2026-04-06T05:52:13.833Z",
+      "createdAt": "2026-04-06T05:52:13.833Z"
+    },
+    "QuoterV2": {
+      "contractName": "QuoterV2",
+      "address": "0x4C1DdA0C79375033cA00BE8c65f08E8F151eE328",
+      "txHash": "0x2b96ce13c30ae1c5ef6a298d48f773e4071ce9f29bfd79359445a35733c88276",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/QuoterV2.json",
+      "deploymentKey": "QuoterV2",
+      "updatedAt": "2026-04-06T05:52:13.996Z",
+      "createdAt": "2026-04-06T05:52:13.996Z"
+    },
+    "NonfungiblePositionManager": {
+      "contractName": "NonfungiblePositionManager",
+      "address": "0xA85c63d1C1093A2767e91E8Ac8c230363Fbe1725",
+      "txHash": "0x22df416a48d5a3871f42a77dff3ba224f76693190f00fd50772cbd3e479d137b",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/NonfungiblePositionManager.json",
+      "deploymentKey": "NonfungiblePositionManager",
+      "updatedAt": "2026-04-06T05:52:14.158Z",
+      "createdAt": "2026-04-06T05:52:14.158Z"
+    },
+    "WETH#56": {
+      "contractName": "WETH",
+      "address": "0xca10fBAbAC679013F70b2D1e52D8a95fbe0cf2c4",
+      "txHash": "0xecf00e3121d77c94efad6b7be95ec1824aac36f5bc2ba4f02db80ea144397be9",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#56",
+      "updatedAt": "2026-04-06T05:53:04.394Z",
+      "createdAt": "2026-04-06T05:53:04.394Z"
+    },
+    "UniFactory#29": {
+      "contractName": "UniFactory",
+      "address": "0x86Bdc33108d41220efDB49bCC44f929E4e0961B9",
+      "txHash": "0xeda0d9c3c4d73266b891d7acbaa510c8df4e2908f585747b4f193293030960de",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#29",
+      "updatedAt": "2026-04-06T05:53:04.597Z",
+      "createdAt": "2026-04-06T05:53:04.597Z"
+    },
+    "Router#2": {
+      "contractName": "Router",
+      "address": "0xF42bAf80209215119368bb7Ade9EDc62E6Df1abe",
+      "txHash": "0xd4ec34b513426f5ae842631284bb2cce09527e7b4e25cb15ad713c2e9b4e773c",
+      "sourceName": "mocks/MockUniswapV2Router02.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Router02/Router.json",
+      "deploymentKey": "Router#2",
+      "updatedAt": "2026-04-06T05:53:04.776Z",
+      "createdAt": "2026-04-06T05:53:04.776Z"
+    },
+    "WETH#57": {
+      "contractName": "WETH",
+      "address": "0x6c1C447e0C1F6A53Fb1D7D0459bd7392F0f29bB2",
+      "txHash": "0x880dae48fb5e567d1885280a47ebc9a0eec43599cc4f3262b3f8f400a00596b4",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#57",
+      "updatedAt": "2026-04-06T05:53:22.815Z",
+      "createdAt": "2026-04-06T05:53:22.815Z"
+    },
+    "UniswapV3Factory#28": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x169F4F7525a604df66929011dfB14359D3F5B999",
+      "txHash": "0x3cfea089624422ba42e22cd24f5024d3993e900767bcdd578513d9de2f7f9a40",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#28",
+      "updatedAt": "2026-04-06T05:53:23.018Z",
+      "createdAt": "2026-04-06T05:53:23.018Z"
+    },
+    "SwapRouter#2": {
+      "contractName": "SwapRouter",
+      "address": "0x247B63895630684C82fb5788d86F0e886c3e0B2E",
+      "txHash": "0xab01c3f4e07b3ca94d626e90d217ad414b71bb47e01357dbce835d74eefb8c82",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/SwapRouter.json",
+      "deploymentKey": "SwapRouter#2",
+      "updatedAt": "2026-04-06T05:53:23.205Z",
+      "createdAt": "2026-04-06T05:53:23.205Z"
+    },
+    "Quoter#2": {
+      "contractName": "Quoter",
+      "address": "0xe393217F65c6F02aC124526aD1b40f9747220d70",
+      "txHash": "0x75a07fad8df2c003e25bad86e3ea317c70d30a81d394ee3720479205748ee3e7",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/Quoter.json",
+      "deploymentKey": "Quoter#2",
+      "updatedAt": "2026-04-06T05:53:23.378Z",
+      "createdAt": "2026-04-06T05:53:23.378Z"
+    },
+    "QuoterV2#2": {
+      "contractName": "QuoterV2",
+      "address": "0x1E5c502d5F43f59A797149FfB4725e91d2Ac7c04",
+      "txHash": "0x9dcab6d32c4334d6b85ce39bce43ed0bf78f0180261639359fd9430562a194af",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/QuoterV2.json",
+      "deploymentKey": "QuoterV2#2",
+      "updatedAt": "2026-04-06T05:53:23.615Z",
+      "createdAt": "2026-04-06T05:53:23.615Z"
+    },
+    "NonfungiblePositionManager#2": {
+      "contractName": "NonfungiblePositionManager",
+      "address": "0x8e3a2De25e6E02Bb44781A1Bc0206EA35b2C0274",
+      "txHash": "0xa438dd13639632c344c599ebc15e1aa4a7b54382417c89fd09f421102a08f736",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/NonfungiblePositionManager.json",
+      "deploymentKey": "NonfungiblePositionManager#2",
+      "updatedAt": "2026-04-06T05:53:23.799Z",
+      "createdAt": "2026-04-06T05:53:23.799Z"
+    },
+    "WETH#58": {
+      "contractName": "WETH",
+      "address": "0xf9a01EA7266Ca524FD6B6c8408BE4c6441207575",
+      "txHash": "0x3d2fda6214b0b876c09e18cdcbc90d48dc03f67afb0def655c751aa58bac4a3f",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#58",
+      "updatedAt": "2026-04-06T05:54:40.372Z",
+      "createdAt": "2026-04-06T05:54:40.372Z"
+    },
+    "UniFactory#30": {
+      "contractName": "UniFactory",
+      "address": "0x38608Fef56786b1e151Ae9f2E98F6B2AF53E1895",
+      "txHash": "0xe86e2439e94f968e7ab558f8ba0747f6fa95075004053d1fd241cc8fc5b09487",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#30",
+      "updatedAt": "2026-04-06T05:54:40.550Z",
+      "createdAt": "2026-04-06T05:54:40.550Z"
+    },
+    "Router#3": {
+      "contractName": "Router",
+      "address": "0xCaB0a7C0a08d5C99e769076f58537FAbAc018e91",
+      "txHash": "0xed31d13a880d0bc9fd1ef0378af873517519565b8d30e6d7420d508bf3c601bd",
+      "sourceName": "mocks/MockUniswapV2Router02.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Router02/Router.json",
+      "deploymentKey": "Router#3",
+      "updatedAt": "2026-04-06T05:54:40.770Z",
+      "createdAt": "2026-04-06T05:54:40.770Z"
+    },
+    "WETH#59": {
+      "contractName": "WETH",
+      "address": "0xa2638E0277d5C2d71fc448fF220bd6907de6965E",
+      "txHash": "0x3b67ecf079da2a70cc0373ef5c2e79c08de1150c2e9db6e3796e4436b3b664bd",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#59",
+      "updatedAt": "2026-04-06T05:55:00.734Z",
+      "createdAt": "2026-04-06T05:55:00.734Z"
+    },
+    "UniswapV3Factory#29": {
+      "contractName": "UniswapV3Factory",
+      "address": "0xd30d7De9e06dE04D77fFA7f40Be8764c59997672",
+      "txHash": "0x10c58839a0b6d3fa9fa1bfd57379ffb584ceb7571b57d1b5a54226ca03764a05",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#29",
+      "updatedAt": "2026-04-06T05:55:00.915Z",
+      "createdAt": "2026-04-06T05:55:00.915Z"
+    },
+    "SwapRouter#3": {
+      "contractName": "SwapRouter",
+      "address": "0x3d85Da12c9579D9968D33aA7c4D0f63024E1F6fe",
+      "txHash": "0x5ed9938f73aa619092efa6ce4718804f10226b8541b064ba19d40741d0e1f7d8",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/SwapRouter.json",
+      "deploymentKey": "SwapRouter#3",
+      "updatedAt": "2026-04-06T05:55:01.078Z",
+      "createdAt": "2026-04-06T05:55:01.078Z"
+    },
+    "QuoterV2#3": {
+      "contractName": "QuoterV2",
+      "address": "0xC660b8431346717d2D1a7361833c4c4b424c85C5",
+      "txHash": "0xead056eaad6ffcce35ee37b3a5856b928a6e40b6cbfbb8571a1f441576b11535",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/QuoterV2.json",
+      "deploymentKey": "QuoterV2#3",
+      "updatedAt": "2026-04-06T05:55:01.234Z",
+      "createdAt": "2026-04-06T05:55:01.234Z"
+    },
+    "NonfungiblePositionManager#3": {
+      "contractName": "NonfungiblePositionManager",
+      "address": "0x6DE8843b235F94951dE09447Ba8800D4686222Af",
+      "txHash": "0x7c06847a7316a496a0c04b009ffe9be776caa8c6991e2afac4bb24c9fbae8e64",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/NonfungiblePositionManager.json",
+      "deploymentKey": "NonfungiblePositionManager#3",
+      "updatedAt": "2026-04-06T05:55:01.407Z",
+      "createdAt": "2026-04-06T05:55:01.407Z"
+    },
+    "WETH#60": {
+      "contractName": "WETH",
+      "address": "0x3Ebf4D22113b86CCf45dfD29E7A25fcAE0CDcC5a",
+      "txHash": "0xb7fa3ff75fe1a21ed6462a4e4dd23de5f8ac45528b83a6a4fa7835d44035d5fb",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#60",
+      "updatedAt": "2026-04-06T05:55:50.944Z",
+      "createdAt": "2026-04-06T05:55:50.944Z"
+    },
+    "UniFactory#31": {
+      "contractName": "UniFactory",
+      "address": "0x639309A4e313a7f5c14039625BEcfe7E55b56542",
+      "txHash": "0xb440cbddaf3cd04a46010a1c6f3b8ad7d40fec3baf9875bdd87009a645758a25",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#31",
+      "updatedAt": "2026-04-06T05:55:51.124Z",
+      "createdAt": "2026-04-06T05:55:51.124Z"
+    },
+    "Router#4": {
+      "contractName": "Router",
+      "address": "0xb1C3f503c0C208dA5305DfA40e91F3543c87aB09",
+      "txHash": "0x133ba0ecae70527e512dab6ce01e4b97b14eebaa8931e1301f71eff49aa91778",
+      "sourceName": "mocks/MockUniswapV2Router02.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Router02/Router.json",
+      "deploymentKey": "Router#4",
+      "updatedAt": "2026-04-06T05:55:51.310Z",
+      "createdAt": "2026-04-06T05:55:51.310Z"
+    },
+    "WETH#61": {
+      "contractName": "WETH",
+      "address": "0xef62991d6e9d9917AD9200498554937c1C1dFFC0",
+      "txHash": "0xf442fe8241a3e6645b9620b41ff31e2231728cf723c79b50e1aac53955dafc5b",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#61",
+      "updatedAt": "2026-04-06T05:56:08.838Z",
+      "createdAt": "2026-04-06T05:56:08.838Z"
+    },
+    "UniswapV3Factory#30": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x51E1bABA1986E1e0E2510f8D1f105daD0A60619a",
+      "txHash": "0xe363da876e3e5da41bfb2058d6ad271d43c1850310f1915e46248a6d9c84e59b",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#30",
+      "updatedAt": "2026-04-06T05:56:09.015Z",
+      "createdAt": "2026-04-06T05:56:09.015Z"
+    },
+    "SwapRouter#4": {
+      "contractName": "SwapRouter",
+      "address": "0x53A0804d32BF884AE32B811f46bA9e75A8053DBd",
+      "txHash": "0x249afe24a6862c69f58c2549a319dcfd43dd3b2ec84f1f27d3265ce660a75c6a",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/SwapRouter.json",
+      "deploymentKey": "SwapRouter#4",
+      "updatedAt": "2026-04-06T05:56:09.231Z",
+      "createdAt": "2026-04-06T05:56:09.231Z"
+    },
+    "QuoterV2#4": {
+      "contractName": "QuoterV2",
+      "address": "0xC088888D365ce7742869F66E7a4F839C967977d1",
+      "txHash": "0x2646b8da0ce1a70f4a13c423dc677481be02b76f30ee54cc0b79492934b6b193",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/QuoterV2.json",
+      "deploymentKey": "QuoterV2#4",
+      "updatedAt": "2026-04-06T05:56:09.393Z",
+      "createdAt": "2026-04-06T05:56:09.393Z"
+    },
+    "NonfungiblePositionManager#4": {
+      "contractName": "NonfungiblePositionManager",
+      "address": "0xc406Ca166839c80A81e3eA819132a0Bf0604272c",
+      "txHash": "0x99b167b88a7c199e35d962b085fa0c151b59935ca9e130b0a514d95d61ffcd6a",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/NonfungiblePositionManager.json",
+      "deploymentKey": "NonfungiblePositionManager#4",
+      "updatedAt": "2026-04-06T05:56:09.563Z",
+      "createdAt": "2026-04-06T05:56:09.563Z"
+    },
+    "WETH#62": {
+      "contractName": "WETH",
+      "address": "0xf3508F828EBC66d2a26bdD6ce1D9BcD4814E2a2d",
+      "txHash": "0x9678f5792a8aec3216ba4b98598a44441a7915803f0aa6a3083fead804e88336",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#62",
+      "updatedAt": "2026-04-06T05:58:19.585Z",
+      "createdAt": "2026-04-06T05:58:19.585Z"
+    },
+    "UniFactory#32": {
+      "contractName": "UniFactory",
+      "address": "0x28B802D8714F11E9b7fF04b13fE4F15E86Cce353",
+      "txHash": "0xfdf0acada256e6fbf6caeb5ad8350b9f285de31e71ca1feef1ced9be24519997",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#32",
+      "updatedAt": "2026-04-06T05:58:19.912Z",
+      "createdAt": "2026-04-06T05:58:19.912Z"
+    },
+    "Router#5": {
+      "contractName": "Router",
+      "address": "0x5386199246b784084c255C016b969921A7EcB3c2",
+      "txHash": "0x01800ffe883607b97c25c79d77a0ca8594bdea7b58d39ddb7c1591e66165b50a",
+      "sourceName": "mocks/MockUniswapV2Router02.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Router02/Router.json",
+      "deploymentKey": "Router#5",
+      "updatedAt": "2026-04-06T05:58:20.193Z",
+      "createdAt": "2026-04-06T05:58:20.193Z"
+    },
+    "WETH#63": {
+      "contractName": "WETH",
+      "address": "0x0180cc334F07711217Cb2dA95816156dc80ACBEC",
+      "txHash": "0x74216f262c15377045e42b3c2f960ba9bb57e215379153dafcb0351b4c1b0562",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#63",
+      "updatedAt": "2026-04-06T05:58:44.726Z",
+      "createdAt": "2026-04-06T05:58:44.726Z"
+    },
+    "UniswapV3Factory#31": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x10a4915648674b839D3c075aE16bf936bfa90E88",
+      "txHash": "0x93c8b98e626ee5f0dcc062e4b972dbcf96d043b04bd484e81a09c219558a0cd4",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#31",
+      "updatedAt": "2026-04-06T05:58:44.927Z",
+      "createdAt": "2026-04-06T05:58:44.927Z"
+    },
+    "SwapRouter#5": {
+      "contractName": "SwapRouter",
+      "address": "0x85b4cabD0DcbC9B7f359423Db749A509E6D52F22",
+      "txHash": "0x130e2096a6b190b380eb272685e9da301ba5b04ee002c356e254f5e7dfca13f3",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/SwapRouter.json",
+      "deploymentKey": "SwapRouter#5",
+      "updatedAt": "2026-04-06T05:58:45.134Z",
+      "createdAt": "2026-04-06T05:58:45.134Z"
+    },
+    "QuoterV2#5": {
+      "contractName": "QuoterV2",
+      "address": "0x2a2bA6525A4418A94Dc1f07fc63Ceda4D4Ed30d4",
+      "txHash": "0xa69ab0f1e6fcc615114c6342822d79b469507ae0c947511b5ed44a90c288c9d2",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/QuoterV2.json",
+      "deploymentKey": "QuoterV2#5",
+      "updatedAt": "2026-04-06T05:58:45.339Z",
+      "createdAt": "2026-04-06T05:58:45.339Z"
+    },
+    "NonfungiblePositionManager#5": {
+      "contractName": "NonfungiblePositionManager",
+      "address": "0x00B375a75341AB9418D31Ad0Cd3344fAD1a3902f",
+      "txHash": "0x52f06b063c2e6f7a9109c8af0d1ffa63e0275f6ae50eb6f8e5638bbaf8536b96",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/NonfungiblePositionManager.json",
+      "deploymentKey": "NonfungiblePositionManager#5",
+      "updatedAt": "2026-04-06T05:58:45.568Z",
+      "createdAt": "2026-04-06T05:58:45.568Z"
+    },
+    "WETH#64": {
+      "contractName": "WETH",
+      "address": "0x58493F7918ad9ED3E2E360AC7d97943E1D0C21D1",
+      "txHash": "0x58f8794a2e7ea539690db60e3244c7a900eb93d73db07562f3d3b60cb4faf887",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#64",
+      "updatedAt": "2026-04-06T12:22:45.847Z",
+      "createdAt": "2026-04-06T12:22:45.847Z"
+    },
+    "UniFactory#33": {
+      "contractName": "UniFactory",
+      "address": "0x35ca4bcCc271eAB5D46017ABC1167E9057Ac400F",
+      "txHash": "0xd13132a1864af68c17dc4fb22e500036fe0e4e80ec429adf87f2c10ab6e1e425",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#33",
+      "updatedAt": "2026-04-06T12:22:46.565Z",
+      "createdAt": "2026-04-06T12:22:46.565Z"
+    },
+    "Router#6": {
+      "contractName": "Router",
+      "address": "0x2bfFF0455910016297F395d143059C8B771e13Af",
+      "txHash": "0x174de6bf27f3aa73eb76ae2c3cc25dfddcfb8b79c5514faf2501681be1106e20",
+      "sourceName": "mocks/MockUniswapV2Router02.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Router02/Router.json",
+      "deploymentKey": "Router#6",
+      "updatedAt": "2026-04-06T12:22:46.840Z",
+      "createdAt": "2026-04-06T12:22:46.840Z"
+    },
+    "WETH#65": {
+      "contractName": "WETH",
+      "address": "0xE17453fA313D03FcB071D85982BfA0678bff225a",
+      "txHash": "0xf1ae48ba5773e65b9fa5bcb6bc98eedf64c9bf2d0a2a1aa72101bbb60ecce3e0",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#65",
+      "updatedAt": "2026-04-06T12:22:49.051Z",
+      "createdAt": "2026-04-06T12:22:49.051Z"
+    },
+    "UniswapV3Factory#32": {
+      "contractName": "UniswapV3Factory",
+      "address": "0x49Db52a95dc00E28F96eae20907A316E3eFD9D0B",
+      "txHash": "0xeb5e72088d09f32e9cbecdb0f7d2e014afb2256fe26c7578e6d0881c71be97b3",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#32",
+      "updatedAt": "2026-04-06T12:22:49.248Z",
+      "createdAt": "2026-04-06T12:22:49.248Z"
+    },
+    "SwapRouter#6": {
+      "contractName": "SwapRouter",
+      "address": "0x6DB640C63486F2990B8e1a2f20D1a73AA6A8334d",
+      "txHash": "0xd437fe2964a83adc9360fef9977fc2090432cf8a6430c350883a639732acf883",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/SwapRouter.json",
+      "deploymentKey": "SwapRouter#6",
+      "updatedAt": "2026-04-06T12:22:49.506Z",
+      "createdAt": "2026-04-06T12:22:49.506Z"
+    },
+    "QuoterV2#6": {
+      "contractName": "QuoterV2",
+      "address": "0x56Fac19C206e5189C687ecc0281581E0E7717256",
+      "txHash": "0x96cfa1ff72c8c8b43c832a925e16ad77f80694cc90547632fc79506fbacc788a",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/QuoterV2.json",
+      "deploymentKey": "QuoterV2#6",
+      "updatedAt": "2026-04-06T12:22:49.931Z",
+      "createdAt": "2026-04-06T12:22:49.931Z"
+    },
+    "NonfungiblePositionManager#6": {
+      "contractName": "NonfungiblePositionManager",
+      "address": "0x53C4f148dda518CBE70f69444491EE5B6aF9DFB2",
+      "txHash": "0x9a4ee5874942bc50351f00dcfc26d45760ef524c63073098bdc70260b655cbf0",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/NonfungiblePositionManager.json",
+      "deploymentKey": "NonfungiblePositionManager#6",
+      "updatedAt": "2026-04-06T12:22:50.157Z",
+      "createdAt": "2026-04-06T12:22:50.157Z"
+    },
+    "WETH#66": {
+      "contractName": "WETH",
+      "address": "0x3b73763981c227221579Decf092ccd3F7C843322",
+      "txHash": "0x7bac77ce537de7d37f8dc88cb2f129e5eecf23b0bc07d93b633ad049251d0c46",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#66",
+      "updatedAt": "2026-04-06T12:26:15.741Z",
+      "createdAt": "2026-04-06T12:26:15.741Z"
+    },
+    "UniFactory#34": {
+      "contractName": "UniFactory",
+      "address": "0x8f53a01DbFE1431AB3fFBFf23aB0627B47Ae7B3C",
+      "txHash": "0x27be0cad0ab12d809383f95f787f3ceca8f19e0d55d546cbac737cbbeb7a2ca2",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#34",
+      "updatedAt": "2026-04-06T12:26:15.939Z",
+      "createdAt": "2026-04-06T12:26:15.939Z"
+    },
+    "Router#7": {
+      "contractName": "Router",
+      "address": "0xa12A9f5DBb08981fad5c14049208f797A7a424e7",
+      "txHash": "0x5bddcd6da8972546cb3363bb4ea622b19caee39d6286a5c5e1a6b2c3d918b129",
+      "sourceName": "mocks/MockUniswapV2Router02.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Router02/Router.json",
+      "deploymentKey": "Router#7",
+      "updatedAt": "2026-04-06T12:26:16.145Z",
+      "createdAt": "2026-04-06T12:26:16.145Z"
+    },
+    "WETH#67": {
+      "contractName": "WETH",
+      "address": "0xa8696b36308e593ac1DFECecFc01074Bd970BA61",
+      "txHash": "0x46cf627f01c60a28e2dba734a35636c17513197607a3c22cf7d84976e576e8df",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#67",
+      "updatedAt": "2026-04-06T12:26:18.269Z",
+      "createdAt": "2026-04-06T12:26:18.269Z"
+    },
+    "UniswapV3Factory#33": {
+      "contractName": "UniswapV3Factory",
+      "address": "0xa2947B75564557317E3501484F34e0b827C63106",
+      "txHash": "0x4e9e8783da302c6f53a3a3e88b7781aafd6e725da0dc99c482726f45a346dbba",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#33",
+      "updatedAt": "2026-04-06T12:26:18.489Z",
+      "createdAt": "2026-04-06T12:26:18.489Z"
+    },
+    "SwapRouter#7": {
+      "contractName": "SwapRouter",
+      "address": "0xc40F774B5F6C95e938510a0722BB2029675A9448",
+      "txHash": "0x1d5fcd72c89695f626d3767e08a40a75758056b07bafb34cec1f1095e3185e09",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/SwapRouter.json",
+      "deploymentKey": "SwapRouter#7",
+      "updatedAt": "2026-04-06T12:26:18.669Z",
+      "createdAt": "2026-04-06T12:26:18.669Z"
+    },
+    "QuoterV2#7": {
+      "contractName": "QuoterV2",
+      "address": "0x16570762C2541A601Ad388306a4b3ab3D749Bc12",
+      "txHash": "0x169ee556412fdfc90d11d18ecf849f14e43b7749b448cd56071a14535dadcf21",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/QuoterV2.json",
+      "deploymentKey": "QuoterV2#7",
+      "updatedAt": "2026-04-06T12:26:18.856Z",
+      "createdAt": "2026-04-06T12:26:18.856Z"
+    },
+    "NonfungiblePositionManager#7": {
+      "contractName": "NonfungiblePositionManager",
+      "address": "0xbD8298422fD6E47885747F821f012833B2dd24ee",
+      "txHash": "0x11b117b28c229a0a2bba227853601f98f13b9401dc8e3103d0b934e24851f678",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/NonfungiblePositionManager.json",
+      "deploymentKey": "NonfungiblePositionManager#7",
+      "updatedAt": "2026-04-06T12:26:19.090Z",
+      "createdAt": "2026-04-06T12:26:19.090Z"
+    },
+    "WETH#68": {
+      "contractName": "WETH",
+      "address": "0x0e526ABd34f9f3eD2e316eab72293B824EDf3F4D",
+      "txHash": "0xcb24575e6d541b242a32ee01846a0715ee3cc096e01706bb800fb4f21540af0a",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#68",
+      "updatedAt": "2026-04-06T12:28:52.321Z",
+      "createdAt": "2026-04-06T12:28:52.321Z"
+    },
+    "UniFactory#35": {
+      "contractName": "UniFactory",
+      "address": "0x15dDD0E43D9844915C27220DCF6104B6BB5Dd9D8",
+      "txHash": "0x08fe2cefd98aa360586dede1949d0898a35053291fc7bc913549a3eaf90ee8df",
+      "sourceName": "mocks/MockUniswapV2Factory.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Factory/UniFactory.json",
+      "deploymentKey": "UniFactory#35",
+      "updatedAt": "2026-04-06T12:28:52.527Z",
+      "createdAt": "2026-04-06T12:28:52.527Z"
+    },
+    "Router#8": {
+      "contractName": "Router",
+      "address": "0x4696686807eBF7dEF455ceCb66cf04220176414D",
+      "txHash": "0x83a2ea29499ea55241dd6e456f014026333f6d5582622a382ac8812367178725",
+      "sourceName": "mocks/MockUniswapV2Router02.sol",
+      "artifactPath": "contracts/artifacts/mocks/MockUniswapV2Router02/Router.json",
+      "deploymentKey": "Router#8",
+      "updatedAt": "2026-04-06T12:28:52.751Z",
+      "createdAt": "2026-04-06T12:28:52.751Z"
+    },
+    "WETH#69": {
+      "contractName": "WETH",
+      "address": "0xe61BaBded03D3296D7786dFd410F3E9bd54b8e17",
+      "txHash": "0x06341d79f696eab06815a3a28a5b67fe17fc6e25750c15e553ffb9eea8ba0d7f",
+      "sourceName": "mocks/WETH.sol",
+      "artifactPath": "contracts/artifacts/mocks/WETH/WETH.json",
+      "deploymentKey": "WETH#69",
+      "updatedAt": "2026-04-06T12:28:55.064Z",
+      "createdAt": "2026-04-06T12:28:55.064Z"
+    },
+    "UniswapV3Factory#34": {
+      "contractName": "UniswapV3Factory",
+      "address": "0xc55280DAA3a6E3784bD47C8Ff8Fe3cC23973CCaA",
+      "txHash": "0xd314751919cb235f7038982ab8e2bfe46c751ff456e2480c607c8e0b0e36e991",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/UniswapV3Factory.json",
+      "deploymentKey": "UniswapV3Factory#34",
+      "updatedAt": "2026-04-06T12:28:55.313Z",
+      "createdAt": "2026-04-06T12:28:55.313Z"
+    },
+    "SwapRouter#8": {
+      "contractName": "SwapRouter",
+      "address": "0x7f9AAE8EA2ACe9321b8eAb1F02225142c27fB5Fb",
+      "txHash": "0x30ec84c5b18bd3d203b5d23019786fb1740df2005e849f47b3d43316116703fe",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/SwapRouter.json",
+      "deploymentKey": "SwapRouter#8",
+      "updatedAt": "2026-04-06T12:28:55.539Z",
+      "createdAt": "2026-04-06T12:28:55.539Z"
+    },
+    "QuoterV2#8": {
+      "contractName": "QuoterV2",
+      "address": "0xc2428c586a89150731E8D9f748c714C2a9f4FC67",
+      "txHash": "0x4c8517e827025ec78e7fd41dfa1abb54484a06bdb1be7d702cc5cd75b42d49fb",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/QuoterV2.json",
+      "deploymentKey": "QuoterV2#8",
+      "updatedAt": "2026-04-06T12:28:55.774Z",
+      "createdAt": "2026-04-06T12:28:55.774Z"
+    },
+    "NonfungiblePositionManager#8": {
+      "contractName": "NonfungiblePositionManager",
+      "address": "0xC17f3199D5fb83F7671445284bF30CbaADc860Bc",
+      "txHash": "0xc6fe78bf8f186e9dcc7fbfebb6b2045d033129d91607677756244673e0c72a15",
+      "sourceName": "mocks/SwapV3.sol",
+      "artifactPath": "contracts/artifacts/mocks/SwapV3/NonfungiblePositionManager.json",
+      "deploymentKey": "NonfungiblePositionManager#8",
+      "updatedAt": "2026-04-06T12:28:55.992Z",
+      "createdAt": "2026-04-06T12:28:55.992Z"
+    }
+  },
+  "proxies": {},
+  "tokens": {},
+  "updatedAt": "2026-04-06T12:28:55.992Z"
+}

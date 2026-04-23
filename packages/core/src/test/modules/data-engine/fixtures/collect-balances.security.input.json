@@ -1,0 +1,11 @@
+{
+  "address": "0x2222222222222222222222222222222222222222",
+  "publicNote": "ok",
+  "privateKey": "PRIVATE_KEY_PLACEHOLDER",
+  "secretNote": "do-not-expose",
+  "meta": {
+    "mnemonic": "MNEMONIC_PLACEHOLDER",
+    "password": "PASSWORD_PLACEHOLDER",
+    "tag": "safe-tag"
+  }
+}

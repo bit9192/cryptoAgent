@@ -1,0 +1,22 @@
+{
+  "walletId": "vault-001",
+  "accounts": [
+    {
+      "address": "0x1111111111111111111111111111111111111111",
+      "chain": "evm",
+      "tokens": [
+        { "symbol": "USDT", "amount": "120.5", "decimals": 6, "status": "active" },
+        { "symbol": "USDC", "amount": "0", "decimals": 6, "status": "active" },
+        { "symbol": "WETH", "amount": "0.01", "decimals": 18, "status": "frozen" }
+      ]
+    },
+    {
+      "address": "TXYZ1234567890TRONADDR",
+      "chain": "trx",
+      "tokens": [
+        { "symbol": "USDT", "amount": "88.2", "decimals": 6, "status": "active" },
+        { "symbol": "TRX", "amount": "300", "decimals": 6, "status": "active" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+node_modules/
+artifacts/
+cache/
+typechain-types/
+.env
+.env.*
+.env*
+!.env.example
+.DS_Store
+
+# ── 运行时密钥存储（敏感数据，不入库）────────────────────────
+**/storage/
+**/key/keystore/
+**/key/keydoc/
+**/key/watch/
+**/key/vault/
+**/key/shares/
+**/key/tmp/
+**/*.enc.json
+
+# ── Legacy 包（已废弃，不再维护）─────────────────────────────
+packages/legacy/
+
+# ── 开发任务本地脚本 ──────────────────────────────────────────
+tasks/local/*.mjs
