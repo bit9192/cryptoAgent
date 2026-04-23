@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import { Wallet } from "ethers";
+import { Mnemonic, Wallet, randomBytes } from "ethers";
 
 const DIRECTIVE_PREFIXES = Object.freeze(["@address-config", "@passphrase"]);
 
@@ -19,6 +19,15 @@ const MNEMONIC_PLACEHOLDERS = new Set([
   "助记词占位符",
 ]);
 
+const MNEMONIC_24_PLACEHOLDERS = new Set([
+  "mnemonic24_placeholder",
+  "mnemonic24-placeholder",
+  "mnemonic_24_placeholder",
+  "mnemonic-24-placeholder",
+  "<mnemonic-24>",
+  "24词助记词占位符",
+]);
+
 function normalizeText(input) {
   return String(input ?? "").replace(/\r\n/g, "\n");
 }
@@ -32,6 +41,7 @@ function classifyPlaceholder(line) {
   const normalized = String(line ?? "").trim().toLowerCase();
   if (!normalized) return null;
   if (PRIVATE_KEY_PLACEHOLDERS.has(normalized)) return "privateKey";
+  if (MNEMONIC_24_PLACEHOLDERS.has(normalized)) return "mnemonic24";
   if (MNEMONIC_PLACEHOLDERS.has(normalized)) return "mnemonic";
   return null;
 }
@@ -50,6 +60,14 @@ function generateMnemonic() {
   const phrase = Wallet.createRandom()?.mnemonic?.phrase;
   if (!phrase) {
     throw new Error("助记词生成失败");
+  }
+  return String(phrase).trim().replace(/\s+/g, " ");
+}
+
+function generateMnemonic24() {
+  const phrase = Mnemonic.fromEntropy(randomBytes(32))?.phrase;
+  if (!phrase) {
+    throw new Error("24词助记词生成失败");
   }
   return String(phrase).trim().replace(/\s+/g, " ");
 }
@@ -132,7 +150,7 @@ export function preprocessKeyDocument(options = {}) {
 
       const secret = placeholderType === "privateKey"
         ? generatePrivateKeyHex()
-        : generateMnemonic();
+        : (placeholderType === "mnemonic24" ? generateMnemonic24() : generateMnemonic());
 
       lines[secretLineIndex] = secret;
       generated.push({
@@ -160,7 +178,10 @@ export function buildKeyDocEditorTemplate() {
     "# 密钥文档编辑说明",
     "# 1) 每条记录至少两行：第一行 name，第二行 secret。",
     "# 2) secret 支持：hex 私钥 / WIF 私钥 / 12-24 英文助记词。",
-    "# 3) 也可用占位符自动生成：PRIVATE_KEY_PLACEHOLDER 或 MNEMONIC_PLACEHOLDER。",
+    "# 3) 也可用占位符自动生成：",
+    "#    PRIVATE_KEY_PLACEHOLDER（随机私钥）",
+    "#    MNEMONIC_PLACEHOLDER（随机 12 词助记词）",
+    "#    MNEMONIC_24_PLACEHOLDER（随机 24 词助记词）",
     "# 4) 可选扩展行：@passphrase your-bip39-passphrase",
     "# 5) 可选扩展行：@address-config chain=btc type=all path=m/84'/0'/0'/0/[0,2]",
     "#",
@@ -170,6 +191,9 @@ export function buildKeyDocEditorTemplate() {
     "#",
     "# wallet-seed",
     "# MNEMONIC_PLACEHOLDER",
+    "#",
+    "# wallet-seed-24",
+    "# MNEMONIC_24_PLACEHOLDER",
     "# @passphrase your-passphrase",
     "# @address-config chain=evm path=m/44'/60'/0'/0/[0,2]",
     "",

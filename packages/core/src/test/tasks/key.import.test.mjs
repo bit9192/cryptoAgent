@@ -200,3 +200,28 @@ test("key.import: 支持 MNEMONIC_PLACEHOLDER 自动生成", async () => {
   assert.equal(loaded.entries[0].type, "mnemonic");
   assert.ok(String(loaded.entries[0].secret).split(/\s+/).length >= 12);
 });
+
+test("key.import: 支持 MNEMONIC_24_PLACEHOLDER 自动生成 24 词助记词", async () => {
+  const tmp = await mkTmpDir();
+  const storageRoot = path.join(tmp, "storage");
+
+  const result = await keyImport({
+    inputContent: [
+      "wallet-auto-mn-24",
+      "MNEMONIC_24_PLACEHOLDER",
+    ].join("\n"),
+    password: "strong-pass-123",
+    storageRoot,
+  });
+
+  assert.equal(result.entryCount, 1);
+  assert.equal(result.generatedCount, 1);
+
+  const loaded = await loadKeyQueueFromStoredFile({
+    storedFile: result.keyFile,
+    password: "strong-pass-123",
+  });
+  assert.equal(loaded.entries.length, 1);
+  assert.equal(loaded.entries[0].type, "mnemonic");
+  assert.equal(String(loaded.entries[0].secret).split(/\s+/).length, 24);
+});

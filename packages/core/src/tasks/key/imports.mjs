@@ -7,7 +7,10 @@ import { parseKeyFile } from "../../modules/key/parse.mjs";
 import { preprocessKeyDocument } from "../../modules/key/preprocess.mjs";
 
 const ENCRYPTED_FILE_SUFFIX = ".enc.json";
-const DEFAULT_EXTENSIONS = Object.freeze([".md", ".txt", ".key"]);
+// 特殊标记：匹配无扩展名文件（如 btc-main、walletnew）
+const NO_EXT_MARKER = "__NO_EXT__";
+// NO_EXT_MARKER 放进默认列表，使无扩展名文件默认被扫描
+const DEFAULT_EXTENSIONS = Object.freeze([".md", ".txt", ".key", NO_EXT_MARKER]);
 const DEFAULT_ON_CONFLICT = "rename";
 
 function createBatchId() {
@@ -22,8 +25,12 @@ function createBatchId() {
 }
 
 function normalizeExtList(input) {
-  if (input == null || input === "") {
+  if (input == null) {
     return [...DEFAULT_EXTENSIONS];
+  }
+  // 空字符串 "" 表示：包含无扩展名文件（区别于 null/undefined 的「使用默认」）
+  if (input === "") {
+    return [NO_EXT_MARKER, ...DEFAULT_EXTENSIONS];
   }
 
   const rawList = Array.isArray(input)
@@ -32,10 +39,13 @@ function normalizeExtList(input) {
 
   const out = rawList
     .map((item) => String(item ?? "").trim().toLowerCase())
-    .filter(Boolean)
-    .map((item) => (item.startsWith(".") ? item : `.${item}`));
+    .map((item) => {
+      if (item === "") return NO_EXT_MARKER;  // 空字符串 = 匹配无扩展名文件
+      return item.startsWith(".") ? item : `.${item}`;
+    });
 
-  return out.length > 0 ? Array.from(new Set(out)) : [...DEFAULT_EXTENSIONS];
+  const unique = Array.from(new Set(out.filter((item) => item)));
+  return unique.length > 0 ? unique : [...DEFAULT_EXTENSIONS];
 }
 
 async function walkFiles(rootDir, recursive) {
@@ -143,6 +153,7 @@ export async function keyImports(options = {}) {
   const scannedFiles = await walkFiles(sourceRoot, recursive);
   const matchedFiles = scannedFiles.filter((filePath) => {
     const ext = path.extname(filePath).toLowerCase();
+    if (ext === "" && extensions.includes(NO_EXT_MARKER)) return true;
     return extensions.includes(ext);
   });
 
@@ -233,8 +244,10 @@ export async function keyImports(options = {}) {
   return {
     ok: true,
     batchId,
+    cwd: process.cwd(),
     inputDir: path.relative(process.cwd(), sourceRoot),
     outputDir: path.relative(process.cwd(), outputRoot),
+    outputDirAbs: outputRoot,
     dryRun,
     scanned: scannedFiles.length,
     matched: matchedFiles.length,

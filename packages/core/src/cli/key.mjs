@@ -35,6 +35,7 @@ function printUsage() {
   console.log("  pnpm key import --source tui --password <password>   # 终端内存编辑，不落盘");
   console.log("  pnpm key import --source edit --editor vim --password <password>   # 打开编辑器，模板含注释与占位符");
   console.log("  pnpm key imports --dir ./to-import --password <password> [--storageRoot storage] [--recursive true] [--ext md,txt,key] [--onConflict rename|skip|overwrite] [--dryRun] [--failFast]");
+  console.log("  pnpm key imports --dir ./to-import --ext \"\" --password <password>   # 无扩展名文件（如 btc-main、walletnew）用 --ext \"\" 匹配");
   console.log("  pnpm key page-import [--pagePort 8787] [--pageTimeoutMs 300000] [--storageRoot storage]");
   console.log("  pnpm key derive-config --input ./src/test/modules/key/testdata.md --password <password> [--out ./testdata.addresses.json] [--strict]");
   console.log("  pnpm key add --file storage/key/wallet-main.enc.json --input ./new-keys.md --password <password>");
@@ -50,7 +51,7 @@ function printUsage() {
   console.log("  pnpm key backup --all   # 交互选择 threshold/shares，并输入备份 password（可留空）");
   console.log("  pnpm key restore --backup storage/backup/key-sss-backup-20260101010101 [--out ./restore-dir] [--passphrase <password>]");
   console.log("  pnpm key import --password <password>   # 交互选择：文件路径 / 直接输入文档内容");
-  console.log("提示：密钥行支持占位符 PRIVATE_KEY_PLACEHOLDER / MNEMONIC_PLACEHOLDER，导入时自动替换为随机密钥。\n");
+  console.log("提示：密钥行支持占位符 PRIVATE_KEY_PLACEHOLDER / MNEMONIC_PLACEHOLDER(12词) / MNEMONIC_24_PLACEHOLDER(24词)，导入时自动替换为随机密钥。\n");
 }
 
 async function runWithRenameRetry(executor, initialName) {
@@ -481,6 +482,19 @@ async function main() {
       failFast: Boolean(args.failFast),
       dryRun: Boolean(args.dryRun),
     });
+
+    if (!result.dryRun && Number(result.imported ?? 0) === 0) {
+      const firstFailure = Array.isArray(result.results)
+        ? result.results.find((item) => item.status === "failed")
+        : null;
+      const reason = firstFailure?.reason
+        ? `；首个失败原因：${firstFailure.reason}`
+        : "";
+      throw new Error(
+        `批量导入未生成任何加密文件（matched=${result.matched}, imported=${result.imported}, skipped=${result.skipped}, failed=${result.failed}）。` +
+        `当前工作目录：${result.cwd}；预期输出目录：${result.outputDirAbs}${reason}`,
+      );
+    }
 
     console.log(JSON.stringify({ ok: true, action: "key.imports", result }, null, 2));
     return;

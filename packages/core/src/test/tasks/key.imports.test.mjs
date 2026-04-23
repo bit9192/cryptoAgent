@@ -130,3 +130,22 @@ test("key.imports: 支持占位符自动生成", async () => {
   assert.ok(loaded.entries.some((entry) => entry.type === "privateKey"));
   assert.ok(loaded.entries.some((entry) => entry.type === "mnemonic"));
 });
+
+test("key.imports: 无匹配扩展名时 imported=0 且返回可诊断路径", async () => {
+  const tmp = await mkTmpDir();
+  const sourceDir = path.join(tmp, "inputs");
+  const storageRoot = path.join(tmp, "storage");
+  await fs.mkdir(sourceDir, { recursive: true });
+  await fs.writeFile(path.join(sourceDir, "only.json"), "{}\n", "utf8");
+
+  const result = await keyImports({
+    inputDir: sourceDir,
+    password: "strong-pass-123",
+    storageRoot,
+  });
+
+  assert.equal(result.matched, 0);
+  assert.equal(result.imported, 0);
+  assert.equal(result.failed, 0);
+  assert.ok(String(result.outputDirAbs ?? "").length > 0);
+});
