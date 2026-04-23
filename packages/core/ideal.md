@@ -52,12 +52,18 @@ srcipt
 当前已忘成了 密钥导入的粗陋功能
 接下来完成 wallet 的使用
 
+# 期望实现
 
+在 ex:lon 模式下 可以 导入 key 到 wallet 里，根据 wallet name 选择 key 在对应的网络上操作，同时可以用 key 里的配置像 快速导入 配置的 地址到 keytree 上，方便用 name 或 直接的 地址 去 查询余额 转账
 
-## wallet
+还有可以用 现有的 key 增加新的 path 配置 name 以便快速使用新地址
 
-在 ex:lon 模式中使用
+## 期望的操作
 
-1. wallet list 查看本地 keys 列表
-2. open wallet 将 key 注入 ex 的 wallet
-3. 
+1. 查看 keys list
+2. 导入钱包：将 key name 放到缓存列表中
+3. 导入配置钱包：用 key 里的配置创建地址列表，放到缓存中
+4. 查看 key 和 name 和 address 的列表
+5. 移除钱包：可以 按 name 或 钱包名 移除缓存中的 key
+
+上述操作可以在 ex 的缓存中 给到其他 接口使用，比如 可以先 生成 地址，然后根据 name 查询对应的 账户资产

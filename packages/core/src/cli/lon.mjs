@@ -317,8 +317,28 @@ async function dispatchCommand(line, session) {
     case "task": {
       const positional = args._ ?? [];
       const taskId = String(positional[0] ?? "").trim();
+      if (taskId === "-h" || taskId === "--help") {
+        console.log("\n  task 命令用法:\n    task <taskId> [--key value ...]\n    task -h | --help\n");
+        if (!session.registry) {
+          console.log("  (注册表未初始化)\n");
+          break;
+        }
+        const ids = session.registry.listIds();
+        if (ids.length === 0) {
+          console.log("  (没有已注册的任务)\n");
+          break;
+        }
+        console.log("  当前可用 task:\n");
+        for (const id of ids.sort()) {
+          const def = session.registry.get(id);
+          const title = String(def?.title ?? "").trim();
+          console.log(`    ${id}${title ? `  ${title}` : ""}`);
+        }
+        console.log("");
+        break;
+      }
       if (!taskId) {
-        console.error("  用法: task <taskId> [--key value ...]");
+        console.error("  用法: task <taskId> [--key value ...]  (或 task -h 查看可用 task)");
         break;
       }
       const taskArgs = { ...args };
@@ -526,6 +546,7 @@ async function dispatchCommand(line, session) {
       console.log(`
   Lon REPL 命令:
     task <taskId> [--key value ...]   执行已注册的任务
+    task -h | --help                  查看当前可用 task 命令集
     run  <scriptName>                 运行 src/run/<scriptName>.mjs
     n    <scriptPath>                 按路径运行脚本（旧 run 行为）
     test <filePattern>                运行 Node 测试文件
