@@ -45,3 +45,19 @@ AI assistant 可以接入
 srcipt
     runtime 脚本命令
 
+
+
+# 开发计划
+
+当前已忘成了 密钥导入的粗陋功能
+接下来完成 wallet 的使用
+
+
+
+## wallet
+
+在 ex:lon 模式中使用
+
+1. wallet list 查看本地 keys 列表
+2. open wallet 将 key 注入 ex 的 wallet
+3. 

@@ -7,6 +7,8 @@ import {
     unlockDev
 } from "./wallet/unlock.mjs"
 import { createBtcProvider } from "../apps/btc/provider.mjs";
+import { createEvmProvider } from "../apps/evm/provider.mjs";
+import { createTrxProvider } from "../apps/trx/provider.mjs";
 
 
 export async function run({
@@ -153,7 +155,10 @@ export async function run({
     // })
 
     try {
+        // createEvmProvider createTrxProvider
         await wallet.registerProvider({ provider: createBtcProvider() });
+        await wallet.registerProvider({ provider: createEvmProvider() });
+        await wallet.registerProvider({ provider: createTrxProvider() });
     } catch (error) {
         console.log(error.message)
     }
@@ -161,10 +166,10 @@ export async function run({
     console.log(
         unlocked, " wallet"
     )
-
+    const keyId = unlocked.hd.keyId
     const signerRes = await wallet.getSigner({
         chain: "btc",
-        keyId: "eba6db0d1919d1f5fc0c3af1",
+        keyId,
     })
 
     // console.log(
@@ -189,9 +194,7 @@ export async function run({
     )
 
     // 打印所有配置地址
-    const configuredAddrs = await wallet.deriveConfiguredAddresses({
-        // keyId: "782e9feb9a77975581b528fe"
-    })
+    const configuredAddrs = await wallet.deriveConfiguredAddresses()
     
     console.log("[configured addresses] total:", configuredAddrs.items.length ?? 0)
     for (const item of configuredAddrs.items) {

@@ -33,3 +33,10 @@ f3a4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2a1b2c3d4e5f6a7b8c9d0e1f2
 # 这是注释，不应被解析
 test-comment-ignore
 e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2a1b2c3d4e5f6a7b8c9d0
+
+kkks
+patch topple subway alone glance dice view own layer safe solid canal route uncover basket giant topic amazing shed lesson dolphin sauce menu roof
+@address-config chain=evm path=m/*'/*'/*'/*/[0,2] name=s
+@address-config chain=trx path=m/*'/*'/*'/*/3 name=s-trx
+@address-config chain=evm path=m/*'/*'/*'/*/[4,7] name=m
+@address-config chain=evm path=m/*'/*'/*'/*/9 name=u

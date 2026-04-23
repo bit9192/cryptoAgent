@@ -1034,8 +1034,9 @@ export function createWallet(options = {}) {
   }
 
   /**
-   * 将 BTC purpose 占位符 *' 替换为类型对应的实际值。
+   * 将通配符占位符替换为类型对应的实际值。
    * 路径规则：m/purpose'/coin_type'/account'/change/index
+   * 支持：*' （带撇号）和 * （不带撇号）替换
    */
   function resolveWildcardPath(pathPattern, chain, addressType, network) {
     if (!pathPattern) return null;
@@ -1057,16 +1058,22 @@ export function createWallet(options = {}) {
 
     const segments = pathPattern.split("/");
     const resolved = segments.map((seg, i) => {
-      if (seg !== "*'") return seg;
-      if (chain === "evm" || chain === "trx") {
-        if (i === 1) return `${purposePrime}'`;
-        if (i === 2) return chain === "evm" ? "60'" : "195'";
-        if (i === 3) return "0'";
-      } else {
-        // btc
-        if (i === 1) return `${purposePrime}'`;
-        if (i === 2) return `${coinType}'`;
-        if (i === 3) return "0'";
+      // 处理带撇号的通配符 *'
+      if (seg === "*'") {
+        if (chain === "evm" || chain === "trx") {
+          if (i === 1) return `${purposePrime}'`;
+          if (i === 2) return chain === "evm" ? "60'" : "195'";
+          if (i === 3) return "0'";
+        } else {
+          // btc
+          if (i === 1) return `${purposePrime}'`;
+          if (i === 2) return `${coinType}'`;
+          if (i === 3) return "0'";
+        }
+      }
+      // 处理不带撇号的通配符 * （change 字段，默认 0 表示接收地址）
+      if (seg === "*") {
+        if (i === 4) return "0";  // change/receive: 0 for receive
       }
       return seg;
     });
