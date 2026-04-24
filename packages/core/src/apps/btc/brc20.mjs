@@ -2,6 +2,7 @@ import "../../load-env.mjs";
 
 import { resolveBtcProvider } from "./netprovider.mjs";
 import { resolveBtcToken } from "./config/tokens.js";
+import { brc20BalanceBatchGet as queryBrc20BalanceBatch } from "./assets/brc20-balance-batch.mjs";
 
 const UNISAT_BASE = "https://open-api.unisat.io";
 const BRC20_MAINNET_ALIASES = new Set(["mainnet", "bitcoin", "main"]);
@@ -391,67 +392,8 @@ export async function brc20BalanceGet(options = {}, networkNameOrProvider = null
 	};
 }
 
-function normalizeBrc20BatchItems(input = []) {
-	if (!Array.isArray(input)) {
-		throw new Error("batch 输入必须是数组");
-	}
-
-	return input.map((item) => {
-		const address = normalizeAddress(item?.address, "address");
-		const token = String(item?.token ?? item?.tokenAddress ?? item?.ticker ?? "").trim();
-		if (!token) {
-			throw new Error("token 不能为空");
-		}
-		return {
-			address,
-			token,
-		};
-	});
-}
-
 export async function brc20BalanceBatchGet(input = [], networkNameOrProvider = null) {
-	const items = normalizeBrc20BatchItems(input);
-	if (items.length === 0) {
-		return {
-			ok: true,
-			items: [],
-		};
-	}
-
-	const rows = await Promise.all(items.map(async (item) => {
-		try {
-			const balance = await brc20BalanceGet({
-				address: item.address,
-				ticker: item.token,
-			}, networkNameOrProvider);
-			return {
-				...balance,
-				ok: true,
-				error: null,
-			};
-		} catch (error) {
-			return {
-				chain: "btc",
-				type: "brc20",
-				address: item.address,
-				tokenAddress: String(item.token).trim().toUpperCase(),
-				symbol: String(item.token).trim().toUpperCase(),
-				decimals: null,
-				balance: null,
-				availableBalance: null,
-				transferableBalance: null,
-				transferableCount: null,
-				networkName: null,
-				ok: false,
-				error: error?.message ?? String(error),
-			};
-		}
-	}));
-
-	return {
-		ok: true,
-		items: rows,
-	};
+	return queryBrc20BalanceBatch(input, networkNameOrProvider);
 }
 
 export function createBrc20(options = {}) {

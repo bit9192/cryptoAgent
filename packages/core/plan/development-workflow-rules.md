@@ -137,6 +137,12 @@
 3. 新增动作已在测试中覆盖。
 4. warnings 与 errors 分层清晰，不泄露敏感信息。
 5. 对外输出对象字段已过安全筛选。
+6. assets 目录不存在“仅 re-export 占位文件”。
+
+建议执行的门禁检查（提交前）：
+
+- `rg '^export \{[^}]+\} from "\.\./' packages/core/src/apps/*/assets`
+- 若命中结果非空，默认视为不符合落位规范（除非评审中明确豁免与截止迁移时间）。
 
 ## 资产查询能力落位规则（ideal 需求适用）
 
@@ -148,11 +154,14 @@
 	- packages/core/src/apps/evm/assets/
 	- packages/core/src/apps/btc/assets/
 	- packages/core/src/apps/trx/assets/
-2. 仅放链相关原子查询：
+2. assets 目录文件必须包含真实实现，禁止仅用 re-export 占位：
+	- 禁止写法：`export { fn } from "../xxx.mjs"`
+	- 兼容层允许放在旧路径文件（如 `apps/btc/core.mjs`），但主实现必须在 assets 目录。
+3. 仅放链相关原子查询：
 	- token 元信息（name/symbol/decimals）
 	- address/token 余额
 	- 链内批量查询（如 evm multicall）
-3. 禁止在 apps 层写跨链聚合、排序、筛选。
+4. 禁止在 apps 层写跨链聚合、排序、筛选。
 
 ### 2. offchain 层（外部数据源）
 
