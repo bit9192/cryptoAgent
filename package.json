@@ -6,5 +6,8 @@
   "scripts": {
     "core": "pnpm --filter @ch/core",
     "install:all": "pnpm install"
+  },
+  "devDependencies": {
+    "hardhat": "^3.4.1"
   }
 }
