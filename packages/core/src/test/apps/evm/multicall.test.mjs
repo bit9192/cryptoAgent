@@ -25,10 +25,13 @@ function makeRequest(abi, target, method, args = []) {
 
 function createStubMulticall(responses) {
 	return {
-		aggregate: {
-			async staticCall(calls) {
+		tryAggregate: {
+			async staticCall(_requireSuccess, calls) {
 				assert.equal(calls.length, responses.length);
-				return [1n, responses.map((item) => item.encoded)];
+				return responses.map((item) => ({
+					success: item.success ?? true,
+					returnData: item.encoded,
+				}));
 			},
 		},
 	};
@@ -164,6 +167,41 @@ describe("evm multiCall", () => {
 			meta: {
 				decimals: 18n,
 			},
+		});
+	});
+
+	it("does not fail whole batch when a single call fails", async () => {
+		const token = "0x00000000000000000000000000000000000000aa";
+		const iface = new Interface(erc20Abi);
+		const responses = [
+			{
+				success: true,
+				encoded: iface.encodeFunctionResult("name", ["TokenX"]),
+			},
+			{
+				success: false,
+				encoded: "0x",
+			},
+			{
+				success: true,
+				encoded: iface.encodeFunctionResult("decimals", [6]),
+			},
+		];
+
+		const mc = multiCall({
+			getContract: async () => createStubMulticall(responses),
+		});
+
+		const output = await mc.call({
+			name: makeRequest(erc20Abi, token, "name"),
+			symbol: makeRequest(erc20Abi, token, "symbol"),
+			decimals: makeRequest(erc20Abi, token, "decimals"),
+		});
+
+		assert.deepEqual(output, {
+			name: "TokenX",
+			symbol: null,
+			decimals: 6n,
 		});
 	});
 });

@@ -77,15 +77,51 @@ function buildCalls(requests) {
 	}));
 }
 
-function decodeResults(requests, returnData) {
-	if (!Array.isArray(returnData) || returnData.length !== requests.length) {
+function normalizeCallResultEntry(entry) {
+	if (Array.isArray(entry) && entry.length >= 2 && typeof entry[0] === "boolean") {
+		return {
+			success: entry[0],
+			returnData: entry[1],
+		};
+	}
+
+	if (entry && typeof entry === "object" && typeof entry.success === "boolean") {
+		return {
+			success: entry.success,
+			returnData: entry.returnData,
+		};
+	}
+
+	return {
+		success: true,
+		returnData: entry,
+	};
+}
+
+function decodeResults(requests, rawResults, options = {}) {
+	if (!Array.isArray(rawResults) || rawResults.length !== requests.length) {
 		throw new Error("Multicall 返回结果数量与请求数量不一致");
 	}
 
 	return requests.map((request, index) => {
-		const data = returnData[index];
+		const outcome = normalizeCallResultEntry(rawResults[index]);
+		if (!outcome.success) {
+			if (options.requireSuccess === true) {
+				throw new Error(`Multicall 子调用失败（index=${index}）`);
+			}
+			return null;
+		}
+
+		const data = outcome.returnData;
 		if (typeof request.decode === "function") {
-			return request.decode(data);
+			try {
+				return request.decode(data);
+			} catch (error) {
+				if (options.requireSuccess === true) {
+					throw error;
+				}
+				return null;
+			}
 		}
 
 		const fragment = request.fragment
@@ -94,9 +130,29 @@ function decodeResults(requests, returnData) {
 			throw new Error("Multicall 请求缺少 decode 信息");
 		}
 
-		const decoded = request.iface.decodeFunctionResult(fragment, data);
-		return normalizeDecodedResult(decoded, fragment?.outputs ?? []);
+		try {
+			const decoded = request.iface.decodeFunctionResult(fragment, data);
+			return normalizeDecodedResult(decoded, fragment?.outputs ?? []);
+		} catch (error) {
+			if (options.requireSuccess === true) {
+				throw error;
+			}
+			return null;
+		}
 	});
+}
+
+async function executeMulticall(multicall, calls, options = {}) {
+	if (multicall?.tryAggregate && typeof multicall.tryAggregate.staticCall === "function") {
+		return multicall.tryAggregate.staticCall(options.requireSuccess === true, calls);
+	}
+
+	if (multicall?.aggregate && typeof multicall.aggregate.staticCall === "function") {
+		const result = await multicall.aggregate.staticCall(calls);
+		return Array.isArray(result) ? result[1] : result.returnData;
+	}
+
+	throw new Error("Multicall 合约缺少可用聚合方法（tryAggregate/aggregate）");
 }
 
 async function resolveMulticallContract(config = {}, options = {}) {
@@ -115,7 +171,7 @@ async function resolveMulticallContract(config = {}, options = {}) {
 		return getContract(explicitContractName, null, resolveArgs);
 	}
 
-	const fallbackNames = ["MultiCall", "Multicall3"];
+	const fallbackNames = ["Multicall3", "MultiCall"];
 	let lastError = null;
 	for (const name of fallbackNames) {
 		try {
@@ -145,9 +201,8 @@ export function multiCall(config = {}) {
 
 			const multicall = await getMulticall(config, options);
 			const calls = buildCalls(requests);
-			const result = await multicall.aggregate.staticCall(calls);
-			const returnData = Array.isArray(result) ? result[1] : result.returnData;
-			const decodedValues = decodeResults(requests, returnData);
+			const rawResults = await executeMulticall(multicall, calls, options);
+			const decodedValues = decodeResults(requests, rawResults, options);
 
 			return rebuildShape(input, {
 				index: 0,

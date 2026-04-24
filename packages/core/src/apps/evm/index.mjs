@@ -41,3 +41,7 @@ export {
 	queryEvmTokenMetadata,
 	queryEvmTokenMetadataBatch,
 } from "./assets/token-metadata.mjs";
+export {
+	queryEvmTokenBalance,
+	queryEvmTokenBalanceBatch,
+} from "./assets/balance-batch.mjs";

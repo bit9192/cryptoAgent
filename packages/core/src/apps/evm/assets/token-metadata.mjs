@@ -1,22 +1,13 @@
-import { Interface, getAddress } from "ethers";
+import { getAddress } from "ethers";
 
-import { resolveEvmNetProvider } from "../netprovider.mjs";
+import { EvmContract } from "../contracts/deploy.mjs";
+import { multiCall, MULTICALL_REQUEST_SYMBOL } from "../multicall.mjs";
 
-const ERC20_METADATA_INTERFACE = new Interface([
+const ERC20_METADATA_ABI = [
 	"function name() view returns (string)",
 	"function symbol() view returns (string)",
 	"function decimals() view returns (uint8)",
-]);
-
-function unwrapAdapterResult(value) {
-	if (!value || typeof value !== "object") {
-		return value;
-	}
-	if (value.ok === true && Object.prototype.hasOwnProperty.call(value, "result")) {
-		return value.result;
-	}
-	return value;
-}
+];
 
 function normalizeTokenAddress(tokenAddress) {
 	const raw = String(tokenAddress ?? "").trim();
@@ -26,78 +17,133 @@ function normalizeTokenAddress(tokenAddress) {
 	return getAddress(raw);
 }
 
-function resolveCallRunner(options = {}) {
-	if (options.runner && typeof options.runner.call === "function") {
-		return options.runner;
+function resolveMulticallClient(options = {}) {
+	if (options.multicall && typeof options.multicall.call === "function") {
+		return options.multicall;
 	}
-	if (options.provider && typeof options.provider.call === "function") {
-		return options.provider;
-	}
-
-	const networkRef = options.networkNameOrProvider
-		?? options.netProvider
-		?? options.networkName
-		?? options.network
-		?? null;
-	if (!networkRef) {
-		throw new Error("缺少可用 EVM provider（请传入 runner/provider/networkNameOrProvider）");
-	}
-
-	const netProvider = resolveEvmNetProvider(networkRef, options);
-	if (!netProvider?.provider || typeof netProvider.provider.call !== "function") {
-		throw new Error("无法解析可用的 EVM call provider");
-	}
-	return netProvider.provider;
+	const config = typeof options.getContract === "function"
+		? { getContract: options.getContract }
+		: {};
+	return multiCall(config);
 }
 
-async function callRead(runner, tokenAddress, method) {
-	const tx = {
-		to: tokenAddress,
-		data: ERC20_METADATA_INTERFACE.encodeFunctionData(method, []),
+function buildMetadataCallRequest(tokenAddress, method) {
+	const token = new EvmContract(tokenAddress, ERC20_METADATA_ABI, null);
+	const request = token.calls[method]();
+	request[MULTICALL_REQUEST_SYMBOL] = true;
+	return request;
+}
+
+function normalizeMetadataItems(input) {
+	if (!Array.isArray(input)) {
+		throw new Error("batch 输入必须是数组");
+	}
+	return input.map((item) => {
+		const tokenRef = (item && typeof item === "object")
+			? (item.token ?? item.tokenAddress)
+			: item;
+		return {
+			tokenAddress: normalizeTokenAddress(tokenRef),
+		};
+	});
+}
+
+function normalizeMetadataNumber(value) {
+	if (value == null) {
+		return null;
+	}
+	const num = Number(value);
+	return Number.isFinite(num) ? num : null;
+}
+
+function normalizeMetadataRow(row = {}) {
+	return {
+		chain: "evm",
+		tokenAddress: row.tokenAddress,
+		name: String(row.name ?? "").trim() || null,
+		symbol: String(row.symbol ?? "").trim() || null,
+		decimals: normalizeMetadataNumber(row.decimals),
 	};
-	const raw = unwrapAdapterResult(await runner.call(tx));
-	const decoded = ERC20_METADATA_INTERFACE.decodeFunctionResult(method, raw);
-	return decoded[0];
+}
+
+function normalizeMetadataQueryInput(input = {}) {
+	if (Array.isArray(input)) {
+		return {
+			items: normalizeMetadataItems(input),
+			options: {},
+			isBatch: true,
+		};
+	}
+
+	if (!input || typeof input !== "object") {
+		throw new Error("input 必须是对象或数组");
+	}
+
+	if (Array.isArray(input.items)) {
+		const { items, ...options } = input;
+		return {
+			items: normalizeMetadataItems(items),
+			options,
+			isBatch: true,
+		};
+	}
+
+	if (Array.isArray(input.tokens)) {
+		const { tokens, ...options } = input;
+		return {
+			items: normalizeMetadataItems(tokens),
+			options,
+			isBatch: true,
+		};
+	}
+
+	const tokenRef = input.token ?? input.tokenAddress;
+	return {
+		items: [{ tokenAddress: normalizeTokenAddress(tokenRef) }],
+		options: input,
+		isBatch: false,
+	};
 }
 
 export async function queryEvmTokenMetadata(input = {}) {
-	const tokenAddress = normalizeTokenAddress(input.tokenAddress);
-	const runner = resolveCallRunner(input);
+	const parsed = normalizeMetadataQueryInput(input);
+	const result = await queryEvmTokenMetadataBatch(parsed.items, parsed.options);
 
-	const [name, symbol, decimalsRaw] = await Promise.all([
-		callRead(runner, tokenAddress, "name"),
-		callRead(runner, tokenAddress, "symbol"),
-		callRead(runner, tokenAddress, "decimals"),
-	]);
+	if (parsed.isBatch) {
+		return result;
+	}
 
-	return {
+	return result.items[0] ?? {
 		chain: "evm",
-		tokenAddress,
-		name: String(name ?? "").trim() || null,
-		symbol: String(symbol ?? "").trim() || null,
-		decimals: Number(decimalsRaw),
+		tokenAddress: parsed.items[0]?.tokenAddress,
+		name: null,
+		symbol: null,
+		decimals: null,
 	};
 }
 
-export async function queryEvmTokenMetadataBatch(input = {}) {
-	const tokenAddresses = Array.isArray(input.tokenAddresses) ? input.tokenAddresses : [];
-	if (tokenAddresses.length === 0) {
+export async function queryEvmTokenMetadataBatch(items = [], options = {}) {
+	const normalizedItems = normalizeMetadataItems(items);
+	if (normalizedItems.length === 0) {
 		return {
 			ok: true,
 			items: [],
 		};
 	}
+	const multicallClient = resolveMulticallClient(options);
+	const requestShape = normalizedItems.map((item) => ({
+		tokenAddress: item.tokenAddress,
+		name: buildMetadataCallRequest(item.tokenAddress, "name"),
+		symbol: buildMetadataCallRequest(item.tokenAddress, "symbol"),
+		decimals: buildMetadataCallRequest(item.tokenAddress, "decimals"),
+	}));
+	const rows = await multicallClient.call(requestShape, options);
 
-	const items = await Promise.all(
-		tokenAddresses.map(async (tokenAddress) => await queryEvmTokenMetadata({
-			...input,
-			tokenAddress,
-		})),
-	);
+	const normalizedRows = rows.map((row) => normalizeMetadataRow(row));
 
 	return {
 		ok: true,
-		items,
+		items: normalizedRows,
 	};
 }
 
