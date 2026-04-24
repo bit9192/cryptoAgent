@@ -1,3 +1,5 @@
+import "../../../load-env.mjs";
+
 import { getEvmNetworkConfig } from "./networks.js";
 
 const EVM_DEFAULT_TOKENS = Object.freeze({

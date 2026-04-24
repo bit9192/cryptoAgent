@@ -1,13 +1,4 @@
-import dotenv from "dotenv";
-import fs from "node:fs";
-import path from "node:path";
-
-if (!process.env.GOPLUSLABS_API_KEY) {
-  const envPath = path.resolve(process.cwd(), ".env");
-  if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
-  }
-}
+import "../../load-env.mjs";
 
 export * from "./request.mjs";
 export * from "./address-validators.mjs";

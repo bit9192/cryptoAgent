@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../../../load-env.mjs";
 import path from "node:path";
 
 function normalizeBaseUrl(value, fallbackHost = "127.0.0.1") {

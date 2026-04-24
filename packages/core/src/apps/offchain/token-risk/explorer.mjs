@@ -1,3 +1,5 @@
+import "../../../load-env.mjs";
+
 import { evmNetworks } from "../../evm/configs/networks.js";
 import { offchainGet } from "../request.mjs";
 

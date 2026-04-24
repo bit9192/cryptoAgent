@@ -1,3 +1,5 @@
+import "../../../load-env.mjs";
+
 import { ethers } from "ethers";
 import hre from "hardhat";
 

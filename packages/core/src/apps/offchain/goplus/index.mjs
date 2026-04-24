@@ -1,3 +1,5 @@
+import "../../../load-env.mjs";
+
 import { GoPlus, ErrorCode } from "@goplus/sdk-node";
 import fs from "node:fs";
 import path from "node:path";

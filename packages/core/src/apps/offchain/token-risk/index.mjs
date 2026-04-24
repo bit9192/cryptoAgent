@@ -1,3 +1,5 @@
+import "../../../load-env.mjs";
+
 import { JsonRpcProvider } from "ethers";
 import { spawn } from "node:child_process";
 import { goplusTokenSecurityOne } from "../goplus/index.mjs";

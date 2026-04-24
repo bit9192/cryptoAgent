@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../../../load-env.mjs";
 import { readEvmForkStateSync } from "../fork/node.mjs";
 
 function normalizeOptionalUrl(value) {

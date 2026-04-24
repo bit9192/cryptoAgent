@@ -168,3 +168,98 @@ test("assets:query assets.query handles multi-chain items in one call", async ()
   const chains = res.snapshot.items.map((i) => i.chain).sort();
   assert.deepEqual(chains, ["evm", "trx"]);
 });
+
+test("assets:query assets.query does not build cartesian pairs inside one chain", async () => {
+  const balanceCalls = [];
+  const metadataCalls = [];
+
+  const res = await task.run(createCtx({
+    action: "assets.query",
+    items: [
+      { address: "TA5DvvvmYbS75o3DKtgy2ATAGVHhpFkRLe", token: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", network: "mainnet" },
+      { address: "TMwFHYXLJaRUPeW6421aqXL4ZEzPRFGkGT", token: "TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7", network: "mainnet" },
+    ],
+  }, {
+    trx: {
+      async queryMetadataBatch(items) {
+        metadataCalls.push(items.map((item) => item.token));
+        return {
+          ok: true,
+          items: items.map((item) => ({
+            tokenAddress: item.token,
+            symbol: item.token === "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" ? "USDT" : "WIN",
+            name: item.token === "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" ? "Tether USD" : "WINk",
+            decimals: 6,
+            ok: true,
+          })),
+        };
+      },
+      async queryBalanceBatch(pairs) {
+        balanceCalls.push(pairs);
+        return {
+          ok: true,
+          items: pairs.map((pair) => ({
+            ownerAddress: pair.address,
+            tokenAddress: pair.token,
+            balance: 1n,
+            ok: true,
+          })),
+        };
+      },
+    },
+  }));
+
+  assert.equal(res.ok, true);
+  assert.equal(res.snapshot.items.length, 2);
+  assert.equal(balanceCalls.length, 1);
+  assert.deepEqual(balanceCalls[0], [
+    { address: "TA5DvvvmYbS75o3DKtgy2ATAGVHhpFkRLe", token: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" },
+    { address: "TMwFHYXLJaRUPeW6421aqXL4ZEzPRFGkGT", token: "TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7" },
+  ]);
+  assert.deepEqual(metadataCalls[0], [
+    "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+    "TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7",
+  ]);
+});
+
+test("assets:query assets.query supports btc native and brc20 in one call", async () => {
+  const res = await task.run(createCtx({
+    action: "assets.query",
+    items: [
+      { address: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", token: "BTC", network: "mainnet" },
+      { address: "bc1p8w6zr5e2q60s0r8al4tvmsfer77c0eqc8j55gk8r7hzv39zhs2lqa8p0k6", token: "ORDI", network: "mainnet" },
+    ],
+  }, {
+    btc: {
+      async queryNativeBalance(input) {
+        return {
+          rows: [
+            { address: input.addresses[0], total: 68.12345678 },
+          ],
+        };
+      },
+      async queryBalanceBatch() {
+        return {
+          ok: true,
+          items: [
+            {
+              address: "bc1p8w6zr5e2q60s0r8al4tvmsfer77c0eqc8j55gk8r7hzv39zhs2lqa8p0k6",
+              tokenAddress: "ORDI",
+              symbol: "ORDI",
+              tokenName: "Ordinals",
+              decimals: 18,
+              balance: "12.5",
+              ok: true,
+            },
+          ],
+        };
+      },
+    },
+  }));
+
+  assert.equal(res.ok, true);
+  assert.equal(res.snapshot.items.length, 2);
+  assert.equal(res.snapshot.items[0].tokenAddress, "native");
+  assert.equal(res.snapshot.items[0].symbol, "BTC");
+  assert.equal(res.snapshot.items[1].tokenAddress, "ORDI");
+});

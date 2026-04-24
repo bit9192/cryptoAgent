@@ -1,6 +1,7 @@
 import { getAddress } from "ethers";
 
-import { EvmContract } from "../contracts/deploy.mjs";
+import { EvmContract, getContract } from "../contracts/deploy.mjs";
+import { resolveEvmContract } from "../configs/contracts.js";
 import { multiCall, MULTICALL_REQUEST_SYMBOL } from "../multicall.mjs";
 
 const ERC20_METADATA_ABI = [
@@ -21,9 +22,18 @@ function resolveMulticallClient(options = {}) {
 	if (options.multicall && typeof options.multicall.call === "function") {
 		return options.multicall;
 	}
-	const config = typeof options.getContract === "function"
-		? { getContract: options.getContract }
-		: {};
+	const explicitAddress = getAddress(resolveEvmContract({
+		key: "multicall3",
+		network: options.networkName ?? options.network,
+		chainId: options.chainId,
+		forkSourceChainId: options.forkSourceChainId,
+		overrides: options.contractOverrides,
+	}));
+	const config = {
+		getContract: typeof options.getContract === "function"
+			? options.getContract
+			: async (_config, resolveArgs = {}) => await getContract("Multicall3", explicitAddress, resolveArgs),
+	};
 	return multiCall(config);
 }
 

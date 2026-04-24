@@ -1,3 +1,5 @@
+import "../../../load-env.mjs";
+
 function normalizeHttpUrl(value, fallback) {
 	const raw = String(value ?? "").trim();
 	if (!raw) return fallback;

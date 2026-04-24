@@ -1,6 +1,10 @@
+import "../../load-env.mjs";
+
 import { getTrxNetworkConfig } from "./config/networks.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
+const DEFAULT_MAX_RETRIES = 2;
+const DEFAULT_RETRY_DELAY_MS = 600;
 
 function buildEndpoint(baseRpcUrl, segment) {
   const base = String(baseRpcUrl ?? "").replace(/\/$/, "");
@@ -35,6 +39,20 @@ async function postJson(url, payload, options = {}) {
     }
 
     if (!response.ok) {
+      const status = Number(response.status ?? 0);
+      const maxRetries = Number(options.maxRetries ?? DEFAULT_MAX_RETRIES);
+      const retryCount = Number(options.retryCount ?? 0);
+      if (status === 429 && retryCount < maxRetries) {
+        const retryAfterHeader = Number(response.headers.get("retry-after") ?? 0);
+        const retryAfterMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
+          ? retryAfterHeader * 1000
+          : Number(options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS) * (retryCount + 1);
+        await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
+        return postJson(url, payload, {
+          ...options,
+          retryCount: retryCount + 1,
+        });
+      }
       throw new Error(`TRX 请求失败: HTTP ${response.status} ${response.statusText}`);
     }
     return data;

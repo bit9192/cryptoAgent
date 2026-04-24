@@ -1,3 +1,5 @@
+import "../../load-env.mjs";
+
 import { resolveBtcProvider } from "./netprovider.mjs";
 import { resolveBtcToken } from "./config/tokens.js";
 

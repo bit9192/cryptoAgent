@@ -11,6 +11,9 @@ import {
   brc20BalanceBatchGet,
 } from "../../apps/btc/brc20.mjs";
 import {
+  btcBalanceGet,
+} from "../../apps/btc/core.mjs";
+import {
   queryTrxTokenMetadataBatch,
   queryTrxTokenBalanceBatch,
 } from "../../apps/trx/trc20.mjs";
@@ -80,12 +83,16 @@ function unique(items = []) {
   return [...new Set(items)];
 }
 
-function cartesianPairs(addresses, tokens) {
+function uniquePairs(items = []) {
+  const seen = new Set();
   const pairs = [];
-  for (const address of addresses) {
-    for (const token of tokens) {
-      pairs.push({ address, token });
-    }
+  for (const item of items) {
+    const address = String(item?.address ?? "").trim();
+    const token = String(item?.token ?? "").trim();
+    const key = `${address.toLowerCase()}::${token.toLowerCase()}`;
+    if (!address || !token || seen.has(key)) continue;
+    seen.add(key);
+    pairs.push({ address, token });
   }
   return pairs;
 }
@@ -124,6 +131,7 @@ function resolveAdapters(ctx = {}) {
       queryBalanceBatch: custom.evm?.queryBalanceBatch ?? queryEvmTokenBalanceBatch,
     },
     btc: {
+      queryNativeBalance: custom.btc?.queryNativeBalance ?? btcBalanceGet,
       queryBalanceBatch: custom.btc?.queryBalanceBatch ?? brc20BalanceBatchGet,
     },
     trx: {
@@ -152,13 +160,11 @@ async function queryEvmSnapshot(evmItems, adapters, sharedInput = {}) {
   const rows = [];
 
   for (const [network, items] of byNetwork) {
-    const addresses = unique(items.map((i) => i.address));
-    const tokens    = unique(items.map((i) => i.token));
-    const pairs     = cartesianPairs(addresses, tokens);
+    const pairs = uniquePairs(items);
     const networkHint = network === "default" ? null : network;
     const callInput = { ...sharedInput, network: networkHint };
 
-    const metadataTokens = tokens.filter((t) => t.toLowerCase() !== "native");
+    const metadataTokens = unique(items.map((item) => item.token)).filter((t) => t.toLowerCase() !== "native");
     const [balanceRes, metadataRes] = await Promise.all([
       adapters.evm.queryBalanceBatch(pairs, callInput),
       metadataTokens.length > 0
@@ -220,29 +226,61 @@ async function queryBtcSnapshot(btcItems, adapters, sharedInput = {}) {
   const rows = [];
 
   for (const [network, items] of byNetwork) {
-    const addresses = unique(items.map((i) => i.address));
-    const tokens    = unique(items.map((i) => i.token));
-    const pairs     = cartesianPairs(addresses, tokens);
+    const nativeItems = items.filter((item) => {
+      const token = String(item.token ?? "").trim().toLowerCase();
+      return token === "btc" || token === "native";
+    });
+    const brc20Items = items.filter((item) => {
+      const token = String(item.token ?? "").trim().toLowerCase();
+      return token !== "btc" && token !== "native";
+    });
 
-    const balanceRes = await adapters.btc.queryBalanceBatch(pairs, network);
-
-    for (const item of balanceRes?.items ?? []) {
-      if (item?.ok === false) {
-        warnings.push({ chain: "btc", network, address: item.address ?? null, token: item.tokenAddress ?? null, error: item.error ?? "query failed" });
-        continue;
+    if (nativeItems.length > 0) {
+      try {
+        const nativeRes = await adapters.btc.queryNativeBalance({
+          addresses: unique(nativeItems.map((item) => item.address)),
+        }, network);
+        for (const row of nativeRes?.rows ?? []) {
+          rows.push({
+            chain: "btc",
+            network,
+            ownerAddress: row.address,
+            tokenAddress: "native",
+            symbol: "BTC",
+            name: "Bitcoin",
+            decimals: 8,
+            balanceRaw: decimalToRaw(row.total, 8),
+          });
+        }
+      } catch (error) {
+        for (const item of nativeItems) {
+          warnings.push({ chain: "btc", network, address: item.address ?? null, token: item.token ?? null, error: error?.message ?? String(error) });
+        }
       }
+    }
 
-      const decimals = Number.isFinite(Number(item.decimals)) ? Number(item.decimals) : 0;
-      rows.push({
-        chain: "btc",
-        network,
-        ownerAddress: item.address,
-        tokenAddress: item.tokenAddress,
-        symbol: item.symbol ?? null,
-        name: item.tokenName ?? null,
-        decimals,
-        balanceRaw: decimalToRaw(item.balance, decimals),
-      });
+    if (brc20Items.length > 0) {
+      const pairs = uniquePairs(brc20Items);
+      const balanceRes = await adapters.btc.queryBalanceBatch(pairs, network);
+
+      for (const item of balanceRes?.items ?? []) {
+        if (item?.ok === false) {
+          warnings.push({ chain: "btc", network, address: item.address ?? null, token: item.tokenAddress ?? null, error: item.error ?? "query failed" });
+          continue;
+        }
+
+        const decimals = Number.isFinite(Number(item.decimals)) ? Number(item.decimals) : 0;
+        rows.push({
+          chain: "btc",
+          network,
+          ownerAddress: item.address,
+          tokenAddress: item.tokenAddress,
+          symbol: item.symbol ?? null,
+          name: item.tokenName ?? null,
+          decimals,
+          balanceRaw: decimalToRaw(item.balance, decimals),
+        });
+      }
     }
   }
 
@@ -253,36 +291,67 @@ async function queryBtcSnapshot(btcItems, adapters, sharedInput = {}) {
  * TRX 查询：items 已归集为 trx chain。TRX 单网络，无需按 network 分组。
  */
 async function queryTrxSnapshot(trxItems, adapters, sharedInput = {}) {
-  const addresses = unique(trxItems.map((i) => i.address));
-  const tokens    = unique(trxItems.map((i) => i.token));
-  const pairs     = cartesianPairs(addresses, tokens);
-
-  const [balanceRes, metadataRes] = await Promise.all([
-    adapters.trx.queryBalanceBatch(pairs, sharedInput),
-    adapters.trx.queryMetadataBatch(tokens.map((token) => ({ token })), sharedInput),
-  ]);
-
-  const meta = metadataMap(metadataRes?.items ?? []);
   const warnings = [];
   const rows = [];
 
-  for (const item of balanceRes?.items ?? []) {
-    if (item?.ok === false) {
-      warnings.push({ chain: "trx", address: item.ownerAddress ?? null, token: item.tokenAddress ?? null, error: item.error ?? "query failed" });
-      continue;
+  const byNetwork = new Map();
+  for (const item of trxItems) {
+    const network = item.network || "mainnet";
+    if (!byNetwork.has(network)) byNetwork.set(network, []);
+    byNetwork.get(network).push(item);
+  }
+
+  for (const [network, items] of byNetwork) {
+    const pairs = uniquePairs(items);
+    const tokens = unique(items.map((i) => i.token));
+    const callInput = { ...sharedInput, network };
+
+    const balanceRes = await adapters.trx.queryBalanceBatch(pairs, callInput);
+    let metadataRes = { ok: true, items: [] };
+    try {
+      metadataRes = await adapters.trx.queryMetadataBatch(tokens.map((token) => ({ token })), callInput);
+    } catch (error) {
+      metadataRes = {
+        ok: false,
+        items: tokens.map((token) => ({
+          chain: "trx",
+          tokenAddress: token,
+          name: null,
+          symbol: null,
+          decimals: null,
+          ok: false,
+          error: error?.message ?? String(error),
+        })),
+      };
     }
 
-    const tokenAddress = String(item.tokenAddress ?? "").trim();
-    const m = meta.get(tokenAddress.toLowerCase()) ?? {};
-    rows.push({
-      chain: "trx",
-      ownerAddress: item.ownerAddress,
-      tokenAddress,
-      symbol: m.symbol ?? null,
-      name: m.name ?? null,
-      decimals: Number.isFinite(Number(m.decimals)) ? Number(m.decimals) : 0,
-      balanceRaw: typeof item.balance === "bigint" ? item.balance : BigInt(String(item.balance ?? 0)),
-    });
+    const meta = metadataMap(metadataRes?.items ?? []);
+
+    for (const item of metadataRes?.items ?? []) {
+      if (item?.ok === false) {
+        warnings.push({ chain: "trx", network, address: null, token: item.tokenAddress ?? null, error: item.error ?? "metadata query failed" });
+      }
+    }
+
+    for (const item of balanceRes?.items ?? []) {
+      if (item?.ok === false) {
+        warnings.push({ chain: "trx", network, address: item.ownerAddress ?? null, token: item.tokenAddress ?? null, error: item.error ?? "query failed" });
+        continue;
+      }
+
+      const tokenAddress = String(item.tokenAddress ?? "").trim();
+      const m = meta.get(tokenAddress.toLowerCase()) ?? {};
+      rows.push({
+        chain: "trx",
+        network,
+        ownerAddress: item.ownerAddress,
+        tokenAddress,
+        symbol: m.symbol ?? null,
+        name: m.name ?? null,
+        decimals: Number.isFinite(Number(m.decimals)) ? Number(m.decimals) : 0,
+        balanceRaw: typeof item.balance === "bigint" ? item.balance : BigInt(String(item.balance ?? 0)),
+      });
+    }
   }
 
   return { rows, warnings };
