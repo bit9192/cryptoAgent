@@ -144,7 +144,60 @@ export async function putCachedTokenMetadata(input = {}) {
   return changed;
 }
 
+export async function findCachedTokenMetadata(input = {}) {
+  const chain = String(input.chain ?? "").trim().toLowerCase();
+  const network = String(input.network ?? "").trim().toLowerCase();
+  const query = String(input.query ?? "").trim().toLowerCase();
+  const kind = String(input.kind ?? "auto").trim().toLowerCase();
+
+  if (!query) return null;
+
+  const cache = await loadCache();
+  const chainEntries = chain
+    ? [[chain, cache.records?.[chain] ?? {}]]
+    : Object.entries(cache.records ?? {});
+
+  for (const [chainKey, networkBucket] of chainEntries) {
+    if (!networkBucket || typeof networkBucket !== "object") continue;
+    const networkEntries = network
+      ? [[network, networkBucket[network] ?? {}]]
+      : Object.entries(networkBucket);
+
+    for (const [networkKey, tokenBucket] of networkEntries) {
+      if (!tokenBucket || typeof tokenBucket !== "object") continue;
+
+      for (const [tokenAddress, entry] of Object.entries(tokenBucket)) {
+        if (!isFresh(entry?.updatedAt, input.maxAgeMs)) continue;
+        const symbol = String(entry?.symbol ?? "").trim().toLowerCase();
+        const name = String(entry?.name ?? "").trim().toLowerCase();
+
+        const matched = kind === "address"
+          ? tokenAddress === query
+          : kind === "symbol"
+            ? symbol === query
+            : kind === "name"
+              ? name === query
+              : tokenAddress === query || symbol === query || name === query;
+
+        if (!matched) continue;
+
+        return {
+          chain: chainKey,
+          network: networkKey,
+          tokenAddress,
+          name: String(entry?.name ?? "").trim() || null,
+          symbol: String(entry?.symbol ?? "").trim() || null,
+          decimals: Number.isFinite(Number(entry?.decimals)) ? Number(entry.decimals) : null,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 export default {
+  findCachedTokenMetadata,
   getCachedTokenMetadataMap,
   putCachedTokenMetadata,
 };
