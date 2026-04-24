@@ -24,6 +24,47 @@ function resolveProvider(inputRpc, signerOptions = {}) {
   return inputRpc;
 }
 
+function unwrapAdapterResult(value) {
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+  if (value.ok === true && Object.prototype.hasOwnProperty.call(value, "result")) {
+    return value.result;
+  }
+  return value;
+}
+
+export function wrapEvmSignerAsEthersSigner(input = {}) {
+  const signer = input?.signer;
+  const provider = resolveProvider(input?.provider ?? input?.rpc ?? input?.rpcUrl, input?.options ?? {});
+  if (!signer || typeof signer !== "object") {
+    throw new Error("signer 不能为空");
+  }
+
+  return new Proxy(signer, {
+    get(target, prop, receiver) {
+      if (prop === "provider") {
+        return provider ?? target.provider ?? null;
+      }
+
+      if (Reflect.has(target, prop)) {
+        const own = Reflect.get(target, prop, receiver);
+        if (typeof own !== "function") {
+          return own;
+        }
+        return async (...args) => unwrapAdapterResult(await own.apply(target, args));
+      }
+
+      if (provider && Reflect.has(provider, prop)) {
+        const delegated = Reflect.get(provider, prop, provider);
+        return typeof delegated === "function" ? delegated.bind(provider) : delegated;
+      }
+
+      return undefined;
+    },
+  });
+}
+
 export function createEvmProvider(options = {}) {
   const version = String(options.version ?? "1.0.0");
   const operationList = [

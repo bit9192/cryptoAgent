@@ -1040,6 +1040,9 @@ export function createWallet(options = {}) {
    */
   function resolveWildcardPath(pathPattern, chain, addressType, network) {
     if (!pathPattern) return null;
+    if (pathPattern === "*") {
+      return defaultDerivationPathByChain({ chain, addressType, network });
+    }
     const isTestnet = String(network ?? "mainnet").toLowerCase() !== "mainnet";
     const coinType = isTestnet ? "1" : "0";
 
@@ -1168,11 +1171,8 @@ export function createWallet(options = {}) {
         if (chain === "btc" && addressType && effectivePattern) {
           const mismatch = validateBtcPurposeMatch(addressType, effectivePattern);
           if (mismatch) {
-            if (strict) {
-              throw new Error(mismatch);
-            }
             warnings.push(mismatch);
-            // 非 strict：继续派生（path 不匹配仍推导地址）
+            // path 优先：即使 type/path 不匹配也不中断，仅给出提示
           }
         }
 

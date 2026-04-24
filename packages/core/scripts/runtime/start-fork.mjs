@@ -82,7 +82,7 @@ function resolveForkableNetworks() {
 
 function spawnHardhat(args, extraEnv = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn("npx", ["hardhat", ...args], {
+    const child = spawn("pnpm", ["hardhat", ...args], {
       stdio: "inherit",
       env: {
         ...process.env,

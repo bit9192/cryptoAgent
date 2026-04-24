@@ -37,3 +37,7 @@ export {
 	loadContractManifest,
 	loadContractArtifact,
 } from "./contracts/load.mjs";
+export {
+	queryEvmTokenMetadata,
+	queryEvmTokenMetadataBatch,
+} from "./assets/token-metadata.mjs";

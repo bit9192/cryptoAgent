@@ -38,6 +38,7 @@ function normalizeInputSchema(schema) {
  * @param {boolean}  [config.requiresConfirm] - 是否必须人工确认
  * @param {string[]} [config.sourcePolicy] - 允许的来源列表（空数组 = 允许所有）
  * @param {string[]} [config.tags]         - 标签
+ * @param {Array}    [config.operations]   - 可选：任务内部子操作定义（用于 help/AI 可发现性）
  * @param {Function} config.run            - 任务执行函数 async (ctx) => result
  * @returns {object}  TaskDefinition
  */
@@ -68,6 +69,9 @@ export function defineTask(config) {
     requiresConfirm: Boolean(config.requiresConfirm),
     sourcePolicy: coerceStringList(config.sourcePolicy),
     tags: coerceStringList(config.tags),
+    operations: Array.isArray(config.operations)
+      ? config.operations.map((item) => ({ ...item }))
+      : [],
     run: config.run,
   };
 }

@@ -153,7 +153,7 @@ describe("evm multiCall", () => {
 
 		const tokenA = new EvmContract(token, erc20Abi, null);
 		const output = await mc.call({
-			balance: tokenA.call.balanceOf(wallet),
+			balance: tokenA.calls.balanceOf(wallet),
 			meta: {
 				decimals: tokenA.calls.decimals(),
 			},

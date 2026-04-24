@@ -10,6 +10,9 @@ export { execute, createMemoryCheckpointStore } from "./execute.mjs";
 // 任务定义
 export { defineTask, isTaskDefinition } from "./define-task.mjs";
 
+// Action dispatcher
+export { buildActionDispatcher } from "./action-dispatcher.mjs";
+
 // 任务注册表
 export {
   buildTaskRegistry,

@@ -25,6 +25,7 @@ import {
   getDefaultRegistry,
   clearRegistryCache,
 } from "../execute/index.mjs";
+import { walletSessionActionList } from "../tasks/wallet/index.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -304,6 +305,132 @@ async function runScriptWithExecHandlers(session, scriptPath) {
   }
 }
 
+function printWalletHelp(session) {
+  const ids = session.registry ? session.registry.listIds() : [];
+  const walletTaskIds = ids.filter((id) => String(id).startsWith("wallet:"));
+  const enabledDefs = walletSessionActionList.filter((item) => walletTaskIds.includes(item.taskId));
+
+  if (enabledDefs.length === 0) {
+    console.log("\n  (尚无可用 wallet 命令)\n");
+    return;
+  }
+
+  console.log("\n  wallet 命令:");
+  for (const item of enabledDefs) {
+    console.log(`    ${item.usage.padEnd(20)}  ${item.description}`);
+  }
+  console.log("");
+}
+
+function formatTaskInputField(name, def = {}, requiredSet) {
+  const required = requiredSet.has(name) ? "required" : "optional";
+  const type = String(def?.type ?? "any").trim() || "any";
+  return { name, type, required };
+}
+
+function printTaskCatalogHelp(session) {
+  console.log("\n  task 命令用法:");
+  console.log("    task <taskId> [--key value ...]");
+  console.log("    task -h | --help");
+  console.log("    task -h <taskId>      查看该 task 的参数说明");
+  console.log("    task help <taskId>    同上");
+  console.log("");
+
+  if (!session.registry) {
+    console.log("  (注册表未初始化)\n");
+    return;
+  }
+
+  const ids = session.registry.listIds();
+  if (ids.length === 0) {
+    console.log("  (没有已注册的任务)\n");
+    return;
+  }
+
+  console.log("  当前可用 task:\n");
+  for (const id of ids.sort()) {
+    const def = session.registry.get(id);
+    const title = String(def?.title ?? "").trim();
+    const desc = String(def?.description ?? "").trim();
+    console.log(`    ${id}${title ? `  ${title}` : ""}${desc ? `  - ${desc}` : ""}`);
+  }
+  console.log("\n  提示: 使用 task -h <taskId> 查看该任务参数。\n");
+}
+
+function printTaskDetailHelp(session, taskId) {
+  const id = String(taskId ?? "").trim();
+  if (!id) {
+    printTaskCatalogHelp(session);
+    return;
+  }
+
+  if (!session.registry) {
+    console.log("\n  (注册表未初始化)\n");
+    return;
+  }
+
+  const def = session.registry.get(id);
+  if (!def) {
+    console.log(`\n  未找到 task: ${id}`);
+    console.log("  可用命令: task -h\n");
+    return;
+  }
+
+  const schema = def.inputSchema ?? {};
+  const required = new Set(Array.isArray(schema.required) ? schema.required : []);
+  const properties = schema.properties && typeof schema.properties === "object"
+    ? schema.properties
+    : {};
+  const fields = Object.keys(properties)
+    .sort()
+    .map((name) => formatTaskInputField(name, properties[name], required));
+
+  console.log(`\n  task: ${id}`);
+  if (def.title) console.log(`  title: ${def.title}`);
+  if (def.description) console.log(`  desc: ${def.description}`);
+  console.log(`  readonly: ${Boolean(def.readonly)}`);
+  console.log(`  requiresConfirm: ${Boolean(def.requiresConfirm)}`);
+  if (Array.isArray(def.sourcePolicy) && def.sourcePolicy.length > 0) {
+    console.log(`  sourcePolicy: ${def.sourcePolicy.join(", ")}`);
+  }
+
+  if (fields.length === 0) {
+    console.log("\n  input: (无参数约束)");
+  } else {
+    console.log("\n  input fields:");
+    for (const field of fields) {
+      console.log(`    --${field.name} <${field.type}>  (${field.required})`);
+    }
+  }
+
+  const operations = Array.isArray(def.operations) ? def.operations : [];
+  if (operations.length > 0) {
+    console.log("\n  actions:");
+    for (const op of operations) {
+      const actionName = String(op?.action ?? "").trim();
+      const usage = String(op?.usage ?? "").trim();
+      const description = String(op?.description ?? "").trim();
+      console.log(`    ${actionName}${usage ? `  -> ${usage}` : ""}`);
+      if (description) {
+        console.log(`      ${description}`);
+      }
+
+      const opProps = op?.argsSchema?.properties ?? {};
+      const opRequired = new Set(Array.isArray(op?.argsSchema?.required) ? op.argsSchema.required : []);
+      const opArgNames = Object.keys(opProps).filter((k) => k !== "action");
+      if (opArgNames.length > 0) {
+        const argLine = opArgNames
+          .sort()
+          .map((k) => `--${k}<${opProps[k]?.type ?? "any"}>${opRequired.has(k) ? "*" : ""}`)
+          .join("  ");
+        console.log(`      args: ${argLine}`);
+      }
+    }
+  }
+
+  console.log(`\n  usage: task ${id} [--key value ...]\n`);
+}
+
 // ─── 命令分发 ─────────────────────────────────────────────────
 
 async function dispatchCommand(line, session) {
@@ -313,36 +440,73 @@ async function dispatchCommand(line, session) {
   const { com, args } = parseCliCommand(trimmed.split(/\s+/));
 
   switch (com) {
+    // ── wallet <subcommand> ──
+    case "wallet": {
+      const positional = args._ ?? [];
+      const sub = String(positional[0] ?? "").trim().toLowerCase();
+      const bySub = new Map(walletSessionActionList.map((item) => [item.sub, item]));
+
+      if (!sub || sub === "-h" || sub === "--help" || sub === "help") {
+        printWalletHelp(session);
+        break;
+      }
+
+      const spec = bySub.get(sub);
+      if (!spec) {
+        console.error(`  未知 wallet 子命令: ${sub}（输入 wallet -h 查看帮助）`);
+        break;
+      }
+
+      const taskArgs = {
+        action: spec.action,
+      };
+
+      const optionKeys = Object.keys(args).filter((k) => k !== "_");
+      if (optionKeys.length > 0) {
+        console.log(`  [wallet] ${spec.sub} 不接收参数，已忽略: ${optionKeys.join(", ")}`);
+      }
+
+      await runTask(session, spec.taskId, taskArgs, null);
+      break;
+    }
+
     // ── task <taskId> [--key value ...] ──
     case "task": {
       const positional = args._ ?? [];
       const taskId = String(positional[0] ?? "").trim();
       if (taskId === "-h" || taskId === "--help") {
-        console.log("\n  task 命令用法:\n    task <taskId> [--key value ...]\n    task -h | --help\n");
-        if (!session.registry) {
-          console.log("  (注册表未初始化)\n");
-          break;
+        const targetId = String(positional[1] ?? "").trim();
+        if (targetId) {
+          printTaskDetailHelp(session, targetId);
+        } else {
+          printTaskCatalogHelp(session);
         }
-        const ids = session.registry.listIds();
-        if (ids.length === 0) {
-          console.log("  (没有已注册的任务)\n");
-          break;
+        break;
+      }
+      if (taskId === "help") {
+        const targetId = String(positional[1] ?? "").trim();
+        if (targetId) {
+          printTaskDetailHelp(session, targetId);
+        } else {
+          printTaskCatalogHelp(session);
         }
-        console.log("  当前可用 task:\n");
-        for (const id of ids.sort()) {
-          const def = session.registry.get(id);
-          const title = String(def?.title ?? "").trim();
-          console.log(`    ${id}${title ? `  ${title}` : ""}`);
-        }
-        console.log("");
         break;
       }
       if (!taskId) {
-        console.error("  用法: task <taskId> [--key value ...]  (或 task -h 查看可用 task)");
+        console.error("  用法: task <taskId> [--key value ...]  (或 task -h / task -h <taskId>)");
         break;
       }
       const taskArgs = { ...args };
       delete taskArgs._;
+      // 支持: task <taskId> <sub|action>  -> 自动补充 --action
+      const positionalSub = String(positional[1] ?? "").trim();
+      if (positionalSub && !taskArgs.action) {
+        // 先按 sub 别名查找
+        const matched = walletSessionActionList.find(
+          (item) => item.sub === positionalSub || item.action === positionalSub,
+        );
+        taskArgs.action = matched ? matched.action : positionalSub;
+      }
       await runTask(session, taskId, taskArgs, null);
       break;
     }
@@ -525,6 +689,25 @@ async function dispatchCommand(line, session) {
         console.log("  (注册表未初始化)");
         break;
       }
+      if (Boolean(args.json)) {
+        const ids = session.registry.listIds().sort();
+        const items = ids.map((id) => {
+          const def = session.registry.get(id);
+          return {
+            id,
+            title: String(def?.title ?? "").trim() || null,
+            description: String(def?.description ?? "").trim() || null,
+            readonly: Boolean(def?.readonly),
+            requiresConfirm: Boolean(def?.requiresConfirm),
+            sourcePolicy: Array.isArray(def?.sourcePolicy) ? def.sourcePolicy : [],
+            tags: Array.isArray(def?.tags) ? def.tags : [],
+            operations: Array.isArray(def?.operations) ? def.operations : [],
+            inputSchema: def?.inputSchema ?? {},
+          };
+        });
+        console.log(JSON.stringify({ ok: true, action: "tasks.list", count: items.length, items }, null, 2));
+        break;
+      }
       const ids = session.registry.list();
       if (ids.length === 0) {
         console.log("  (没有已注册的任务)");
@@ -545,14 +728,16 @@ async function dispatchCommand(line, session) {
     case "?": {
       console.log(`
   Lon REPL 命令:
+    wallet <subcommand>                  wallet 固定流程命令（输入 wallet -h 查看）
     task <taskId> [--key value ...]   执行已注册的任务
     task -h | --help                  查看当前可用 task 命令集
+    task -h <taskId>                  查看某个 task 的输入参数说明
     run  <scriptName>                 运行 src/run/<scriptName>.mjs
     n    <scriptPath>                 按路径运行脚本（旧 run 行为）
     test <filePattern>                运行 Node 测试文件
     resume <token>                    恢复已暂停的任务
     use  <dev|op>                     切换 wallet 模式
-    tasks                             列出所有已注册任务
+    tasks [--json]                    列出所有已注册任务（--json 机器可读）
     reload                            重新加载任务注册表
     state                             查看当前 Session 状态
     history [id]                      查看执行历史
