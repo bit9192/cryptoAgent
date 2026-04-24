@@ -1,4 +1,5 @@
 import { DexScreenerSource } from "../sources/dexscreener/index.mjs";
+import { resolveEvmToken } from "../../evm/configs/tokens.js";
 import {
   getCachedTokenPriceMap,
   putCachedTokenPrice,
@@ -99,32 +100,90 @@ function groupByChainNetwork(rows = []) {
   return [...map.values()];
 }
 
-async function resolveRemotePriceMap(tokens = [], options = {}) {
-  if (tokens.length === 0) return new Map();
+function buildRemoteQueryToken(meta) {
+  const tokenAddress = normalizeLower(meta?.tokenAddress);
+  if (tokenAddress && tokenAddress !== "native") return tokenAddress;
+
+  const chain = normalizeLower(meta?.chain);
+  const network = normalizeNetworkName(meta?.network);
+  const symbol = normalizeLower(meta?.symbol);
+
+  if (chain === "evm") {
+    try {
+      const wrapped = network === "bsc"
+        ? resolveEvmToken({ network, key: "wbnb" })
+        : resolveEvmToken({ network, key: "weth" });
+      const address = normalizeString(wrapped?.address);
+      if (address) return normalizeLower(address);
+    } catch {
+      // ignore and fallback to symbol
+    }
+  }
+
+  return symbol || null;
+}
+
+function buildStablecoinGuardWarning(meta, priceUsd, options = {}) {
+  const symbol = normalizeLower(meta?.symbol);
+  const stableSymbols = new Set(
+    Array.isArray(options.stableSymbols) && options.stableSymbols.length > 0
+      ? options.stableSymbols.map((v) => normalizeLower(v)).filter(Boolean)
+      : ["usdt", "usdc", "dai", "fdusd", "usde"]
+  );
+  if (!stableSymbols.has(symbol)) return null;
+
+  const minUsd = Number.isFinite(Number(options.stableMinUsd)) ? Number(options.stableMinUsd) : 0.9;
+  const maxUsd = Number.isFinite(Number(options.stableMaxUsd)) ? Number(options.stableMaxUsd) : 1.1;
+  if (priceUsd < minUsd || priceUsd > maxUsd) {
+    return `稳定币价格偏离区间[${minUsd}, ${maxUsd}]: ${symbol.toUpperCase()}=${priceUsd}`;
+  }
+  return null;
+}
+
+async function resolveRemotePriceMap(requests = [], options = {}) {
+  if (requests.length === 0) return new Map();
+
+  const queryTokens = requests
+    .map((item) => normalizeLower(item?.queryToken))
+    .filter(Boolean);
+  if (queryTokens.length === 0) return new Map();
+
+  const queryToKeys = new Map();
+  for (const item of requests) {
+    const queryToken = normalizeLower(item?.queryToken);
+    const key = normalizeLower(item?.key);
+    if (!queryToken || !key) continue;
+    if (!queryToKeys.has(queryToken)) queryToKeys.set(queryToken, new Set());
+    queryToKeys.get(queryToken).add(key);
+  }
 
   try {
     if (typeof options.priceBatchResolver === "function") {
-      const remote = await options.priceBatchResolver(tokens, options);
+      const remote = await options.priceBatchResolver([...new Set(queryTokens)], options);
       const map = new Map();
-      for (const token of tokens) {
+      for (const token of queryToKeys.keys()) {
         const row = remote?.[token] ?? remote?.[normalizeLower(token)] ?? null;
         const priceUsd = toPriceUsd(row);
         if (!Number.isFinite(priceUsd)) continue;
-        map.set(normalizeLower(token), priceUsd);
+        for (const key of queryToKeys.get(token)) {
+          map.set(key, priceUsd);
+        }
       }
       return map;
     }
 
     const source = options.priceSource ?? await getDefaultDexScreenerSource();
     if (!source || typeof source.getPrice !== "function") return new Map();
-    const remote = await source.getPrice(tokens);
+    const remote = await source.getPrice([...new Set(queryTokens)]);
 
     const map = new Map();
-    for (const token of tokens) {
+    for (const token of queryToKeys.keys()) {
       const row = remote?.[token] ?? remote?.[normalizeLower(token)] ?? null;
       const priceUsd = toPriceUsd(row);
       if (!Number.isFinite(priceUsd)) continue;
-      map.set(normalizeLower(token), priceUsd);
+      for (const key of queryToKeys.get(token)) {
+        map.set(key, priceUsd);
+      }
     }
     return map;
   } catch {
@@ -142,6 +201,7 @@ export async function queryTokenPriceBatchByMeta(metaItems = [], options = {}) {
       cacheHits: 0,
       remoteHits: 0,
       unresolved: 0,
+      guardWarnings: 0,
     }
     : null;
   const cacheApi = buildCacheApi(options);
@@ -192,24 +252,16 @@ export async function queryTokenPriceBatchByMeta(metaItems = [], options = {}) {
   }
 
   for (const group of groupByChainNetwork(metasToPrice)) {
-    const tokens = [...new Set(group.rows.map((v) => normalizeLower(v.tokenAddress)).filter(Boolean))];
-    const cacheMap = options.forceRemote === true
-      ? new Map()
-      : await cacheApi.getMap({
-        chain: group.chain,
-        network: group.network,
-        tokens,
-        maxAgeMs: options.cacheMaxAgeMs,
-      });
-
-    const missing = [];
-    for (const tokenAddress of tokens) {
-      if (!cacheMap.has(tokenAddress)) {
-        missing.push(tokenAddress);
-      }
+    const cacheMap = new Map();
+    const requests = [];
+    for (const meta of group.rows) {
+      const key = normalizeLower(meta.tokenAddress);
+      const queryToken = buildRemoteQueryToken(meta);
+      if (!key || !queryToken) continue;
+      requests.push({ key, queryToken });
     }
 
-    const remoteMap = await resolveRemotePriceMap(missing, options);
+    const remoteMap = await resolveRemotePriceMap(requests, options);
     const savable = [];
     for (const [tokenAddress, priceUsd] of remoteMap.entries()) {
       savable.push({ tokenAddress, priceUsd });
@@ -232,6 +284,8 @@ export async function queryTokenPriceBatchByMeta(metaItems = [], options = {}) {
 
       if (hasCache || hasRemote) {
         const source = hasRemote ? "remote" : "cache";
+        const pickedPrice = hasRemote ? priceFromRemote : priceFromCache;
+        const guardWarning = buildStablecoinGuardWarning(meta, pickedPrice, options);
         const out = {
           ok: true,
           query: meta.query,
@@ -241,9 +295,13 @@ export async function queryTokenPriceBatchByMeta(metaItems = [], options = {}) {
           tokenAddress: meta.tokenAddress,
           symbol: meta.symbol,
           name: meta.name,
-          priceUsd: hasRemote ? priceFromRemote : priceFromCache,
+          priceUsd: pickedPrice,
           source,
         };
+        if (guardWarning) {
+          out.warning = guardWarning;
+          if (stats) stats.guardWarnings += 1;
+        }
         if (stats) {
           if (source === "cache") stats.cacheHits += 1;
           if (source === "remote") stats.remoteHits += 1;

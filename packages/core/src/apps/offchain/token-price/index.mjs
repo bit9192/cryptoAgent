@@ -165,6 +165,57 @@ function normalizeRemoteTokenInfo(raw, item) {
   };
 }
 
+function resolveNativeTokenCandidate(query, network) {
+  const key = normalizeLower(query);
+  const net = normalizeNetworkName(network);
+
+  if (net === "bsc" && ["bnb", "wbnb", "native"].includes(key)) {
+    return {
+      chain: "evm",
+      network: "bsc",
+      tokenAddress: "native",
+      symbol: "BNB",
+      name: "BNB",
+      decimals: 18,
+    };
+  }
+
+  if (net === "eth" && ["eth", "weth", "native"].includes(key)) {
+    return {
+      chain: "evm",
+      network: "eth",
+      tokenAddress: "native",
+      symbol: "ETH",
+      name: "Ether",
+      decimals: 18,
+    };
+  }
+
+  if (net === "mainnet" && ["trx", "native"].includes(key)) {
+    return {
+      chain: "trx",
+      network: "mainnet",
+      tokenAddress: "native",
+      symbol: "TRX",
+      name: "TRON",
+      decimals: 6,
+    };
+  }
+
+  if (["btc", "bitcoin", "mainnet"].includes(net || "") && ["btc", "native"].includes(key)) {
+    return {
+      chain: "btc",
+      network: net || "mainnet",
+      tokenAddress: "native",
+      symbol: "BTC",
+      name: "Bitcoin",
+      decimals: 8,
+    };
+  }
+
+  return null;
+}
+
 let _defaultDexScreenerSource = null;
 
 async function getDefaultDexScreenerSource() {
@@ -204,6 +255,14 @@ function resolveConfigCandidates(item) {
     if (detected === "btc") maybeResolve("btc", resolveBtcToken, { network, address: query });
     if (detected === "trx") maybeResolve("trx", resolveTrxToken, { network, address: query });
     return candidates;
+  }
+
+  const nativeCandidate = resolveNativeTokenCandidate(query, network);
+  if (nativeCandidate) {
+    pushRow(normalizeResolvedRow(nativeCandidate, {
+      chain: nativeCandidate.chain,
+      network: nativeCandidate.network,
+    }));
   }
 
   maybeResolve("evm", resolveEvmToken, { network, key: query });

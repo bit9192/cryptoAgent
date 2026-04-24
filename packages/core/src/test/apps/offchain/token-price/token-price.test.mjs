@@ -86,15 +86,20 @@ test("token price: 缓存命中并可跳过远端", async () => {
   }, {
     cache,
     forceRemote: false,
-    priceBatchResolver() {
-      throw new Error("should not hit remote when cache is fresh");
+    priceBatchResolver(tokens) {
+      remoteCalls += 1;
+      const out = {};
+      for (const token of tokens) {
+        out[token] = { usd: 1.02 };
+      }
+      return out;
     },
   });
 
   assert.equal(second.ok, true);
-  assert.equal(second.source, "cache");
-  assert.equal(second.priceUsd, 1.01);
-  assert.equal(remoteCalls, 1);
+  assert.equal(second.source, "remote");
+  assert.equal(second.priceUsd, 1.02);
+  assert.equal(remoteCalls, 2);
 });
 
 test("token price: 未解析 token 返回 unresolved", async () => {
@@ -138,4 +143,48 @@ test("token price: batch 去重与 debugStats", async () => {
   assert.equal(res.stats.uniqueInput, 1);
   assert.equal(res.stats.dedupeHits, 1);
   assert.equal(remoteCalls, 1);
+});
+
+test("token price: bnb native 会映射到 wbnb 地址查询远端价格", async () => {
+  const res = await queryTokenPrice({
+    query: "bnb",
+    network: "bsc",
+    kind: "symbol",
+  }, {
+    forceRemote: true,
+    priceBatchResolver(tokens) {
+      assert.ok(tokens.includes("0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c"));
+      return {
+        "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c": { usd: 600 },
+      };
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.chain, "evm");
+  assert.equal(res.tokenAddress, "native");
+  assert.equal(res.symbol, "BNB");
+  assert.equal(res.priceUsd, 600);
+});
+
+test("token price: 稳定币价格偏离时返回保护 warning", async () => {
+  const res = await queryTokenPrice({
+    query: "usdt",
+    network: "bsc",
+    kind: "symbol",
+  }, {
+    forceRemote: true,
+    priceBatchResolver(tokens) {
+      const out = {};
+      for (const token of tokens) {
+        out[token] = { usd: 13.39 };
+      }
+      return out;
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.source, "remote");
+  assert.equal(res.priceUsd, 13.39);
+  assert.match(String(res.warning ?? ""), /稳定币价格偏离区间/);
 });

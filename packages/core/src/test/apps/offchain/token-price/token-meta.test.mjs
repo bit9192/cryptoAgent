@@ -594,3 +594,35 @@ test("token meta: symbol 远端命中后会补齐 EVM decimals", async () => {
   assert.equal(res.decimals, 18);
   assert.equal(evmReaderCalled, 1);
 });
+
+test("token meta: bsc 上 bnb symbol 可解析为 native", async () => {
+  const res = await queryTokenMeta({
+    query: "bnb",
+    network: "bsc",
+    kind: "symbol",
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.source, "config");
+  assert.equal(res.chain, "evm");
+  assert.equal(res.network, "bsc");
+  assert.equal(res.tokenAddress, "native");
+  assert.equal(res.symbol, "BNB");
+  assert.equal(res.decimals, 18);
+});
+
+test("token meta: eth 上 eth symbol 可解析为 native", async () => {
+  const res = await queryTokenMeta({
+    query: "eth",
+    network: "eth",
+    kind: "symbol",
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.source, "config");
+  assert.equal(res.chain, "evm");
+  assert.equal(res.network, "eth");
+  assert.equal(res.tokenAddress, "native");
+  assert.equal(res.symbol, "ETH");
+  assert.equal(res.decimals, 18);
+});
