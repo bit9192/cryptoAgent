@@ -431,6 +431,48 @@ function printTaskDetailHelp(session, taskId) {
   console.log(`\n  usage: task ${id} [--key value ...]\n`);
 }
 
+function unwrapQuotedString(raw) {
+  const text = String(raw ?? "").trim();
+  if (text.length >= 2) {
+    const first = text[0];
+    const last = text[text.length - 1];
+    if ((first === "'" && last === "'") || (first === '"' && last === '"')) {
+      return text.slice(1, -1);
+    }
+  }
+  return text;
+}
+
+function coerceTaskArgValue(key, value) {
+  if (typeof value !== "string") return value;
+  const text = unwrapQuotedString(value);
+  if (!text) return text;
+
+  // 支持: --items '["a:b:c"]' / --prices '[{...}]' / --risk '{...}'
+  if (text.startsWith("[") || text.startsWith("{")) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return value;
+    }
+  }
+
+  // 常见场景：items 直接给单条 triplet 字符串，自动包一层数组
+  if (key === "items") {
+    return [text];
+  }
+
+  return value;
+}
+
+function normalizeTaskArgs(rawArgs = {}) {
+  const out = {};
+  for (const [key, value] of Object.entries(rawArgs)) {
+    out[key] = coerceTaskArgValue(key, value);
+  }
+  return out;
+}
+
 // ─── 命令分发 ─────────────────────────────────────────────────
 
 async function dispatchCommand(line, session) {
@@ -496,7 +538,7 @@ async function dispatchCommand(line, session) {
         console.error("  用法: task <taskId> [--key value ...]  (或 task -h / task -h <taskId>)");
         break;
       }
-      const taskArgs = { ...args };
+      const taskArgs = normalizeTaskArgs({ ...args });
       delete taskArgs._;
       // 支持: task <taskId> <sub|action>  -> 自动补充 --action
       const positionalSub = String(positional[1] ?? "").trim();
