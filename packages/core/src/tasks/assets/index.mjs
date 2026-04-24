@@ -3,6 +3,7 @@ import { buildActionDispatcher } from "../../execute/action-dispatcher.mjs";
 import { aggregateAssetSnapshot } from "../../modules/assets-engine/snapshot-aggregate.mjs";
 import { getCachedTokenMetadataMap, putCachedTokenMetadata } from "../../modules/assets-engine/token-metadata-cache.mjs";
 import { resolveEvmToken } from "../../apps/evm/configs/tokens.js";
+import { resolveBtcToken } from "../../apps/btc/config/tokens.js";
 import { resolveTrxToken } from "../../apps/trx/config/tokens.js";
 import {
   queryEvmTokenMetadataBatch,
@@ -171,6 +172,25 @@ function buildTrxConfigMetadataMap(tokens = [], network = null) {
       }
     } catch {
       // 配置中不存在则忽略，交给缓存/RPC
+    }
+  }
+  return map;
+}
+
+function buildBtcConfigMetadataMap(tokens = [], network = null) {
+  const map = new Map();
+  for (const token of tokens) {
+    const key = normalizeTokenKey(token);
+    if (!key || key === "native" || key === "btc") continue;
+    try {
+      const resolved = resolveBtcToken({ network, key: token });
+      const row = toMetadataRowFromConfig("btc", resolved?.address ?? token, resolved);
+      map.set(key, row);
+      if (row.tokenAddress) {
+        map.set(normalizeTokenKey(row.tokenAddress), row);
+      }
+    } catch {
+      // 配置中不存在则忽略，交给缓存/余额结果兜底
     }
   }
   return map;
@@ -355,7 +375,16 @@ async function queryBtcSnapshot(btcItems, adapters, sharedInput = {}) {
 
     if (brc20Items.length > 0) {
       const pairs = uniquePairs(brc20Items);
+      const tokens = unique(brc20Items.map((item) => item.token));
+      const configMeta = buildBtcConfigMetadataMap(tokens, network);
+      const missingForConfig = tokens.filter((token) => !configMeta.has(normalizeTokenKey(token)));
+      const cachedMeta = await getCachedTokenMetadataMap({
+        chain: "btc",
+        network,
+        tokens: missingForConfig,
+      });
       const balanceRes = await adapters.btc.queryBalanceBatch(pairs, network);
+      const freshMetaRows = [];
 
       for (const item of balanceRes?.items ?? []) {
         if (item?.ok === false) {
@@ -363,16 +392,41 @@ async function queryBtcSnapshot(btcItems, adapters, sharedInput = {}) {
           continue;
         }
 
-        const decimals = Number.isFinite(Number(item.decimals)) ? Number(item.decimals) : 0;
+        const tokenAddress = String(item.tokenAddress ?? item.token ?? "").trim();
+        const tokenKey = normalizeTokenKey(tokenAddress);
+        const m = configMeta.get(tokenKey) ?? cachedMeta.get(tokenKey) ?? {};
+        const decimals = Number.isFinite(Number(m.decimals))
+          ? Number(m.decimals)
+          : (Number.isFinite(Number(item.decimals)) ? Number(item.decimals) : 0);
+
+        freshMetaRows.push({
+          tokenAddress,
+          symbol: m.symbol ?? item.symbol ?? null,
+          name: m.name ?? item.tokenName ?? null,
+          decimals,
+        });
+
         rows.push({
           chain: "btc",
           network,
           ownerAddress: item.address,
-          tokenAddress: item.tokenAddress,
-          symbol: item.symbol ?? null,
-          name: item.tokenName ?? null,
+          tokenAddress,
+          symbol: m.symbol ?? item.symbol ?? null,
+          name: m.name ?? item.tokenName ?? null,
           decimals,
           balanceRaw: decimalToRaw(item.balance, decimals),
+        });
+      }
+
+      const savableMetaRows = freshMetaRows.filter((row) => {
+        const key = normalizeTokenKey(row.tokenAddress);
+        return key && (row.symbol || row.name || Number.isFinite(Number(row.decimals)));
+      });
+      if (savableMetaRows.length > 0) {
+        await putCachedTokenMetadata({
+          chain: "btc",
+          network,
+          items: savableMetaRows,
         });
       }
     }

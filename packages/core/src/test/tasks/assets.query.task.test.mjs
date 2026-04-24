@@ -305,3 +305,41 @@ test("assets:query assets.query reads metadata from config before RPC", async ()
   assert.equal(res.snapshot.items[0].symbol, "USDT");
   assert.equal(res.snapshot.items[0].decimals, 18);
 });
+
+test("assets:query assets.query reads BTC metadata from config before adapter fields", async () => {
+  const res = await task.run(createCtx({
+    action: "assets.query",
+    items: [
+      {
+        address: "bc1p8w6zr5e2q60s0r8al4tvmsfer77c0eqc8j55gk8r7hzv39zhs2lqa8p0k6",
+        token: "ordi",
+        network: "mainnet",
+      },
+    ],
+  }, {
+    btc: {
+      async queryBalanceBatch() {
+        return {
+          ok: true,
+          items: [
+            {
+              address: "bc1p8w6zr5e2q60s0r8al4tvmsfer77c0eqc8j55gk8r7hzv39zhs2lqa8p0k6",
+              tokenAddress: "ordi",
+              symbol: null,
+              tokenName: null,
+              decimals: null,
+              balance: "1",
+              ok: true,
+            },
+          ],
+        };
+      },
+    },
+  }));
+
+  assert.equal(res.ok, true);
+  assert.equal(res.snapshot.items.length, 1);
+  assert.equal(res.snapshot.items[0].symbol, "ORDI");
+  assert.equal(res.snapshot.items[0].name, "Ordinals");
+  assert.equal(res.snapshot.items[0].decimals, 18);
+});
