@@ -19,6 +19,11 @@ function normalizeLower(value) {
   return normalizeString(value).toLowerCase();
 }
 
+function normalizeQueryKind(kind) {
+  const value = normalizeLower(kind || "auto") || "auto";
+  return value;
+}
+
 function normalizeNetworkName(network) {
   const raw = normalizeLower(network);
   if (!raw) return null;
@@ -68,7 +73,8 @@ function looksLikeMalformedAddress(query) {
   if (value.startsWith("0x")) {
     return !/^0x[a-fA-F0-9]{40}$/.test(value);
   }
-  if (/^T/i.test(value)) {
+  const looksLikeTrxAddress = /^T/i.test(value) && (value.length >= 25 || /\d/.test(value));
+  if (looksLikeTrxAddress) {
     return !/^T[1-9A-HJ-NP-Za-km-z]{25,34}$/.test(value);
   }
   const looksLikeBtcAddress = /^(bc1|tb1|bcrt1)[ac-hj-np-z02-9]{11,71}$/i.test(value)
@@ -96,11 +102,11 @@ function normalizeItems(input) {
     if (!query) {
       throw new Error("query 不能为空");
     }
-    if (looksLikeMalformedAddress(query)) {
+    const kind = normalizeQueryKind(item.kind);
+    if ((kind === "auto" || kind === "address") && looksLikeMalformedAddress(query)) {
       throw new Error(`非法地址: ${query}`);
     }
     const network = normalizeNetworkName(item.network);
-    const kind = normalizeLower(item.kind || "auto") || "auto";
     return { query, network, kind };
   });
 }

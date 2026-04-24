@@ -295,6 +295,31 @@ test("token meta: 非法地址样式输入抛错", async () => {
   );
 });
 
+test("token meta: kind=symbol 时 T 前缀 query 不应被当成非法地址", async () => {
+  const res = await queryTokenMeta({
+    query: "Tst",
+    network: "bsc",
+    kind: "symbol",
+  }, {
+    forceRemote: true,
+    async remoteResolver(item) {
+      return {
+        chain: "evm",
+        network: item.network,
+        tokenAddress: "0x55d398326f99059fF775485246999027B3197955",
+        symbol: "TST",
+        name: "Test Token",
+        decimals: 18,
+      };
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.source, "remote");
+  assert.equal(res.symbol, "TST");
+  assert.equal(res.decimals, 18);
+});
+
 test("token meta: 远端异常不泄露敏感信息并降级", async () => {
   const secret = "TRX_MAINNET_API_KEY=super-secret-key";
   const res = await queryTokenMeta({
