@@ -17,27 +17,64 @@ import {
 
 const TASK_ID = "assets:query";
 
-function normalizeChain(value) {
-  const raw = String(value ?? "").trim().toLowerCase();
-  if (!raw) throw new Error("chain 不能为空");
-  if (["evm", "ethereum"].includes(raw)) return "evm";
-  if (["btc", "bitcoin"].includes(raw)) return "btc";
-  if (["trx", "tron"].includes(raw)) return "trx";
-  throw new Error(`不支持的 chain: ${value}`);
+// ─── Address → chain inference ────────────────────────────────
+
+/**
+ * 根据地址形态推断 chain。
+ * - TRX: 以 T 开头的 34 位 Base58 地址
+ * - BTC: bc1/tb1/1/3/m/n 前缀
+ * - EVM: 0x 前缀
+ * - 无法判断 → null
+ */
+function inferChainFromAddress(address) {
+  const addr = String(address ?? "").trim();
+  if (!addr) return null;
+  if (/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(addr)) return "trx";
+  if (/^(bc1|tb1|1|3|m|n)/.test(addr)) return "btc";
+  if (/^0x[0-9a-fA-F]{0,}$/.test(addr)) return "evm";
+  return null;
 }
 
-function ensureStringArray(value, label) {
-  if (!Array.isArray(value)) {
-    throw new Error(`${label} 必须是数组`);
+/**
+ * 标准化单条 item：接受字符串 "address:token:network" 或对象。
+ * 返回 { address, token, network, chain } 内部强类型。
+ */
+function normalizeQueryItem(raw) {
+  let address, token, network;
+
+  if (typeof raw === "string") {
+    const parts = raw.split(":");
+    address = (parts[0] ?? "").trim();
+    token   = (parts[1] ?? "native").trim() || "native";
+    network = (parts[2] ?? "").trim();
+  } else if (raw && typeof raw === "object") {
+    address = String(raw.address ?? "").trim();
+    token   = String(raw.token   ?? "native").trim() || "native";
+    network = String(raw.network ?? "").trim();
+  } else {
+    throw new Error(`无效的 query item: ${JSON.stringify(raw)}`);
   }
-  const list = value
-    .map((item) => String(item ?? "").trim())
-    .filter(Boolean);
-  if (list.length === 0) {
-    throw new Error(`${label} 不能为空`);
-  }
-  return list;
+
+  if (!address) throw new Error(`query item 缺少 address: ${JSON.stringify(raw)}`);
+
+  const chain = inferChainFromAddress(address);
+
+  return { address, token, network, chain };
 }
+
+/**
+ * 解析 assets.query 输入中的 items 字段。
+ * 支持三元组字符串数组或对象数组，混合均可。
+ */
+function parseQueryItems(input) {
+  const raw = input.items;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new Error("assets.query: items 必须是非空数组，格式为 [{address,token,network}] 或 ['address:token:network']");
+  }
+  return raw.map((item) => normalizeQueryItem(item));
+}
+
+// ─── Utilities ────────────────────────────────────────────────
 
 function unique(items = []) {
   return [...new Set(items)];
@@ -96,88 +133,133 @@ function resolveAdapters(ctx = {}) {
   };
 }
 
-async function queryEvmSnapshot(input, adapters) {
-  const addresses = unique(ensureStringArray(input.addresses, "addresses"));
-  const tokens = unique(ensureStringArray(input.tokens, "tokens"));
-  const pairs = cartesianPairs(addresses, tokens);
+// ─── Chain-specific snapshot queries ──────────────────────────
 
-  const metadataTokens = tokens.filter((token) => token.toLowerCase() !== "native");
-  const [balanceRes, metadataRes] = await Promise.all([
-    adapters.evm.queryBalanceBatch(pairs, input),
-    metadataTokens.length > 0
-      ? adapters.evm.queryMetadataBatch(metadataTokens.map((token) => ({ token })), input)
-      : Promise.resolve({ ok: true, items: [] }),
-  ]);
+/**
+ * EVM 查询：items 已归集为同属 evm chain，但可能跨 network（如 eth/bsc）。
+ * 按 network 分组，逐组调用 adapters。
+ */
+async function queryEvmSnapshot(evmItems, adapters, sharedInput = {}) {
+  // 按 network 分组
+  const byNetwork = new Map();
+  for (const item of evmItems) {
+    const net = item.network || "default";
+    if (!byNetwork.has(net)) byNetwork.set(net, []);
+    byNetwork.get(net).push(item);
+  }
 
-  const meta = metadataMap(metadataRes?.items ?? []);
   const warnings = [];
   const rows = [];
 
-  for (const item of balanceRes?.items ?? []) {
-    if (item?.ok === false) {
-      warnings.push({ chain: "evm", address: item.ownerAddress ?? null, token: item.tokenAddress ?? null, error: item.error ?? "query failed" });
-      continue;
+  for (const [network, items] of byNetwork) {
+    const addresses = unique(items.map((i) => i.address));
+    const tokens    = unique(items.map((i) => i.token));
+    const pairs     = cartesianPairs(addresses, tokens);
+    const networkHint = network === "default" ? null : network;
+    const callInput = { ...sharedInput, network: networkHint };
+
+    const metadataTokens = tokens.filter((t) => t.toLowerCase() !== "native");
+    const [balanceRes, metadataRes] = await Promise.all([
+      adapters.evm.queryBalanceBatch(pairs, callInput),
+      metadataTokens.length > 0
+        ? adapters.evm.queryMetadataBatch(metadataTokens.map((token) => ({ token })), callInput)
+        : Promise.resolve({ ok: true, items: [] }),
+    ]);
+
+    const meta = metadataMap(metadataRes?.items ?? []);
+
+    for (const item of balanceRes?.items ?? []) {
+      if (item?.ok === false) {
+        warnings.push({ chain: "evm", network: networkHint, address: item.ownerAddress ?? null, token: item.tokenAddress ?? null, error: item.error ?? "query failed" });
+        continue;
+      }
+
+      const tokenAddress = String(item.tokenAddress ?? "").trim();
+      const tokenKey = tokenAddress.toLowerCase();
+      const native = tokenKey === "native";
+      const m = native
+        ? { symbol: "ETH", name: "Ether", decimals: 18 }
+        : (meta.get(tokenKey) ?? {});
+
+      rows.push({
+        chain: "evm",
+        network: networkHint,
+        ownerAddress: item.ownerAddress,
+        tokenAddress,
+        symbol: m.symbol ?? null,
+        name: m.name ?? null,
+        decimals: Number.isFinite(Number(m.decimals)) ? Number(m.decimals) : 0,
+        balanceRaw: typeof item.balance === "bigint" ? item.balance : BigInt(String(item.balance ?? 0)),
+      });
     }
-
-    const tokenAddress = String(item.tokenAddress ?? "").trim();
-    const tokenKey = tokenAddress.toLowerCase();
-    const native = tokenKey === "native";
-    const m = native
-      ? { symbol: "ETH", name: "Ether", decimals: 18 }
-      : (meta.get(tokenKey) ?? {});
-
-    rows.push({
-      chain: "evm",
-      ownerAddress: item.ownerAddress,
-      tokenAddress,
-      symbol: m.symbol ?? null,
-      name: m.name ?? null,
-      decimals: Number.isFinite(Number(m.decimals)) ? Number(m.decimals) : 0,
-      balanceRaw: typeof item.balance === "bigint" ? item.balance : BigInt(String(item.balance ?? 0)),
-    });
   }
 
   return { rows, warnings };
 }
 
-async function queryBtcSnapshot(input, adapters) {
-  const addresses = unique(ensureStringArray(input.addresses, "addresses"));
-  const tokens = unique(ensureStringArray(input.tokens, "tokens"));
-  const pairs = cartesianPairs(addresses, tokens);
-
-  const balanceRes = await adapters.btc.queryBalanceBatch(pairs, input.networkNameOrProvider ?? input.networkName ?? input.network ?? null);
+/**
+ * BTC 查询：items 已归集为 btc chain，network 可推断（mainnet/testnet）。
+ */
+async function queryBtcSnapshot(btcItems, adapters, sharedInput = {}) {
+  // 按 network 分组（BTC 可从地址前缀推断 network）
+  const byNetwork = new Map();
+  for (const item of btcItems) {
+    let net = item.network;
+    if (!net) {
+      // 从地址推断 BTC network
+      const addr = item.address;
+      if (/^(bc1|1|3)/.test(addr)) net = "mainnet";
+      else if (/^(tb1|m|n)/.test(addr)) net = "testnet";
+      else net = "mainnet";
+    }
+    if (!byNetwork.has(net)) byNetwork.set(net, []);
+    byNetwork.get(net).push(item);
+  }
 
   const warnings = [];
   const rows = [];
-  for (const item of balanceRes?.items ?? []) {
-    if (item?.ok === false) {
-      warnings.push({ chain: "btc", address: item.address ?? null, token: item.tokenAddress ?? null, error: item.error ?? "query failed" });
-      continue;
-    }
 
-    const decimals = Number.isFinite(Number(item.decimals)) ? Number(item.decimals) : 0;
-    rows.push({
-      chain: "btc",
-      ownerAddress: item.address,
-      tokenAddress: item.tokenAddress,
-      symbol: item.symbol ?? null,
-      name: item.tokenName ?? null,
-      decimals,
-      balanceRaw: decimalToRaw(item.balance, decimals),
-    });
+  for (const [network, items] of byNetwork) {
+    const addresses = unique(items.map((i) => i.address));
+    const tokens    = unique(items.map((i) => i.token));
+    const pairs     = cartesianPairs(addresses, tokens);
+
+    const balanceRes = await adapters.btc.queryBalanceBatch(pairs, network);
+
+    for (const item of balanceRes?.items ?? []) {
+      if (item?.ok === false) {
+        warnings.push({ chain: "btc", network, address: item.address ?? null, token: item.tokenAddress ?? null, error: item.error ?? "query failed" });
+        continue;
+      }
+
+      const decimals = Number.isFinite(Number(item.decimals)) ? Number(item.decimals) : 0;
+      rows.push({
+        chain: "btc",
+        network,
+        ownerAddress: item.address,
+        tokenAddress: item.tokenAddress,
+        symbol: item.symbol ?? null,
+        name: item.tokenName ?? null,
+        decimals,
+        balanceRaw: decimalToRaw(item.balance, decimals),
+      });
+    }
   }
 
   return { rows, warnings };
 }
 
-async function queryTrxSnapshot(input, adapters) {
-  const addresses = unique(ensureStringArray(input.addresses, "addresses"));
-  const tokens = unique(ensureStringArray(input.tokens, "tokens"));
-  const pairs = cartesianPairs(addresses, tokens);
+/**
+ * TRX 查询：items 已归集为 trx chain。TRX 单网络，无需按 network 分组。
+ */
+async function queryTrxSnapshot(trxItems, adapters, sharedInput = {}) {
+  const addresses = unique(trxItems.map((i) => i.address));
+  const tokens    = unique(trxItems.map((i) => i.token));
+  const pairs     = cartesianPairs(addresses, tokens);
 
   const [balanceRes, metadataRes] = await Promise.all([
-    adapters.trx.queryBalanceBatch(pairs, input),
-    adapters.trx.queryMetadataBatch(tokens.map((token) => ({ token })), input),
+    adapters.trx.queryBalanceBatch(pairs, sharedInput),
+    adapters.trx.queryMetadataBatch(tokens.map((token) => ({ token })), sharedInput),
   ]);
 
   const meta = metadataMap(metadataRes?.items ?? []);
@@ -206,6 +288,8 @@ async function queryTrxSnapshot(input, adapters) {
   return { rows, warnings };
 }
 
+// ─── Task handlers ────────────────────────────────────────────
+
 async function runAssetsStatus() {
   return {
     ok: true,
@@ -214,36 +298,98 @@ async function runAssetsStatus() {
       chains: ["evm", "btc", "trx"],
       actions: ["assets.status", "assets.query"],
       quote: ["usd"],
+      inputFormats: ["triplet-string", "triplet-object"],
     },
   };
 }
 
 async function runAssetsQuery(ctx, input = {}) {
-  const chain = normalizeChain(input.chain);
   const quote = String(input.quote ?? "usd").trim().toLowerCase() || "usd";
   const adapters = resolveAdapters(ctx);
 
-  let queried;
-  if (chain === "evm") {
-    queried = await queryEvmSnapshot(input, adapters);
-  } else if (chain === "btc") {
-    queried = await queryBtcSnapshot(input, adapters);
-  } else {
-    queried = await queryTrxSnapshot(input, adapters);
+  // 解析三元组 items
+  const items = parseQueryItems(input);
+
+  // 找出 chain 推断失败的 items
+  const unknownChainItems = items.filter((i) => !i.chain);
+  if (unknownChainItems.length > 0) {
+    // 通过 interact 上报给外层补全，task 自身不调 AI
+    if (typeof ctx.interact === "function") {
+      const filled = await ctx.interact({
+        type: "assets.query.missing_chain",
+        message: "以下地址无法推断所属链，请补充 chain 信息",
+        fields: unknownChainItems.map((i) => ({
+          name: `chain_for_${i.address}`,
+          type: "select",
+          label: `${i.address} 的链`,
+          options: ["evm", "btc", "trx"],
+        })),
+      });
+      const payload = filled?.payload ?? filled ?? {};
+      for (const item of unknownChainItems) {
+        const key = `chain_for_${item.address}`;
+        if (payload[key]) item.chain = String(payload[key]).trim().toLowerCase();
+      }
+    }
+
+    // interact 后仍有未解析的 → 报错
+    const stillUnknown = items.filter((i) => !i.chain);
+    if (stillUnknown.length > 0) {
+      return {
+        ok: false,
+        action: "assets.query",
+        error: "无法推断部分地址的链类型，请在 items 中通过 network 字段显式指定",
+        unknownAddresses: stillUnknown.map((i) => i.address),
+      };
+    }
   }
 
+  // EVM items 缺少 network → interact 补全
+  const evmItemsMissingNetwork = items.filter((i) => i.chain === "evm" && !i.network);
+  if (evmItemsMissingNetwork.length > 0 && typeof ctx.interact === "function") {
+    const filled = await ctx.interact({
+      type: "assets.query.missing_network",
+      message: "以下 EVM 地址缺少 network，请补充（如 eth/bsc/polygon）",
+      fields: evmItemsMissingNetwork.map((i) => ({
+        name: `network_for_${i.address}`,
+        type: "text",
+        label: `${i.address} 的 EVM network`,
+        placeholder: "eth",
+      })),
+    });
+    const payload = filled?.payload ?? filled ?? {};
+    for (const item of evmItemsMissingNetwork) {
+      const key = `network_for_${item.address}`;
+      if (payload[key]) item.network = String(payload[key]).trim().toLowerCase();
+    }
+  }
+
+  // 按 chain 归集
+  const evmItems = items.filter((i) => i.chain === "evm");
+  const btcItems = items.filter((i) => i.chain === "btc");
+  const trxItems = items.filter((i) => i.chain === "trx");
+
+  const sharedInput = { prices: input.prices, risks: input.risks };
+  const results = await Promise.all([
+    evmItems.length > 0 ? queryEvmSnapshot(evmItems, adapters, sharedInput) : Promise.resolve({ rows: [], warnings: [] }),
+    btcItems.length > 0 ? queryBtcSnapshot(btcItems, adapters, sharedInput) : Promise.resolve({ rows: [], warnings: [] }),
+    trxItems.length > 0 ? queryTrxSnapshot(trxItems, adapters, sharedInput) : Promise.resolve({ rows: [], warnings: [] }),
+  ]);
+
+  const allRows     = results.flatMap((r) => r.rows);
+  const allWarnings = results.flatMap((r) => r.warnings);
+
   const snapshot = aggregateAssetSnapshot({
-    balances: queried.rows,
+    balances: allRows,
     prices: Array.isArray(input.prices) ? input.prices : [],
-    risks: Array.isArray(input.risks) ? input.risks : [],
+    risks:   Array.isArray(input.risks)  ? input.risks  : [],
   });
 
   return {
     ok: true,
     action: "assets.query",
-    chain,
     quote,
-    warnings: queried.warnings,
+    warnings: allWarnings,
     snapshot,
   };
 }
@@ -263,14 +409,12 @@ export const actionObject = Object.freeze({
   "assets.query": {
     taskId: TASK_ID,
     sub: "query",
-    usage: "assets query --chain <evm|btc|trx> --addresses [...] --tokens [...]",
-    description: "Query single-chain assets and build normalized snapshot",
+    usage: "assets query --items <address:token:network> [--items ...]",
+    description: "Query multi-chain assets by triplet items and build normalized snapshot",
     argsSchema: {
-      required: ["chain", "addresses", "tokens"],
+      required: ["items"],
       properties: {
-        chain: { type: "string" },
-        addresses: { type: "array" },
-        tokens: { type: "array" },
+        items: { type: "array", description: "Each item: {address, token, network} or 'address:token:network'" },
         quote: { type: "string" },
         prices: { type: "array" },
         risks: { type: "array" },
@@ -291,7 +435,7 @@ export const operationList = Object.freeze(dispatcher.list());
 export const task = defineTask({
   id: TASK_ID,
   title: "Assets Query",
-  description: "Assets orchestrator for status/query with standardized snapshot output",
+  description: "Assets orchestrator for multi-chain status/query with triplet-item input and standardized snapshot output",
   readonly: false,
   requiresConfirm: false,
   sourcePolicy: ["cli", "test", "api", "workflow"],
@@ -307,12 +451,10 @@ export const task = defineTask({
     required: ["action"],
     properties: {
       action: { type: "string" },
-      chain: { type: "string" },
-      addresses: { type: "array" },
-      tokens: { type: "array" },
-      quote: { type: "string" },
+      items:  { type: "array" },
+      quote:  { type: "string" },
       prices: { type: "array" },
-      risks: { type: "array" },
+      risks:  { type: "array" },
     },
   },
   async run(ctx) {
