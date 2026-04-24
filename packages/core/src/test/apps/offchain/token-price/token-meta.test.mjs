@@ -553,3 +553,44 @@ test("token meta: symbol 远端结果同链但网络不匹配时降级 unresolve
   assert.equal(res.ok, false);
   assert.equal(res.source, "unresolved");
 });
+
+test("token meta: symbol 远端命中后会补齐 EVM decimals", async () => {
+  let evmReaderCalled = 0;
+
+  const res = await queryTokenMeta({
+    query: "fxs",
+    network: "eth",
+    kind: "symbol",
+  }, {
+    forceRemote: true,
+    tokenInfoSource: {
+      async getTokenInfo() {
+        return {
+          chainId: "ethereum",
+          baseToken: {
+            address: "0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0",
+            symbol: "FXS",
+            name: "Frax Share",
+            decimals: 0,
+          },
+        };
+      },
+    },
+    async evmMetadataReader(item) {
+      evmReaderCalled += 1;
+      return {
+        chain: "evm",
+        network: item.network,
+        tokenAddress: item.query,
+        symbol: "FXS",
+        name: "Frax Share",
+        decimals: 18,
+      };
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.source, "remote");
+  assert.equal(res.decimals, 18);
+  assert.equal(evmReaderCalled, 1);
+});

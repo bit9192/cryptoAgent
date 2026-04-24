@@ -255,6 +255,77 @@ async function resolveFromCache(item, cacheApi, options = {}) {
   return found ? { ...normalizeResolvedRow(found, found), source: "cache" } : null;
 }
 
+async function enrichResolvedMetadata(item, normalized, options = {}) {
+  if (!normalized?.tokenAddress || !normalized?.chain) return normalized;
+
+  if (normalized.chain === "evm" && detectAddressKind(normalized.tokenAddress) === "evm") {
+    try {
+      let meta = null;
+      if (typeof options.evmMetadataReader === "function") {
+        meta = await options.evmMetadataReader({
+          query: normalized.tokenAddress,
+          network: normalized.network ?? item.network,
+          kind: "address",
+        }, options);
+      } else {
+        const batchReader = typeof options.evmMetadataBatchReader === "function"
+          ? options.evmMetadataBatchReader
+          : queryEvmTokenMetadataBatch;
+        const batchRes = await batchReader([{ token: normalized.tokenAddress }], {
+          ...(options.evmMetadataOptions && typeof options.evmMetadataOptions === "object" ? options.evmMetadataOptions : {}),
+          network: normalized.network ?? item.network ?? undefined,
+          networkName: normalized.network ?? item.network ?? undefined,
+        });
+        meta = batchRes?.items?.[0] ?? null;
+      }
+
+      if (meta && typeof meta === "object") {
+        return {
+          ...normalized,
+          name: normalized.name ?? (meta.name ?? null),
+          symbol: normalized.symbol ?? (meta.symbol ?? null),
+          decimals: Number.isFinite(Number(meta.decimals)) ? Number(meta.decimals) : normalized.decimals,
+        };
+      }
+    } catch {
+      // ignore enrichment failure, keep normalized remote result
+    }
+  }
+
+  if (normalized.chain === "trx" && detectAddressKind(normalized.tokenAddress) === "trx") {
+    try {
+      let meta = null;
+      if (typeof options.trxMetadataReader === "function") {
+        meta = await options.trxMetadataReader({
+          query: normalized.tokenAddress,
+          network: normalized.network ?? item.network ?? "mainnet",
+          kind: "address",
+        }, options);
+      } else {
+        meta = await queryTrxTokenMetadata({
+          tokenAddress: normalized.tokenAddress,
+          network: normalized.network ?? item.network ?? undefined,
+          networkName: normalized.network ?? item.network ?? undefined,
+          callerAddress: options.trxCallerAddress ?? options.callerAddress ?? undefined,
+        });
+      }
+
+      if (meta && typeof meta === "object") {
+        return {
+          ...normalized,
+          name: normalized.name ?? (meta.name ?? null),
+          symbol: normalized.symbol ?? (meta.symbol ?? null),
+          decimals: Number.isFinite(Number(meta.decimals)) ? Number(meta.decimals) : normalized.decimals,
+        };
+      }
+    } catch {
+      // ignore enrichment failure, keep normalized remote result
+    }
+  }
+
+  return normalized;
+}
+
 async function resolveFromRemote(item, options, cacheApi) {
   let resolved = null;
   try {
@@ -330,12 +401,16 @@ async function resolveFromRemote(item, options, cacheApi) {
   });
   if (!normalized.tokenAddress) return null;
   if (!isRemoteMatchForItem(item, normalized)) return null;
+  const queryKind = inferQueryKind(item);
+  const enriched = queryKind === "address"
+    ? normalized
+    : await enrichResolvedMetadata(item, normalized, options);
   await cacheApi.put({
-    chain: normalized.chain,
-    network: normalized.network ?? "default",
-    items: [normalized],
+    chain: enriched.chain,
+    network: enriched.network ?? "default",
+    items: [enriched],
   });
-  return { ...normalized, source: "remote" };
+  return { ...enriched, source: "remote" };
 }
 
 export async function queryTokenMetaBatch(input = [], options = {}) {
