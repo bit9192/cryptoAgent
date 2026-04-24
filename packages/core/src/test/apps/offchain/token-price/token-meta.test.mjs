@@ -344,3 +344,77 @@ test("token meta: debugStats 返回命中统计", async () => {
   assert.equal(res.stats.remoteHits, 1);
   assert.equal(res.stats.unresolved, 1);
 });
+
+test("token meta: forceRemote 为 true 时跳过缓存并回写", async () => {
+  const cache = createMemoryCache();
+  await cache.put({
+    chain: "evm",
+    network: "bsc",
+    items: [{
+      tokenAddress: "0xb45e6dd851df10961d1aad912baf220168fcaa25",
+      symbol: "OLD",
+      name: "Old Token",
+      decimals: 0,
+    }],
+  });
+
+  let remoteCalled = 0;
+  const res = await queryTokenMeta({
+    query: "0xb45e6dd851df10961d1aad912baf220168fcaa25",
+    network: "bsc",
+  }, {
+    cache,
+    forceRemote: true,
+    async remoteResolver(item) {
+      remoteCalled += 1;
+      return {
+        chain: "evm",
+        network: item.network,
+        tokenAddress: item.query,
+        symbol: "NEW",
+        name: "New Token",
+        decimals: 18,
+      };
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.source, "remote");
+  assert.equal(res.decimals, 18);
+  assert.equal(remoteCalled, 1);
+});
+
+test("token meta: EVM 地址远端优先使用链上 ERC20 读取", async () => {
+  let evmReaderCalled = 0;
+  let sourceCalled = 0;
+
+  const res = await queryTokenMeta({
+    query: "0xb45e6dd851df10961d1aad912baf220168fcaa25",
+    network: "bsc",
+  }, {
+    forceRemote: true,
+    async evmMetadataReader(item) {
+      evmReaderCalled += 1;
+      return {
+        chain: "evm",
+        network: item.network,
+        tokenAddress: item.query,
+        name: "BSC Token",
+        symbol: "BTK",
+        decimals: 18,
+      };
+    },
+    tokenInfoSource: {
+      async getTokenInfo() {
+        sourceCalled += 1;
+        return null;
+      },
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.source, "remote");
+  assert.equal(res.decimals, 18);
+  assert.equal(evmReaderCalled, 1);
+  assert.equal(sourceCalled, 0);
+});

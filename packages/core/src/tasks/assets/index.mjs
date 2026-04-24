@@ -566,6 +566,7 @@ async function runAssetsTokenMeta(ctx, input = {}) {
   const options = {
     ...(ctx?.tokenMetaOptions && typeof ctx.tokenMetaOptions === "object" ? ctx.tokenMetaOptions : {}),
     debugStats: Boolean(input.debugStats),
+    forceRemote: Boolean(input.forceRemote),
   };
 
   if (Number.isFinite(Number(input.cacheMaxAgeMs))) {
@@ -712,6 +713,7 @@ export const actionObject = Object.freeze({
         kind: { type: "string" },
         cacheMaxAgeMs: { type: "number|integer" },
         debugStats: { type: "boolean" },
+        forceRemote: { type: "boolean" },
       },
     },
     handler: async (ctx, input) => await runAssetsTokenMeta(ctx, input),
@@ -754,6 +756,7 @@ export const task = defineTask({
       kind: { type: "string" },
       cacheMaxAgeMs: { type: "number" },
       debugStats: { type: "boolean" },
+      forceRemote: { type: "boolean" },
     },
   },
   async run(ctx) {

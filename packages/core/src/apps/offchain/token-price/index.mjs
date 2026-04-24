@@ -3,6 +3,7 @@ import { DexScreenerSource } from "../sources/dexscreener/index.mjs";
 import { resolveEvmToken } from "../../evm/configs/tokens.js";
 import { resolveBtcToken } from "../../btc/config/tokens.js";
 import { resolveTrxToken } from "../../trx/config/tokens.js";
+import { createErc20 } from "../../evm/erc20.mjs";
 import {
   getCachedTokenMetadataMap,
   putCachedTokenMetadata,
@@ -202,10 +203,39 @@ async function resolveFromRemote(item, options, cacheApi) {
   let resolved = null;
   try {
     if (typeof options.remoteResolver === "function") {
-      resolved = await options.remoteResolver(item);
+      resolved = await options.remoteResolver(item, options);
     } else {
+      const queryKind = inferQueryKind(item);
+      if (queryKind === "address" && detectAddressKind(item.query) === "evm") {
+        if (typeof options.evmMetadataReader === "function") {
+          resolved = await options.evmMetadataReader(item, options);
+        } else {
+          const token = createErc20({
+            ...(options.evmContractOptions && typeof options.evmContractOptions === "object" ? options.evmContractOptions : {}),
+            address: item.query,
+            network: item.network ?? undefined,
+            networkName: item.network ?? undefined,
+          });
+          const [name, symbol, decimals] = await Promise.all([
+            token.name().catch(() => null),
+            token.symbol().catch(() => null),
+            token.decimals().catch(() => null),
+          ]);
+          if (name != null || symbol != null || decimals != null) {
+            resolved = {
+              chain: "evm",
+              network: item.network,
+              tokenAddress: item.query,
+              name,
+              symbol,
+              decimals,
+            };
+          }
+        }
+      }
+
       const source = options.tokenInfoSource ?? await getDefaultDexScreenerSource();
-      if (source && typeof source.getTokenInfo === "function") {
+      if (!resolved && source && typeof source.getTokenInfo === "function") {
         const tokenInfo = await source.getTokenInfo(item.query);
         resolved = normalizeRemoteTokenInfo(tokenInfo, item);
       }
@@ -260,6 +290,22 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
       continue;
     }
 
+    if (options.forceRemote === true) {
+      const remoteOnly = await resolveFromRemote(item, options, cacheApi);
+      if (remoteOnly) {
+        const output = {
+          ok: true,
+          query: item.query,
+          queryKind,
+          ...remoteOnly,
+        };
+        if (stats) stats.remoteHits += 1;
+        dedupResultMap.set(dedupKey, output);
+        results.push(output);
+        continue;
+      }
+    }
+
     const configCandidates = resolveConfigCandidates(item);
     if (configCandidates.length > 0) {
       const chosen = configCandidates[0];
@@ -276,18 +322,20 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
       continue;
     }
 
-    const cached = await resolveFromCache(item, cacheApi, options);
-    if (cached) {
-      const output = {
-        ok: true,
-        query: item.query,
-        queryKind,
-        ...cached,
-      };
-      if (stats) stats.cacheHits += 1;
-      dedupResultMap.set(dedupKey, output);
-      results.push(output);
-      continue;
+    if (options.forceRemote !== true) {
+      const cached = await resolveFromCache(item, cacheApi, options);
+      if (cached) {
+        const output = {
+          ok: true,
+          query: item.query,
+          queryKind,
+          ...cached,
+        };
+        if (stats) stats.cacheHits += 1;
+        dedupResultMap.set(dedupKey, output);
+        results.push(output);
+        continue;
+      }
     }
 
     const remote = await resolveFromRemote(item, options, cacheApi);

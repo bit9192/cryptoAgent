@@ -42,6 +42,46 @@ test("assets:query assets.token-meta resolves metadata with debug stats", async 
   assert.equal(res.stats.dedupeHits, 1);
 });
 
+test("assets:query assets.token-meta passes forceRemote option", async () => {
+  let forceRemoteSeen = false;
+  const res = await task.run(createCtx({
+    action: "assets.token-meta",
+    query: "0xb45e6dd851df10961d1aad912baf220168fcaa25",
+    network: "bsc",
+    forceRemote: true,
+  }, null, null, {
+    cache: {
+      async getMap() {
+        return new Map();
+      },
+      async find() {
+        return null;
+      },
+      async put() {
+        return 1;
+      },
+    },
+    async remoteResolver(item, options) {
+      forceRemoteSeen = options.forceRemote === true;
+      return {
+        chain: "evm",
+        network: item.network,
+        tokenAddress: item.query,
+        symbol: "TOK",
+        name: "Token",
+        decimals: 18,
+      };
+    },
+  }));
+
+  assert.equal(res.ok, true);
+  assert.equal(res.action, "assets.token-meta");
+  assert.equal(res.items.length, 1);
+  assert.equal(res.items[0].source, "remote");
+  assert.equal(res.items[0].decimals, 18);
+  assert.equal(forceRemoteSeen, true);
+});
+
 // ─── assets.query — triplet object items ──────────────────────
 
 test("assets:query assets.query orchestrates evm adapters via triplet object items", async () => {
