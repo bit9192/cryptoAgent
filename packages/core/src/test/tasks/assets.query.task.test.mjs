@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 
 import task from "../../tasks/assets/index.mjs";
 
-function createCtx(input, assetsAdapters = null, interactFn = null, tokenMetaOptions = null) {
+function createCtx(input, assetsAdapters = null, interactFn = null, tokenMetaOptions = null, tokenPriceOptions = null) {
   return {
     input: () => input,
     assetsAdapters,
     interact: interactFn ?? undefined,
     tokenMetaOptions,
+    tokenPriceOptions,
   };
 }
 
@@ -20,6 +21,7 @@ test("assets:query assets.status returns capabilities", async () => {
   assert.equal(res.action, "assets.status");
   assert.deepEqual(res.capabilities.chains, ["evm", "btc", "trx"]);
   assert.ok(res.capabilities.actions.includes("assets.token-meta"));
+  assert.ok(res.capabilities.actions.includes("assets.token-price"));
   assert.ok(Array.isArray(res.capabilities.inputFormats));
 });
 
@@ -80,6 +82,43 @@ test("assets:query assets.token-meta passes forceRemote option", async () => {
   assert.equal(res.items[0].source, "remote");
   assert.equal(res.items[0].decimals, 18);
   assert.equal(forceRemoteSeen, true);
+});
+
+test("assets:query assets.token-price resolves price with debug stats", async () => {
+  const res = await task.run(createCtx({
+    action: "assets.token-price",
+    items: [
+      { query: "usdt", network: "bsc", kind: "symbol" },
+      { query: "USDT", network: "bsc", kind: "symbol" },
+    ],
+    debugStats: true,
+    forceRemote: true,
+  }, null, null, null, {
+    cache: {
+      async getMap() {
+        return new Map();
+      },
+      async put() {
+        return 1;
+      },
+    },
+    priceBatchResolver(tokens) {
+      const out = {};
+      for (const token of tokens) {
+        out[token] = { usd: 1 };
+      }
+      return out;
+    },
+  }));
+
+  assert.equal(res.ok, true);
+  assert.equal(res.action, "assets.token-price");
+  assert.equal(res.items.length, 2);
+  assert.equal(res.items[0].ok, true);
+  assert.equal(res.items[0].priceUsd, 1);
+  assert.equal(res.stats.totalInput, 2);
+  assert.equal(res.stats.uniqueInput, 1);
+  assert.equal(res.stats.dedupeHits, 1);
 });
 
 // ─── assets.query — triplet object items ──────────────────────

@@ -10,6 +10,10 @@ import {
   putCachedTokenMetadata,
   findCachedTokenMetadata,
 } from "../../../modules/assets-engine/token-metadata-cache.mjs";
+import {
+  queryTokenPriceBatchByMeta,
+  queryTokenPriceByMeta,
+} from "./query-token-price.mjs";
 
 function normalizeString(value) {
   return String(value ?? "").trim();
@@ -544,7 +548,38 @@ export async function queryTokenMeta(input, options = {}) {
   return result.items[0] ?? null;
 }
 
+export async function queryTokenPriceBatch(input = [], options = {}) {
+  const tokenMetaOptions = {
+    ...(options.tokenMetaOptions && typeof options.tokenMetaOptions === "object" ? options.tokenMetaOptions : {}),
+    cache: options.metaCache,
+    cacheMaxAgeMs: options.metaCacheMaxAgeMs,
+    forceRemote: options.metaForceRemote,
+    debugStats: false,
+  };
+
+  if (tokenMetaOptions.cache == null) delete tokenMetaOptions.cache;
+  if (tokenMetaOptions.cacheMaxAgeMs == null) delete tokenMetaOptions.cacheMaxAgeMs;
+  if (tokenMetaOptions.forceRemote == null) delete tokenMetaOptions.forceRemote;
+
+  const metaRes = await queryTokenMetaBatch(input, tokenMetaOptions);
+  const priceRes = await queryTokenPriceBatchByMeta(metaRes.items, options);
+  return priceRes;
+}
+
+export async function queryTokenPrice(input, options = {}) {
+  const meta = await queryTokenMeta(input, {
+    ...(options.tokenMetaOptions && typeof options.tokenMetaOptions === "object" ? options.tokenMetaOptions : {}),
+    cache: options.metaCache,
+    cacheMaxAgeMs: options.metaCacheMaxAgeMs,
+    forceRemote: options.metaForceRemote,
+    debugStats: false,
+  });
+  return await queryTokenPriceByMeta(meta, options);
+}
+
 export default {
   queryTokenMeta,
   queryTokenMetaBatch,
+  queryTokenPrice,
+  queryTokenPriceBatch,
 };

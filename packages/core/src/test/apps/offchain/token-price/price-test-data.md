@@ -40,4 +40,27 @@
 - 不记录敏感 API key
 - 错误信息不回传环境变量内容
 
+## price-slice-data
+
+### happy-path
+
+- ETH (eth) -> 价格应可解析（`priceUsd > 0`）
+- USDT (bsc) -> 价格应可解析（`priceUsd > 0`）
+- SUN (trx) -> 价格应可解析（`priceUsd > 0`）
+
+### edge-case
+
+- mixed chain batch：`eth + bsc + trx` 同批输入
+- 同 token 重复输入：应触发去重，避免重复远端调用
+- 远端返回 `priceUsd` 缺失：可降级 unresolved
+
+### invalid-case
+
+- 空 query
+- 未解析 symbol：`not-a-token`
+
+### security-case
+
+- 远端异常时不回传密钥等敏感上下文
+
 

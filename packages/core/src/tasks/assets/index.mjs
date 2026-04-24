@@ -25,6 +25,7 @@ import {
 } from "../../apps/trx/assets/balance-batch.mjs";
 import {
   queryTokenMetaBatch,
+  queryTokenPriceBatch,
 } from "../../apps/offchain/token-price/index.mjs";
 
 const TASK_ID = "assets:query";
@@ -554,7 +555,7 @@ async function runAssetsStatus() {
     action: "assets.status",
     capabilities: {
       chains: ["evm", "btc", "trx"],
-      actions: ["assets.status", "assets.query", "assets.token-meta"],
+      actions: ["assets.status", "assets.query", "assets.token-meta", "assets.token-price"],
       quote: ["usd"],
       inputFormats: ["triplet-string", "triplet-object"],
     },
@@ -587,6 +588,40 @@ async function runAssetsTokenMeta(ctx, input = {}) {
   const result = await queryTokenMetaBatch(items, options);
   return {
     action: "assets.token-meta",
+    ...result,
+  };
+}
+
+async function runAssetsTokenPrice(ctx, input = {}) {
+  const items = Array.isArray(input.items)
+    ? input.items
+    : (input.query ? [{ query: input.query, network: input.network, kind: input.kind }] : []);
+
+  if (items.length === 0) {
+    return {
+      ok: false,
+      action: "assets.token-price",
+      error: "assets.token-price: items 不能为空（或提供 query）",
+    };
+  }
+
+  const options = {
+    ...(ctx?.tokenPriceOptions && typeof ctx.tokenPriceOptions === "object" ? ctx.tokenPriceOptions : {}),
+    debugStats: Boolean(input.debugStats),
+    forceRemote: Boolean(input.forceRemote),
+    metaForceRemote: input.metaForceRemote == null ? true : Boolean(input.metaForceRemote),
+  };
+
+  if (Number.isFinite(Number(input.cacheMaxAgeMs))) {
+    options.cacheMaxAgeMs = Number(input.cacheMaxAgeMs);
+  }
+  if (Number.isFinite(Number(input.metaCacheMaxAgeMs))) {
+    options.metaCacheMaxAgeMs = Number(input.metaCacheMaxAgeMs);
+  }
+
+  const result = await queryTokenPriceBatch(items, options);
+  return {
+    action: "assets.token-price",
     ...result,
   };
 }
@@ -729,6 +764,27 @@ export const actionObject = Object.freeze({
     },
     handler: async (ctx, input) => await runAssetsTokenMeta(ctx, input),
   },
+  "assets.token-price": {
+    taskId: TASK_ID,
+    sub: "token-price",
+    usage: "assets token-price --items <query item> [--debugStats true]",
+    description: "Resolve token prices via meta->cache->remote with optional debug stats",
+    argsSchema: {
+      required: [],
+      properties: {
+        items: { type: "array" },
+        query: { type: "string" },
+        network: { type: "string" },
+        kind: { type: "string" },
+        cacheMaxAgeMs: { type: "number|integer" },
+        metaCacheMaxAgeMs: { type: "number|integer" },
+        debugStats: { type: "boolean" },
+        forceRemote: { type: "boolean" },
+        metaForceRemote: { type: "boolean" },
+      },
+    },
+    handler: async (ctx, input) => await runAssetsTokenPrice(ctx, input),
+  },
 });
 
 export const dispatcher = buildActionDispatcher({
@@ -768,6 +824,8 @@ export const task = defineTask({
       cacheMaxAgeMs: { type: "number" },
       debugStats: { type: "boolean" },
       forceRemote: { type: "boolean" },
+      metaForceRemote: { type: "boolean" },
+      metaCacheMaxAgeMs: { type: "number" },
     },
   },
   async run(ctx) {

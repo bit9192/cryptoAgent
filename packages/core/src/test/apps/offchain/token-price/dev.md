@@ -277,3 +277,28 @@
 1. 若继续 Slice A，可补更细粒度性能基线（按 network 分组统计、缓存命中率）
 2. 评估是否在 assets.query 中复用 token-meta stats 作为诊断输出
 3. Slice A 稳定后，再进入 Slice B：token price 查询能力
+
+## 10. 当前切片计划（进行中）
+
+### Slice B-1：token price 最小闭环
+
+本次只做：
+
+1. 新增 `queryTokenPrice` / `queryTokenPriceBatch` 接口
+2. 输入支持 `query/network/kind`（复用 token-meta 的 query 形态）
+3. 查询链路：meta 解析 -> 价格缓存 -> 远端批量查询 -> 回写缓存
+4. task 暴露 `assets.token-price`
+5. 可选参数：`cacheMaxAgeMs`、`forceRemote`、`debugStats`
+
+本次不做：
+
+1. 多价格源权重融合
+2. 复杂价格路由策略
+3. 历史 K 线与波动率
+
+验收标准：
+
+1. happy-path：symbol/address 可返回 `priceUsd`
+2. cache-path：缓存可命中；`forceRemote=true` 可跳过缓存
+3. invalid-path：空 query 与未解析 token 降级 `unresolved`
+4. task-path：`assets.token-price` 可从 action 调用并返回标准化输出
