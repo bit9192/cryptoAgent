@@ -232,45 +232,64 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
   const items = normalizeItems(input);
   const cacheApi = buildCacheApi(options);
   const results = [];
+  const dedupResultMap = new Map();
+
+  const dedupKeyOf = (item, queryKind) => {
+    const networkKey = normalizeLower(item.network || "default") || "default";
+    return `${queryKind}:${normalizeLower(item.query)}:${networkKey}`;
+  };
 
   for (const item of items) {
     const queryKind = inferQueryKind(item);
+    const dedupKey = dedupKeyOf(item, queryKind);
+    const existing = dedupResultMap.get(dedupKey);
+    if (existing) {
+      results.push({ ...existing, query: item.query, queryKind });
+      continue;
+    }
+
     const configCandidates = resolveConfigCandidates(item);
     if (configCandidates.length > 0) {
       const chosen = configCandidates[0];
-      results.push({
+      const output = {
         ok: true,
         query: item.query,
         queryKind,
         ...chosen,
         source: "config",
-      });
+      };
+      dedupResultMap.set(dedupKey, output);
+      results.push(output);
       continue;
     }
 
     const cached = await resolveFromCache(item, cacheApi, options);
     if (cached) {
-      results.push({
+      const output = {
         ok: true,
         query: item.query,
         queryKind,
         ...cached,
-      });
+      };
+      dedupResultMap.set(dedupKey, output);
+      results.push(output);
       continue;
     }
 
     const remote = await resolveFromRemote(item, options, cacheApi);
     if (remote) {
-      results.push({
+      const output = {
         ok: true,
         query: item.query,
         queryKind,
         ...remote,
-      });
+      };
+      dedupResultMap.set(dedupKey, output);
+      results.push(output);
       continue;
     }
 
-    results.push({
+    const output = {
       ok: false,
       query: item.query,
       queryKind,
@@ -282,7 +301,9 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
       decimals: null,
       source: "unresolved",
       error: `未解析 token: ${item.query}`,
-    });
+    };
+    dedupResultMap.set(dedupKey, output);
+    results.push(output);
   }
 
   return {

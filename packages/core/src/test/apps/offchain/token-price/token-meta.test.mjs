@@ -246,6 +246,37 @@ test("token meta: mixed chain batch 查询", async () => {
   assert.deepEqual(res.items.map((item) => item.chain), ["evm", "btc", "trx"]);
 });
 
+test("token meta: batch 重复输入只触发一次远端解析", async () => {
+  let remoteCalled = 0;
+  const res = await queryTokenMetaBatch([
+    { query: "sunpump", network: "mainnet", kind: "symbol" },
+    { query: "SUNPUMP", network: "mainnet", kind: "symbol" },
+    { query: "sunpump", network: "mainnet", kind: "symbol" },
+  ], {
+    async remoteResolver(item) {
+      remoteCalled += 1;
+      return {
+        chain: "trx",
+        network: item.network,
+        tokenAddress: "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+        symbol: "SUN",
+        name: "SUN",
+        decimals: 18,
+      };
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.items.length, 3);
+  assert.equal(remoteCalled, 1);
+  assert.deepEqual(res.items.map((item) => item.source), ["remote", "remote", "remote"]);
+  assert.deepEqual(res.items.map((item) => item.tokenAddress), [
+    "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+    "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+    "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+  ]);
+});
+
 test("token meta: 非法空 query 抛错", async () => {
   await assert.rejects(
     async () => await queryTokenMeta({ query: "   " }),

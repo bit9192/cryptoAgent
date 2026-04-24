@@ -268,9 +268,10 @@
 6. invalid-path 已补：空 query、非法地址样式输入
 7. Slice A 已补缓存 TTL 行为：过期缓存跳过，重新走远端并回填
 8. security-case 已补：远端异常不冒泡敏感内容，统一降级 unresolved
+9. Slice A 已补 batch 去重：同批次重复 query+network 复用结果，避免重复远端调用
 
 下一步：
 
 1. 讨论是否需要将 token meta 暴露到 task 层
-2. 若继续 Slice A，可补批量输入去重与性能回归测试
+2. 若继续 Slice A，可补更细粒度性能基线（远端/缓存命中率统计）
 3. Slice A 稳定后，再进入 Slice B：token price 查询能力
