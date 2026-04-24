@@ -8,7 +8,6 @@
     "contracts:compile": "node contracts/compile.mjs --profile production",
     "contracts:compile:all": "node contracts/compile.mjs --profile all",
     "key": "node src/cli/key.mjs",
-    "assets": "node src/cli/assets.mjs",
     "ex:lon": "node src/cli/lon.mjs",
     "ex:lon:dev": "node src/cli/lon.mjs --mode dev --autoConfirm",
     "ex:lon:watch": "LON_EXIT_WATCHER_ON_CLOSE=1 node --watch --watch-path src/execute --watch-path src/tasks src/cli/lon.mjs --mode dev --autoConfirm",
