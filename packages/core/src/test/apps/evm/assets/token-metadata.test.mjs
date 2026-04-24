@@ -74,6 +74,38 @@ test("evm token metadata: supports small batch query", async () => {
 	assert.equal(res.items[1].symbol, "METH");
 });
 
+test("evm token metadata: falls back to single-token reader when multicall misses decimals", async () => {
+	const multicall = createMetadataMulticall({
+		"0x00000000000000000000000000000000000000aa": {
+			name: "Mock USD",
+			symbol: "MUSD",
+			decimals: null,
+		},
+	});
+
+	let fallbackCalled = 0;
+	const res = await queryEvmTokenMetadataBatch([
+		{ token: "0x00000000000000000000000000000000000000aa" },
+	], {
+		multicall,
+		async singleTokenMetadataReader(tokenAddress) {
+			fallbackCalled += 1;
+			return {
+				tokenAddress,
+				name: "Mock USD",
+				symbol: "MUSD",
+				decimals: 18,
+			};
+		},
+	});
+
+	assert.equal(res.ok, true);
+	assert.equal(res.items.length, 1);
+	assert.equal(res.items[0].tokenAddress, "0x00000000000000000000000000000000000000AA");
+	assert.equal(res.items[0].decimals, 18);
+	assert.equal(fallbackCalled, 1);
+});
+
 
 test("evm token metadata: queryEvmTokenMetadata supports batch tokens", async () => {
 	const res = await queryEvmTokenMetadata({

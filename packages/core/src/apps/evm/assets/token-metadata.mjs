@@ -1,6 +1,7 @@
 import { getAddress } from "ethers";
 
 import { EvmContract, getContract } from "../contracts/deploy.mjs";
+import { createErc20 } from "../erc20.mjs";
 import { resolveEvmContract } from "../configs/contracts.js";
 import { multiCall, MULTICALL_REQUEST_SYMBOL } from "../multicall.mjs";
 
@@ -76,6 +77,35 @@ function normalizeMetadataRow(row = {}) {
 	};
 }
 
+function needsMetadataFallback(row = {}) {
+	return row.name == null || row.symbol == null || row.decimals == null;
+}
+
+async function querySingleTokenMetadataFallback(tokenAddress, options = {}) {
+	if (typeof options.singleTokenMetadataReader === "function") {
+		const custom = await options.singleTokenMetadataReader(tokenAddress, options);
+		return normalizeMetadataRow({ tokenAddress, ...custom });
+	}
+
+	const token = createErc20({
+		...options,
+		address: tokenAddress,
+	});
+
+	const [name, symbol, decimals] = await Promise.all([
+		token.name().catch(() => null),
+		token.symbol().catch(() => null),
+		token.decimals().catch(() => null),
+	]);
+
+	return normalizeMetadataRow({
+		tokenAddress,
+		name,
+		symbol,
+		decimals,
+	});
+}
+
 function normalizeMetadataQueryInput(input = {}) {
 	if (Array.isArray(input)) {
 		return {
@@ -149,7 +179,23 @@ export async function queryEvmTokenMetadataBatch(items = [], options = {}) {
 	}));
 	const rows = await multicallClient.call(requestShape, options);
 
-	const normalizedRows = rows.map((row) => normalizeMetadataRow(row));
+	const normalizedRows = await Promise.all(rows.map(async (row) => {
+		const normalized = normalizeMetadataRow(row);
+		if (!needsMetadataFallback(normalized)) {
+			return normalized;
+		}
+		try {
+			const fallback = await querySingleTokenMetadataFallback(normalized.tokenAddress, options);
+			return {
+				...normalized,
+				name: normalized.name ?? fallback.name,
+				symbol: normalized.symbol ?? fallback.symbol,
+				decimals: normalized.decimals ?? fallback.decimals,
+			};
+		} catch {
+			return normalized;
+		}
+	}));
 
 	return {
 		ok: true,
