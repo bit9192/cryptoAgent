@@ -260,3 +260,42 @@ test("token price: batch 场景次源仅补齐主源缺失 token", async () => {
   assert.equal(secondary.calls.length, 1);
   assert.equal(secondary.calls[0].length, 1);
 });
+
+test("token price: debugStats 包含 source 级命中与错误统计", async () => {
+  const brokenSource = {
+    metadata: { name: "broken-source" },
+    async getPrice() {
+      throw new Error("source down");
+    },
+  };
+  const fallbackSource = {
+    metadata: { name: "fallback-source" },
+    async getPrice(tokens) {
+      const out = {};
+      for (const token of tokens) {
+        out[token] = { usd: 1 };
+      }
+      return out;
+    },
+  };
+
+  const res = await queryTokenPriceBatch([
+    { query: "USDT", network: "bsc", kind: "symbol" },
+  ], {
+    forceRemote: true,
+    debugStats: true,
+    priceSources: [brokenSource, fallbackSource],
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.items[0].ok, true);
+  assert.ok(Array.isArray(res.stats.sourceStats));
+
+  const broken = res.stats.sourceStats.find((v) => v.source === "broken-source");
+  const fallback = res.stats.sourceStats.find((v) => v.source === "fallback-source");
+
+  assert.equal(broken.attempts, 1);
+  assert.equal(broken.errors, 1);
+  assert.equal(fallback.attempts, 1);
+  assert.equal(fallback.hits, 1);
+});

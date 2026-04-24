@@ -157,19 +157,36 @@ async function resolveRemotePriceMap(requests = [], options = {}) {
     queryToKeys.get(queryToken).add(key);
   }
 
+  const sourceStats = [];
+
+  const makeSourceMetric = (name) => ({
+    source: String(name ?? "unknown"),
+    attempts: 0,
+    hits: 0,
+    errors: 0,
+  });
+
+  const addSourceHit = (metric, count) => {
+    metric.hits += Number.isFinite(Number(count)) ? Number(count) : 0;
+  };
+
   try {
     if (typeof options.priceBatchResolver === "function") {
       const remote = await options.priceBatchResolver([...new Set(queryTokens)], options);
       const map = new Map();
+      const metric = makeSourceMetric("priceBatchResolver");
+      metric.attempts += 1;
       for (const token of queryToKeys.keys()) {
         const row = remote?.[token] ?? remote?.[normalizeLower(token)] ?? null;
         const priceUsd = toPriceUsd(row);
         if (!Number.isFinite(priceUsd)) continue;
+        addSourceHit(metric, 1);
         for (const key of queryToKeys.get(token)) {
           map.set(key, priceUsd);
         }
       }
-      return map;
+      sourceStats.push(metric);
+      return { map, sourceStats };
     }
 
     const map = new Map();
@@ -186,17 +203,22 @@ async function resolveRemotePriceMap(requests = [], options = {}) {
       }
     }
 
-    if (sources.length === 0) return map;
+    if (sources.length === 0) return { map, sourceStats };
 
     const remaining = new Set(queryToKeys.keys());
 
-    for (const source of sources) {
+    for (let i = 0; i < sources.length; i += 1) {
+      const source = sources[i];
       if (remaining.size === 0) break;
+      const metric = makeSourceMetric(source?.metadata?.name ?? `source#${i + 1}`);
+      sourceStats.push(metric);
 
       let remote = null;
       try {
+        metric.attempts += 1;
         remote = await source.getPrice([...remaining]);
       } catch {
+        metric.errors += 1;
         continue;
       }
 
@@ -204,6 +226,7 @@ async function resolveRemotePriceMap(requests = [], options = {}) {
         const row = remote?.[token] ?? remote?.[normalizeLower(token)] ?? null;
         const priceUsd = toPriceUsd(row);
         if (!Number.isFinite(priceUsd)) continue;
+        addSourceHit(metric, 1);
         for (const key of queryToKeys.get(token) ?? []) {
           map.set(key, priceUsd);
         }
@@ -211,9 +234,12 @@ async function resolveRemotePriceMap(requests = [], options = {}) {
       }
     }
 
-    return map;
+    return { map, sourceStats };
   } catch {
-    return new Map();
+    return {
+      map: new Map(),
+      sourceStats,
+    };
   }
 }
 
@@ -228,6 +254,7 @@ export async function queryTokenPriceBatchByMeta(metaItems = [], options = {}) {
       remoteHits: 0,
       unresolved: 0,
       guardWarnings: 0,
+      sourceStats: [],
     }
     : null;
   const cacheApi = buildCacheApi(options);
@@ -287,7 +314,21 @@ export async function queryTokenPriceBatchByMeta(metaItems = [], options = {}) {
       requests.push({ key, queryToken });
     }
 
-    const remoteMap = await resolveRemotePriceMap(requests, options);
+    const remoteResolved = await resolveRemotePriceMap(requests, options);
+    const remoteMap = remoteResolved?.map instanceof Map ? remoteResolved.map : new Map();
+    if (stats && Array.isArray(remoteResolved?.sourceStats)) {
+      for (const row of remoteResolved.sourceStats) {
+        const sourceName = String(row?.source ?? "unknown");
+        let target = stats.sourceStats.find((v) => v.source === sourceName);
+        if (!target) {
+          target = { source: sourceName, attempts: 0, hits: 0, errors: 0 };
+          stats.sourceStats.push(target);
+        }
+        target.attempts += Number(row?.attempts ?? 0);
+        target.hits += Number(row?.hits ?? 0);
+        target.errors += Number(row?.errors ?? 0);
+      }
+    }
     const savable = [];
     for (const [tokenAddress, priceUsd] of remoteMap.entries()) {
       savable.push({ tokenAddress, priceUsd });

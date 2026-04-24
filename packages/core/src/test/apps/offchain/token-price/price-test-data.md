@@ -69,4 +69,9 @@
 
 - 远端异常时不回传密钥等敏感上下文
 
+### observability-case
+
+- debugStats 应包含 source 级命中统计
+- 主源报错时应记录 source error 计数
+
 
