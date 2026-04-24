@@ -34,5 +34,6 @@ export {
 	brc20TokenInfoGet,
 	brc20TransferableListGet,
 	brc20BalanceGet,
+	brc20BalanceBatchGet,
 	createBrc20,
 } from "./brc20.mjs";

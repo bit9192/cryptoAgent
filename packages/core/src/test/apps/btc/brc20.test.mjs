@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
 	brc20SummaryGet,
 	brc20BalanceGet,
+	brc20BalanceBatchGet,
 	createBrc20,
 } from "../../../apps/btc/brc20.mjs";
 
@@ -128,6 +129,55 @@ test("brc20BalanceGet: 支持用 token key 解析默认 ticker", async (t) => {
 	assert.equal(result.symbol, "ORDI");
 	assert.equal(result.tokenName, "Ordinals");
 	assert.equal(result.decimals, 18);
+});
+
+test("brc20BalanceBatchGet: 严格数组输入 + 单项失败不影响整批", async (t) => {
+	const originalFetch = globalThis.fetch;
+	t.after(() => {
+		globalThis.fetch = originalFetch;
+	});
+
+	globalThis.fetch = async (url) => {
+		const value = String(url);
+		if (/\/brc20\/ORDI\/info/i.test(value)) {
+			return jsonResponse({
+				code: 0,
+				msg: "OK",
+				data: {
+					ticker: "ordi",
+					overallBalance: "3",
+					availableBalance: "2",
+					availableBalanceSafe: "2",
+					availableBalanceUnSafe: "0",
+					transferableBalance: "1",
+					transferableCount: 1,
+					historyCount: 0,
+					historyInscriptions: [],
+					transferableInscriptions: [],
+				},
+			});
+		}
+		return jsonResponse({ code: 400, msg: "not found", data: null }, 200);
+	};
+
+	const res = await brc20BalanceBatchGet([
+		{ address: "bc1qbalance0000000000000000000000000000000000", token: "ordi" },
+		{ address: "tb1qbalance0000000000000000000000000000000000", token: "ordi" },
+	]);
+
+	assert.equal(res.ok, true);
+	assert.equal(res.items.length, 2);
+	assert.equal(res.items[0].ok, true);
+	assert.equal(res.items[0].symbol, "ORDI");
+	assert.equal(res.items[1].ok, false);
+	assert.match(String(res.items[1].error || ""), /mainnet/);
+});
+
+test("brc20BalanceBatchGet: batch input must be array", async () => {
+	await assert.rejects(
+		async () => await brc20BalanceBatchGet({ items: [] }),
+		/数组/,
+	);
 });
 
 test("createBrc20.transfer: 通过 wallet signer 完成 UniSat transfer 编排", async (t) => {

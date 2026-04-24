@@ -113,6 +113,7 @@ async function triggerStateChanging(provider, signer, contractAddress, iface, me
 }
 
 const TRC20_ABI = [
+  "function name() view returns (string)",
   "function symbol() view returns (string)",
   "function decimals() view returns (uint8)",
   "function balanceOf(address) view returns (uint256)",
@@ -151,6 +152,10 @@ export function createTrc20(options = {}) {
         netProvider: provider,
         signer: nextSigner,
       });
+    },
+    async name() {
+      const [value] = await triggerConstant(provider, signer, contractAddress, iface, "name", []);
+      return value;
     },
     async symbol() {
       const [value] = await triggerConstant(provider, signer, contractAddress, iface, "symbol", []);

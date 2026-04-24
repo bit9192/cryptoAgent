@@ -18,6 +18,10 @@ export {
 	trxBalanceBatch,
 	trxSend,
 	createTrc20,
+	queryTrxTokenMetadata,
+	queryTrxTokenMetadataBatch,
+	queryTrxTokenBalance,
+	queryTrxTokenBalanceBatch,
 } from "./core.mjs";
 export {
 	trxNetworks,
