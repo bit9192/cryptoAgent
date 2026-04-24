@@ -10,6 +10,35 @@ function toNumberOrNull(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function normalizeTokenKey(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function deriveTokenUsdPriceFromPair(pair, tokenQuery) {
+  if (!pair) return null;
+
+  const query = normalizeTokenKey(tokenQuery);
+  const baseAddress = normalizeTokenKey(pair?.baseToken?.address);
+  const quoteAddress = normalizeTokenKey(pair?.quoteToken?.address);
+  const baseSymbol = normalizeTokenKey(pair?.baseToken?.symbol);
+  const quoteSymbol = normalizeTokenKey(pair?.quoteToken?.symbol);
+  const baseUsd = toNumberOrNull(pair?.priceUsd);
+
+  if (!Number.isFinite(baseUsd)) return null;
+
+  const isBase = query && (query === baseAddress || query === baseSymbol);
+  if (isBase) return baseUsd;
+
+  const isQuote = query && (query === quoteAddress || query === quoteSymbol);
+  if (isQuote) {
+    const priceNative = toNumberOrNull(pair?.priceNative);
+    if (!Number.isFinite(priceNative) || priceNative <= 0) return null;
+    return baseUsd / priceNative;
+  }
+
+  return baseUsd;
+}
+
 function pickBestPair(pairs = []) {
   if (!Array.isArray(pairs) || pairs.length === 0) return null;
   const sorted = [...pairs].sort((a, b) => {
@@ -113,9 +142,10 @@ export class DexScreenerSource extends DataSourceBase {
     for (const token of tokenList) {
       const pairs = await this.resolvePairs(token);
       const best = pickBestPair(pairs);
+      const priceUsd = deriveTokenUsdPriceFromPair(best, token);
       out[String(token)] = best
         ? {
-          usd: toNumberOrNull(best.priceUsd),
+          usd: priceUsd,
           chainId: best.chainId,
           dexId: best.dexId,
           pairAddress: best.pairAddress,
