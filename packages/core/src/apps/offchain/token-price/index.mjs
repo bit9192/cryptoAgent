@@ -170,15 +170,17 @@ function buildCacheApi(options = {}) {
   };
 }
 
-async function resolveFromCache(item, cacheApi) {
+async function resolveFromCache(item, cacheApi, options = {}) {
   const kind = inferQueryKind(item);
   const chain = kind === "address" ? detectAddressKind(item.query) : null;
+  const maxAgeMs = options.cacheMaxAgeMs;
 
   if (kind === "address" && chain) {
     const map = await cacheApi.getMap({
       chain,
       network: item.network ?? "default",
       tokens: [item.query],
+      maxAgeMs,
     });
     const found = map.get(normalizeLower(item.query));
     return found ? { ...normalizeResolvedRow(found, { chain, network: item.network }), source: "cache" } : null;
@@ -189,6 +191,7 @@ async function resolveFromCache(item, cacheApi) {
     network: item.network,
     query: item.query,
     kind,
+    maxAgeMs,
   });
   return found ? { ...normalizeResolvedRow(found, found), source: "cache" } : null;
 }
@@ -239,7 +242,7 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
       continue;
     }
 
-    const cached = await resolveFromCache(item, cacheApi);
+    const cached = await resolveFromCache(item, cacheApi, options);
     if (cached) {
       results.push({
         ok: true,

@@ -11,7 +11,13 @@ function createMemoryCache() {
       for (const token of input.tokens ?? []) {
         const key = `${input.chain}:${input.network}:${String(token).trim().toLowerCase()}`;
         if (records.has(key)) {
-          map.set(String(token).trim().toLowerCase(), records.get(key));
+          const value = records.get(key);
+          const maxAgeMs = Number(input.maxAgeMs);
+          const updatedAt = Number(value?.updatedAt ?? 0);
+          if (Number.isFinite(maxAgeMs) && maxAgeMs >= 0 && Number.isFinite(updatedAt) && updatedAt > 0) {
+            if (Date.now() - updatedAt > maxAgeMs) continue;
+          }
+          map.set(String(token).trim().toLowerCase(), value);
         }
       }
       return map;
@@ -29,6 +35,11 @@ function createMemoryCache() {
         const [chain, network, tokenAddress] = key.split(":");
         if (input.chain && chain !== input.chain) continue;
         if (input.network && network !== input.network) continue;
+        const maxAgeMs = Number(input.maxAgeMs);
+        const updatedAt = Number(value?.updatedAt ?? 0);
+        if (Number.isFinite(maxAgeMs) && maxAgeMs >= 0 && Number.isFinite(updatedAt) && updatedAt > 0) {
+          if (Date.now() - updatedAt > maxAgeMs) continue;
+        }
         const symbol = String(value.symbol ?? "").trim().toLowerCase();
         const name = String(value.name ?? "").trim().toLowerCase();
         if (tokenAddress === query || symbol === query || name === query) {
@@ -180,6 +191,47 @@ test("token meta: 默认使用 DexScreener 作为远端兜底", async () => {
   } finally {
     globalThis.fetch = oldFetch;
   }
+});
+
+test("token meta: 过期缓存会跳过并走远端回填", async () => {
+  const cache = createMemoryCache();
+  let remoteCalled = 0;
+
+  await cache.put({
+    chain: "trx",
+    network: "mainnet",
+    items: [{
+      tokenAddress: "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+      symbol: "SUN-OLD",
+      name: "SUN Old",
+      decimals: 6,
+      updatedAt: Date.now() - 10_000,
+    }],
+  });
+
+  const res = await queryTokenMeta({
+    query: "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+    network: "mainnet",
+  }, {
+    cache,
+    cacheMaxAgeMs: 100,
+    async remoteResolver(item) {
+      remoteCalled += 1;
+      return {
+        chain: "trx",
+        network: item.network,
+        tokenAddress: "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+        symbol: "SUN",
+        name: "SUN",
+        decimals: 18,
+      };
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.source, "remote");
+  assert.equal(res.symbol, "SUN");
+  assert.equal(remoteCalled, 1);
 });
 
 test("token meta: mixed chain batch 查询", async () => {
