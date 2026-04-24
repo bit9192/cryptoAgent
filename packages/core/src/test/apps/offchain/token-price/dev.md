@@ -267,9 +267,10 @@
 5. 默认远端兜底已接入 DexScreener source，不再依赖外部临时注入 remoteResolver
 6. invalid-path 已补：空 query、非法地址样式输入
 7. Slice A 已补缓存 TTL 行为：过期缓存跳过，重新走远端并回填
+8. security-case 已补：远端异常不冒泡敏感内容，统一降级 unresolved
 
 下一步：
 
-1. 为 Slice A 增补 security-case 测试，确认错误路径不泄露敏感环境信息
-2. 讨论是否需要将 token meta 暴露到 task 层
+1. 讨论是否需要将 token meta 暴露到 task 层
+2. 若继续 Slice A，可补批量输入去重与性能回归测试
 3. Slice A 稳定后，再进入 Slice B：token price 查询能力

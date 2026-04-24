@@ -26,7 +26,9 @@ function looksLikeMalformedAddress(query) {
   if (/^T/i.test(value)) {
     return !/^T[1-9A-HJ-NP-Za-km-z]{25,34}$/.test(value);
   }
-  if (/^(bc1|tb1|bcrt1|[13mn2])/i.test(value)) {
+  const looksLikeBtcAddress = /^(bc1|tb1|bcrt1)[ac-hj-np-z02-9]{11,71}$/i.test(value)
+    || /^[13mn2][a-km-zA-HJ-NP-Z1-9]{25,62}$/.test(value);
+  if (looksLikeBtcAddress) {
     return detectAddressKind(value) == null;
   }
   return false;
@@ -198,14 +200,18 @@ async function resolveFromCache(item, cacheApi, options = {}) {
 
 async function resolveFromRemote(item, options, cacheApi) {
   let resolved = null;
-  if (typeof options.remoteResolver === "function") {
-    resolved = await options.remoteResolver(item);
-  } else {
-    const source = options.tokenInfoSource ?? await getDefaultDexScreenerSource();
-    if (source && typeof source.getTokenInfo === "function") {
-      const tokenInfo = await source.getTokenInfo(item.query);
-      resolved = normalizeRemoteTokenInfo(tokenInfo, item);
+  try {
+    if (typeof options.remoteResolver === "function") {
+      resolved = await options.remoteResolver(item);
+    } else {
+      const source = options.tokenInfoSource ?? await getDefaultDexScreenerSource();
+      if (source && typeof source.getTokenInfo === "function") {
+        const tokenInfo = await source.getTokenInfo(item.query);
+        resolved = normalizeRemoteTokenInfo(tokenInfo, item);
+      }
     }
+  } catch {
+    return null;
   }
 
   if (!resolved || typeof resolved !== "object") return null;

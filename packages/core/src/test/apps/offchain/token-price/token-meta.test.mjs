@@ -263,3 +263,21 @@ test("token meta: 非法地址样式输入抛错", async () => {
     /非法地址/,
   );
 });
+
+test("token meta: 远端异常不泄露敏感信息并降级", async () => {
+  const secret = "TRX_MAINNET_API_KEY=super-secret-key";
+  const res = await queryTokenMeta({
+    query: "not-a-token",
+    network: "mainnet",
+    kind: "symbol",
+  }, {
+    async remoteResolver() {
+      throw new Error(`remote failed: ${secret}`);
+    },
+  });
+
+  assert.equal(res.ok, false);
+  assert.equal(res.source, "unresolved");
+  assert.match(String(res.error ?? ""), /未解析 token/);
+  assert.doesNotMatch(String(res.error ?? ""), /TRX_MAINNET_API_KEY|super-secret-key/);
+});
