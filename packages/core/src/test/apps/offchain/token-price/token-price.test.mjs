@@ -189,6 +189,28 @@ test("token price: 稳定币价格偏离时返回保护 warning", async () => {
   assert.match(String(res.warning ?? ""), /稳定币价格偏离区间/);
 });
 
+test("token price: btc native 会映射到 bitcoin ID 查询远端价格", async () => {
+  const res = await queryTokenPrice({
+    query: "BTC",
+    network: "btc",
+    kind: "symbol",
+  }, {
+    forceRemote: true,
+    priceBatchResolver(tokens) {
+      assert.ok(tokens.includes("bitcoin"));
+      return {
+        bitcoin: { usd: 77590 },
+      };
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.chain, "btc");
+  assert.equal(res.tokenAddress, "native");
+  assert.equal(res.symbol, "BTC");
+  assert.equal(res.priceUsd, 77590);
+});
+
 test("token price: 主源失败时次源可fallback成功", async () => {
   const brokenSource = {
     async getPrice() {

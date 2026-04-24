@@ -1,4 +1,5 @@
 import { DexScreenerSource } from "../sources/dexscreener/index.mjs";
+import { CoinGeckoSource } from "../sources/coingecko/index.mjs";
 import { resolveEvmToken } from "../../evm/configs/tokens.js";
 import {
   getCachedTokenPriceMap,
@@ -64,12 +65,21 @@ function buildCacheApi(options = {}) {
 }
 
 let _defaultDexScreenerSource = null;
+let _defaultCoinGeckoSource = null;
 
 async function getDefaultDexScreenerSource() {
   if (_defaultDexScreenerSource) return _defaultDexScreenerSource;
   const source = new DexScreenerSource();
   await source.init();
   _defaultDexScreenerSource = source;
+  return source;
+}
+
+async function getDefaultCoinGeckoSource() {
+  if (_defaultCoinGeckoSource) return _defaultCoinGeckoSource;
+  const source = new CoinGeckoSource();
+  await source.init();
+  _defaultCoinGeckoSource = source;
   return source;
 }
 
@@ -118,6 +128,10 @@ function buildRemoteQueryToken(meta) {
     } catch {
       // ignore and fallback to symbol
     }
+  }
+
+  if (chain === "btc" && (tokenAddress === "native" || symbol === "btc" || symbol === "bitcoin")) {
+    return "bitcoin";
   }
 
   return symbol || null;
@@ -197,9 +211,13 @@ async function resolveRemotePriceMap(requests = [], options = {}) {
     } else if (options.priceSource && typeof options.priceSource.getPrice === "function") {
       sources = [options.priceSource];
     } else {
+      const coinGecko = await getDefaultCoinGeckoSource();
       const defaultSource = await getDefaultDexScreenerSource();
+      if (coinGecko && typeof coinGecko.getPrice === "function") {
+        sources.push(coinGecko);
+      }
       if (defaultSource && typeof defaultSource.getPrice === "function") {
-        sources = [defaultSource];
+        sources.push(defaultSource);
       }
     }
 
