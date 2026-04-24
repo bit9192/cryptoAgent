@@ -3,7 +3,7 @@ import { DexScreenerSource } from "../sources/dexscreener/index.mjs";
 import { resolveEvmToken } from "../../evm/configs/tokens.js";
 import { resolveBtcToken } from "../../btc/config/tokens.js";
 import { resolveTrxToken } from "../../trx/config/tokens.js";
-import { createErc20 } from "../../evm/erc20.mjs";
+import { queryEvmTokenMetadataBatch } from "../../evm/assets/token-metadata.mjs";
 import { queryTrxTokenMetadata } from "../../trx/assets/token-metadata.mjs";
 import {
   getCachedTokenMetadataMap,
@@ -211,25 +211,25 @@ async function resolveFromRemote(item, options, cacheApi) {
         if (typeof options.evmMetadataReader === "function") {
           resolved = await options.evmMetadataReader(item, options);
         } else {
-          const token = createErc20({
-            ...(options.evmContractOptions && typeof options.evmContractOptions === "object" ? options.evmContractOptions : {}),
-            address: item.query,
+          const batchReader = typeof options.evmMetadataBatchReader === "function"
+            ? options.evmMetadataBatchReader
+            : queryEvmTokenMetadataBatch;
+          const batchRes = await batchReader([
+            { token: item.query },
+          ], {
+            ...(options.evmMetadataOptions && typeof options.evmMetadataOptions === "object" ? options.evmMetadataOptions : {}),
             network: item.network ?? undefined,
             networkName: item.network ?? undefined,
           });
-          const [name, symbol, decimals] = await Promise.all([
-            token.name().catch(() => null),
-            token.symbol().catch(() => null),
-            token.decimals().catch(() => null),
-          ]);
-          if (name != null || symbol != null || decimals != null) {
+          const first = batchRes?.items?.[0] ?? null;
+          if (first && (first.name != null || first.symbol != null || first.decimals != null)) {
             resolved = {
               chain: "evm",
               network: item.network,
               tokenAddress: item.query,
-              name,
-              symbol,
-              decimals,
+              name: first.name ?? null,
+              symbol: first.symbol ?? null,
+              decimals: first.decimals ?? null,
             };
           }
         }
