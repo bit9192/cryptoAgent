@@ -462,3 +462,43 @@ test("token meta: TRX 地址远端优先使用链上 TRC20 读取", async () => 
   assert.equal(trxReaderCalled, 1);
   assert.equal(sourceCalled, 0);
 });
+
+test("token meta: network=trx 别名可规范到 mainnet 并命中配置", async () => {
+  const res = await queryTokenMeta({
+    query: "SUN",
+    network: "trx",
+    kind: "symbol",
+  });
+
+  assert.equal(res.ok, true);
+  assert.ok(["config", "cache"].includes(res.source));
+  assert.equal(res.chain, "trx");
+  assert.equal(res.network, "mainnet");
+  assert.equal(String(res.tokenAddress).toLowerCase(), "tssmhyev2ue9qyh95dqyocunczel1nvu3s");
+});
+
+test("token meta: symbol 远端结果与请求网络链不匹配时降级 unresolved", async () => {
+  const res = await queryTokenMeta({
+    query: "SUNDOG",
+    network: "bsc",
+    kind: "symbol",
+  }, {
+    forceRemote: true,
+    tokenInfoSource: {
+      async getTokenInfo() {
+        return {
+          chainId: "tron",
+          baseToken: {
+            address: "9kWKLnZFTSj4vn9BLWivJjBLZoYEXySt7TJYjM75PZ8Y",
+            symbol: "SUNDOG",
+            name: "SUNDOG",
+            decimals: 0,
+          },
+        };
+      },
+    },
+  });
+
+  assert.equal(res.ok, false);
+  assert.equal(res.source, "unresolved");
+});

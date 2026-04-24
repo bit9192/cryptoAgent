@@ -19,6 +19,49 @@ function normalizeLower(value) {
   return normalizeString(value).toLowerCase();
 }
 
+function normalizeNetworkName(network) {
+  const raw = normalizeLower(network);
+  if (!raw) return null;
+  if (raw === "trx") return "mainnet";
+  if (raw === "ethereum") return "eth";
+  if (raw === "binance-smart-chain") return "bsc";
+  return raw;
+}
+
+function inferExpectedChainFromNetwork(network) {
+  const net = normalizeNetworkName(network);
+  if (!net) return null;
+  if (["eth", "bsc", "polygon", "arb", "arbitrum", "op", "optimism", "base", "avax", "linea", "scroll", "zksync"].includes(net)) {
+    return "evm";
+  }
+  if (["mainnet", "nile", "shasta"].includes(net)) {
+    return "trx";
+  }
+  if (["btc", "bitcoin", "testnet", "regtest"].includes(net)) {
+    return "btc";
+  }
+  return null;
+}
+
+function isRemoteMatchForItem(item, normalized) {
+  const queryKind = inferQueryKind(item);
+  const tokenAddress = normalizeString(normalized?.tokenAddress);
+  const tokenKind = detectAddressKind(tokenAddress);
+
+  if (queryKind === "address") {
+    const expected = detectAddressKind(item.query);
+    if (!expected) return true;
+    return tokenKind === expected;
+  }
+
+  const expectedChain = inferExpectedChainFromNetwork(item.network);
+  if (!expectedChain) return true;
+  if (normalized?.chain && normalized.chain !== expectedChain) return false;
+  if (tokenKind && tokenKind !== expectedChain) return false;
+  if (!normalized?.chain && !tokenKind) return false;
+  return true;
+}
+
 function looksLikeMalformedAddress(query) {
   const value = normalizeString(query);
   if (!value) return false;
@@ -56,7 +99,7 @@ function normalizeItems(input) {
     if (looksLikeMalformedAddress(query)) {
       throw new Error(`非法地址: ${query}`);
     }
-    const network = normalizeString(item.network) || null;
+    const network = normalizeNetworkName(item.network);
     const kind = normalizeLower(item.kind || "auto") || "auto";
     return { query, network, kind };
   });
@@ -274,6 +317,7 @@ async function resolveFromRemote(item, options, cacheApi) {
     network: resolved.network ?? item.network,
   });
   if (!normalized.tokenAddress) return null;
+  if (!isRemoteMatchForItem(item, normalized)) return null;
   await cacheApi.put({
     chain: normalized.chain,
     network: normalized.network ?? "default",
