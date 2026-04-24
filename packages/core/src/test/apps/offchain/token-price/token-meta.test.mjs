@@ -527,3 +527,29 @@ test("token meta: symbol 远端结果与请求网络链不匹配时降级 unreso
   assert.equal(res.ok, false);
   assert.equal(res.source, "unresolved");
 });
+
+test("token meta: symbol 远端结果同链但网络不匹配时降级 unresolved", async () => {
+  const res = await queryTokenMeta({
+    query: "FXS",
+    network: "bsc",
+    kind: "symbol",
+  }, {
+    forceRemote: true,
+    tokenInfoSource: {
+      async getTokenInfo() {
+        return {
+          chainId: "ethereum",
+          baseToken: {
+            address: "0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0",
+            symbol: "FXS",
+            name: "Frax Share",
+            decimals: 18,
+          },
+        };
+      },
+    },
+  });
+
+  assert.equal(res.ok, false);
+  assert.equal(res.source, "unresolved");
+});

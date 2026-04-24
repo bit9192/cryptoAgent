@@ -52,17 +52,23 @@ function isRemoteMatchForItem(item, normalized) {
   const queryKind = inferQueryKind(item);
   const tokenAddress = normalizeString(normalized?.tokenAddress);
   const tokenKind = detectAddressKind(tokenAddress);
+  const expectedNetwork = normalizeNetworkName(item.network);
+  const actualNetwork = normalizeNetworkName(normalized?.network);
 
   if (queryKind === "address") {
     const expected = detectAddressKind(item.query);
     if (!expected) return true;
-    return tokenKind === expected;
+    if (tokenKind !== expected) return false;
+    if (expectedNetwork && actualNetwork && expectedNetwork !== actualNetwork) return false;
+    return true;
   }
 
   const expectedChain = inferExpectedChainFromNetwork(item.network);
   if (!expectedChain) return true;
   if (normalized?.chain && normalized.chain !== expectedChain) return false;
   if (tokenKind && tokenKind !== expectedChain) return false;
+  if (expectedNetwork && actualNetwork && expectedNetwork !== actualNetwork) return false;
+  if (expectedNetwork && !actualNetwork) return false;
   if (!normalized?.chain && !tokenKind) return false;
   return true;
 }
@@ -147,7 +153,7 @@ function normalizeRemoteTokenInfo(raw, item) {
 
   return {
     chain: chainLike.chain,
-    network: item.network ?? chainLike.network,
+    network: chainLike.network ?? item.network,
     tokenAddress,
     symbol: normalizeString(preferred?.symbol) || null,
     name: normalizeString(preferred?.name) || null,
