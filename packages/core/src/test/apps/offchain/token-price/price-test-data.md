@@ -53,6 +53,12 @@
 - mixed chain batch：`eth + bsc + trx` 同批输入
 - 同 token 重复输入：应触发去重，避免重复远端调用
 - 远端返回 `priceUsd` 缺失：可降级 unresolved
+- 主源仅返回部分 token：次源应补齐缺失 token
+
+### fallback-case
+
+- 主源抛错：次源成功返回价格
+- 主源返回空：次源成功返回价格
 
 ### invalid-case
 

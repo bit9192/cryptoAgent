@@ -172,19 +172,45 @@ async function resolveRemotePriceMap(requests = [], options = {}) {
       return map;
     }
 
-    const source = options.priceSource ?? await getDefaultDexScreenerSource();
-    if (!source || typeof source.getPrice !== "function") return new Map();
-    const remote = await source.getPrice([...new Set(queryTokens)]);
-
     const map = new Map();
-    for (const token of queryToKeys.keys()) {
-      const row = remote?.[token] ?? remote?.[normalizeLower(token)] ?? null;
-      const priceUsd = toPriceUsd(row);
-      if (!Number.isFinite(priceUsd)) continue;
-      for (const key of queryToKeys.get(token)) {
-        map.set(key, priceUsd);
+    let sources = [];
+
+    if (Array.isArray(options.priceSources)) {
+      sources = options.priceSources.filter((source) => source && typeof source.getPrice === "function");
+    } else if (options.priceSource && typeof options.priceSource.getPrice === "function") {
+      sources = [options.priceSource];
+    } else {
+      const defaultSource = await getDefaultDexScreenerSource();
+      if (defaultSource && typeof defaultSource.getPrice === "function") {
+        sources = [defaultSource];
       }
     }
+
+    if (sources.length === 0) return map;
+
+    const remaining = new Set(queryToKeys.keys());
+
+    for (const source of sources) {
+      if (remaining.size === 0) break;
+
+      let remote = null;
+      try {
+        remote = await source.getPrice([...remaining]);
+      } catch {
+        continue;
+      }
+
+      for (const token of [...remaining]) {
+        const row = remote?.[token] ?? remote?.[normalizeLower(token)] ?? null;
+        const priceUsd = toPriceUsd(row);
+        if (!Number.isFinite(priceUsd)) continue;
+        for (const key of queryToKeys.get(token) ?? []) {
+          map.set(key, priceUsd);
+        }
+        remaining.delete(token);
+      }
+    }
+
     return map;
   } catch {
     return new Map();

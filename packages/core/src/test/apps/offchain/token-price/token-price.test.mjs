@@ -188,3 +188,75 @@ test("token price: 稳定币价格偏离时返回保护 warning", async () => {
   assert.equal(res.priceUsd, 13.39);
   assert.match(String(res.warning ?? ""), /稳定币价格偏离区间/);
 });
+
+test("token price: 主源失败时次源可fallback成功", async () => {
+  const brokenSource = {
+    async getPrice() {
+      throw new Error("primary down");
+    },
+  };
+  const fallbackSource = {
+    async getPrice(tokens) {
+      const out = {};
+      for (const token of tokens) {
+        out[token] = { usd: 1 };
+      }
+      return out;
+    },
+  };
+
+  const res = await queryTokenPrice({
+    query: "usdt",
+    network: "bsc",
+    kind: "symbol",
+  }, {
+    forceRemote: true,
+    priceSources: [brokenSource, fallbackSource],
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.source, "remote");
+  assert.equal(res.priceUsd, 1);
+});
+
+test("token price: batch 场景次源仅补齐主源缺失 token", async () => {
+  const primary = {
+    async getPrice(tokens) {
+      const out = {};
+      for (const token of tokens) {
+        if (String(token).toLowerCase().includes("55d398")) {
+          out[token] = { usd: 1 };
+        }
+      }
+      return out;
+    },
+  };
+  const secondary = {
+    calls: [],
+    async getPrice(tokens) {
+      this.calls.push([...tokens]);
+      const out = {};
+      for (const token of tokens) {
+        out[token] = { usd: 2 };
+      }
+      return out;
+    },
+  };
+
+  const res = await queryTokenPriceBatch([
+    { query: "USDT", network: "bsc", kind: "symbol" },
+    { query: "WBNB", network: "bsc", kind: "symbol" },
+  ], {
+    forceRemote: true,
+    priceSources: [primary, secondary],
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.items.length, 2);
+  const usdt = res.items.find((v) => String(v.symbol).toUpperCase() === "USDT");
+  const wbnb = res.items.find((v) => String(v.symbol).toUpperCase() === "WBNB");
+  assert.equal(usdt.priceUsd, 1);
+  assert.equal(wbnb.priceUsd, 2);
+  assert.equal(secondary.calls.length, 1);
+  assert.equal(secondary.calls[0].length, 1);
+});

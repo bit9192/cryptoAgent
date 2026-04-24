@@ -302,3 +302,26 @@
 2. cache-path：缓存可命中；`forceRemote=true` 可跳过缓存
 3. invalid-path：空 query 与未解析 token 降级 `unresolved`
 4. task-path：`assets.token-price` 可从 action 调用并返回标准化输出
+
+## 11. 当前切片计划（进行中）
+
+### Slice B-2：token price 多源 fallback
+
+本次只做：
+
+1. 价格查询支持主源失败时自动切换次源
+2. 次源仅补齐主源未返回的 token，避免重复覆盖
+3. 维持现有输出结构（`ok/source/priceUsd`）不破坏 task 兼容性
+4. 补 fallback-path 测试（主源失败、次源成功）
+
+本次不做：
+
+1. 多源加权平均
+2. 历史 K 线与波动率
+3. 风险联动评分
+
+验收标准：
+
+1. 单 token：主源异常时，次源可成功返回价格
+2. batch：主源返回部分 token 时，次源仅补缺失 token
+3. 旧测试不回归，新增 fallback 测试通过

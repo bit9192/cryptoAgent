@@ -169,7 +169,7 @@ function resolveNativeTokenCandidate(query, network) {
   const key = normalizeLower(query);
   const net = normalizeNetworkName(network);
 
-  if (net === "bsc" && ["bnb", "wbnb", "native"].includes(key)) {
+  if (net === "bsc" && ["bnb", "native"].includes(key)) {
     return {
       chain: "evm",
       network: "bsc",
@@ -180,7 +180,7 @@ function resolveNativeTokenCandidate(query, network) {
     };
   }
 
-  if (net === "eth" && ["eth", "weth", "native"].includes(key)) {
+  if (net === "eth" && ["eth", "native"].includes(key)) {
     return {
       chain: "evm",
       network: "eth",
