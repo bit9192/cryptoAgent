@@ -233,6 +233,17 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
   const cacheApi = buildCacheApi(options);
   const results = [];
   const dedupResultMap = new Map();
+  const stats = options.debugStats
+    ? {
+      totalInput: items.length,
+      uniqueInput: 0,
+      dedupeHits: 0,
+      configHits: 0,
+      cacheHits: 0,
+      remoteHits: 0,
+      unresolved: 0,
+    }
+    : null;
 
   const dedupKeyOf = (item, queryKind) => {
     const networkKey = normalizeLower(item.network || "default") || "default";
@@ -244,6 +255,7 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
     const dedupKey = dedupKeyOf(item, queryKind);
     const existing = dedupResultMap.get(dedupKey);
     if (existing) {
+      if (stats) stats.dedupeHits += 1;
       results.push({ ...existing, query: item.query, queryKind });
       continue;
     }
@@ -258,6 +270,7 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
         ...chosen,
         source: "config",
       };
+      if (stats) stats.configHits += 1;
       dedupResultMap.set(dedupKey, output);
       results.push(output);
       continue;
@@ -271,6 +284,7 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
         queryKind,
         ...cached,
       };
+      if (stats) stats.cacheHits += 1;
       dedupResultMap.set(dedupKey, output);
       results.push(output);
       continue;
@@ -284,6 +298,7 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
         queryKind,
         ...remote,
       };
+      if (stats) stats.remoteHits += 1;
       dedupResultMap.set(dedupKey, output);
       results.push(output);
       continue;
@@ -302,14 +317,23 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
       source: "unresolved",
       error: `未解析 token: ${item.query}`,
     };
+    if (stats) stats.unresolved += 1;
     dedupResultMap.set(dedupKey, output);
     results.push(output);
   }
 
-  return {
+  if (stats) {
+    stats.uniqueInput = dedupResultMap.size;
+  }
+
+  const output = {
     ok: true,
     items: results,
   };
+  if (stats) {
+    output.stats = stats;
+  }
+  return output;
 }
 
 export async function queryTokenMeta(input, options = {}) {

@@ -312,3 +312,35 @@ test("token meta: 远端异常不泄露敏感信息并降级", async () => {
   assert.match(String(res.error ?? ""), /未解析 token/);
   assert.doesNotMatch(String(res.error ?? ""), /TRX_MAINNET_API_KEY|super-secret-key/);
 });
+
+test("token meta: debugStats 返回命中统计", async () => {
+  const res = await queryTokenMetaBatch([
+    { query: "ordi", network: "mainnet", kind: "symbol" },
+    { query: "ORDI", network: "mainnet", kind: "symbol" },
+    { query: "sunpump", network: "mainnet", kind: "symbol" },
+    { query: "not-a-token", network: "mainnet", kind: "symbol" },
+  ], {
+    debugStats: true,
+    async remoteResolver(item) {
+      if (String(item.query).toLowerCase() === "sunpump") {
+        return {
+          chain: "trx",
+          network: "mainnet",
+          tokenAddress: "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+          symbol: "SUN",
+          name: "SUN",
+          decimals: 18,
+        };
+      }
+      return null;
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.stats.totalInput, 4);
+  assert.equal(res.stats.uniqueInput, 3);
+  assert.equal(res.stats.dedupeHits, 1);
+  assert.equal(res.stats.configHits, 1);
+  assert.equal(res.stats.remoteHits, 1);
+  assert.equal(res.stats.unresolved, 1);
+});

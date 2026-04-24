@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 
 import task from "../../tasks/assets/index.mjs";
 
-function createCtx(input, assetsAdapters = null, interactFn = null) {
+function createCtx(input, assetsAdapters = null, interactFn = null, tokenMetaOptions = null) {
   return {
     input: () => input,
     assetsAdapters,
     interact: interactFn ?? undefined,
+    tokenMetaOptions,
   };
 }
 
@@ -18,7 +19,27 @@ test("assets:query assets.status returns capabilities", async () => {
   assert.equal(res.ok, true);
   assert.equal(res.action, "assets.status");
   assert.deepEqual(res.capabilities.chains, ["evm", "btc", "trx"]);
+  assert.ok(res.capabilities.actions.includes("assets.token-meta"));
   assert.ok(Array.isArray(res.capabilities.inputFormats));
+});
+
+test("assets:query assets.token-meta resolves metadata with debug stats", async () => {
+  const res = await task.run(createCtx({
+    action: "assets.token-meta",
+    items: [
+      { query: "ordi", network: "mainnet", kind: "symbol" },
+      { query: "ORDI", network: "mainnet", kind: "symbol" },
+    ],
+    debugStats: true,
+  }));
+
+  assert.equal(res.ok, true);
+  assert.equal(res.action, "assets.token-meta");
+  assert.equal(res.items.length, 2);
+  assert.equal(res.items[0].source, "config");
+  assert.equal(res.stats.totalInput, 2);
+  assert.equal(res.stats.uniqueInput, 1);
+  assert.equal(res.stats.dedupeHits, 1);
 });
 
 // ─── assets.query — triplet object items ──────────────────────

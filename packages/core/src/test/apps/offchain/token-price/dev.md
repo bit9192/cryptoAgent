@@ -239,7 +239,7 @@
 
 1. 名称模糊匹配排序
 2. 多远端源加权
-3. task / cli 暴露
+3. cli 暴露
 
 ## 8. Slice A 测试文件草案
 
@@ -269,9 +269,11 @@
 7. Slice A 已补缓存 TTL 行为：过期缓存跳过，重新走远端并回填
 8. security-case 已补：远端异常不冒泡敏感内容，统一降级 unresolved
 9. Slice A 已补 batch 去重：同批次重复 query+network 复用结果，避免重复远端调用
+10. Slice A 已补 debug 统计：可选返回 config/cache/remote/unresolved 命中计数
+11. 已通过 assets.token-meta 暴露 token meta 到 task 层（含可选 debugStats）
 
 下一步：
 
-1. 讨论是否需要将 token meta 暴露到 task 层
-2. 若继续 Slice A，可补更细粒度性能基线（远端/缓存命中率统计）
+1. 若继续 Slice A，可补更细粒度性能基线（按 network 分组统计、缓存命中率）
+2. 评估是否在 assets.query 中复用 token-meta stats 作为诊断输出
 3. Slice A 稳定后，再进入 Slice B：token price 查询能力

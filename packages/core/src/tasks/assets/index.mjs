@@ -23,6 +23,9 @@ import {
 import {
   queryTrxTokenBalanceBatch,
 } from "../../apps/trx/assets/balance-batch.mjs";
+import {
+  queryTokenMetaBatch,
+} from "../../apps/offchain/token-price/index.mjs";
 
 const TASK_ID = "assets:query";
 
@@ -540,10 +543,39 @@ async function runAssetsStatus() {
     action: "assets.status",
     capabilities: {
       chains: ["evm", "btc", "trx"],
-      actions: ["assets.status", "assets.query"],
+      actions: ["assets.status", "assets.query", "assets.token-meta"],
       quote: ["usd"],
       inputFormats: ["triplet-string", "triplet-object"],
     },
+  };
+}
+
+async function runAssetsTokenMeta(ctx, input = {}) {
+  const items = Array.isArray(input.items)
+    ? input.items
+    : (input.query ? [{ query: input.query, network: input.network, kind: input.kind }] : []);
+
+  if (items.length === 0) {
+    return {
+      ok: false,
+      action: "assets.token-meta",
+      error: "assets.token-meta: items 不能为空（或提供 query）",
+    };
+  }
+
+  const options = {
+    ...(ctx?.tokenMetaOptions && typeof ctx.tokenMetaOptions === "object" ? ctx.tokenMetaOptions : {}),
+    debugStats: Boolean(input.debugStats),
+  };
+
+  if (Number.isFinite(Number(input.cacheMaxAgeMs))) {
+    options.cacheMaxAgeMs = Number(input.cacheMaxAgeMs);
+  }
+
+  const result = await queryTokenMetaBatch(items, options);
+  return {
+    action: "assets.token-meta",
+    ...result,
   };
 }
 
@@ -666,6 +698,24 @@ export const actionObject = Object.freeze({
     },
     handler: async (ctx, input) => await runAssetsQuery(ctx, input),
   },
+  "assets.token-meta": {
+    taskId: TASK_ID,
+    sub: "token-meta",
+    usage: "assets token-meta --items <query item> [--debugStats true]",
+    description: "Resolve token metadata via config/cache/remote with optional debug stats",
+    argsSchema: {
+      required: [],
+      properties: {
+        items: { type: "array" },
+        query: { type: "string" },
+        network: { type: "string" },
+        kind: { type: "string" },
+        cacheMaxAgeMs: { type: "number|integer" },
+        debugStats: { type: "boolean" },
+      },
+    },
+    handler: async (ctx, input) => await runAssetsTokenMeta(ctx, input),
+  },
 });
 
 export const dispatcher = buildActionDispatcher({
@@ -699,6 +749,11 @@ export const task = defineTask({
       quote:  { type: "string" },
       prices: { type: "array" },
       risks:  { type: "array" },
+      query: { type: "string" },
+      network: { type: "string" },
+      kind: { type: "string" },
+      cacheMaxAgeMs: { type: "number" },
+      debugStats: { type: "boolean" },
     },
   },
   async run(ctx) {
