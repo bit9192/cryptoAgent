@@ -67,6 +67,22 @@ function parseArgv(argv = process.argv.slice(2)) {
   return result;
 }
 
+function toPrintableJson(value, space = 2) {
+  return JSON.stringify(
+    value,
+    (_key, current) => (typeof current === "bigint" ? current.toString() : current),
+    space,
+  );
+}
+
+function printData(value, { indent = 2 } = {}) {
+  try {
+    console.log(toPrintableJson(value, indent));
+  } catch {
+    console.log(String(value));
+  }
+}
+
 // ─── Session 状态 ─────────────────────────────────────────────
 
 function createSession(initArgs) {
@@ -255,14 +271,14 @@ async function runTask(session, taskId, args, resumeToken) {
     session.lastResult = result.data;
     console.log("  [task] 执行成功");
     if (result.data != null) {
-      try { console.log(JSON.stringify(result.data, null, 2)); } catch { console.log(String(result.data)); }
+      printData(result.data);
     }
   } else {
     entry.status = "error";
     entry.error = result.error?.message ?? "未知错误";
     console.error(`  [task] 执行失败: ${entry.error}`);
     if (result.error?.details) {
-      try { console.error(JSON.stringify(result.error.details, null, 2)); } catch { /* ignore */ }
+      try { console.error(toPrintableJson(result.error.details, 2)); } catch { /* ignore */ }
     }
   }
 
@@ -299,7 +315,7 @@ async function runScriptWithExecHandlers(session, scriptPath) {
 
   if (data !== undefined) {
     console.log("  [run] 执行成功");
-    try { console.log(JSON.stringify(data, null, 2)); } catch { console.log(String(data)); }
+    printData(data);
   } else {
     console.log("  [run] 执行成功");
   }
@@ -709,7 +725,7 @@ async function dispatchCommand(line, session) {
         if (entry.token) console.log(`    token:     ${entry.token}`);
         if (entry.error) console.log(`    error:     ${entry.error}`);
         if (entry.result != null) {
-          try { console.log(`    result:    ${JSON.stringify(entry.result)}`); } catch { /* ignore */ }
+          try { console.log(`    result:    ${toPrintableJson(entry.result, 0)}`); } catch { /* ignore */ }
         }
         console.log();
       } else if (session.execLog.length === 0) {
