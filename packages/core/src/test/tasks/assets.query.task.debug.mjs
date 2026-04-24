@@ -5,10 +5,10 @@ import { fileURLToPath } from "node:url";
 import task from "../../tasks/assets/index.mjs";
 import {
   brc20BalanceBatchGet,
-} from "../../apps/btc/brc20.mjs";
+} from "../../apps/btc/assets/brc20-balance-batch.mjs";
 import {
   btcBalanceGet,
-} from "../../apps/btc/core.mjs";
+} from "../../apps/btc/assets/native-balance.mjs";
 import {
   queryEvmTokenMetadataBatch,
 } from "../../apps/evm/assets/token-metadata.mjs";
@@ -17,8 +17,10 @@ import {
 } from "../../apps/evm/assets/balance-batch.mjs";
 import {
   queryTrxTokenMetadataBatch,
+} from "../../apps/trx/assets/token-metadata.mjs";
+import {
   queryTrxTokenBalanceBatch,
-} from "../../apps/trx/trc20.mjs";
+} from "../../apps/trx/assets/balance-batch.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TESTDATA_PATH = path.join(__dirname, "assets.query.task.testdata.md");
