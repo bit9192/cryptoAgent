@@ -76,3 +76,6 @@ export {
 	getTrxTokenBook,
 	resolveTrxToken,
 } from "./apps/trx/config/tokens.js";
+export {
+	aggregateAssetSnapshot,
+} from "./modules/assets-engine/index.mjs";
