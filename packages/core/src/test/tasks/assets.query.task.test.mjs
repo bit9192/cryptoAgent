@@ -280,6 +280,56 @@ test("assets:query assets.query does not build cartesian pairs inside one chain"
   assert.ok(metadataCalls.length <= 1);
 });
 
+test("assets:query assets.query passes callerAddress to trx metadata batch", async () => {
+  const metadataCalls = [];
+
+  const res = await task.run(createCtx({
+    action: "assets.query",
+    items: [
+      {
+        address: "TA5DvvvmYbS75o3DKtgy2ATAGVHhpFkRLe",
+        token: "TXL6rJbvmjD46zeN1JssfgxvSo99qC8MRT",
+        network: "mainnet",
+      },
+    ],
+  }, {
+    trx: {
+      async queryMetadataBatch(items) {
+        metadataCalls.push(items);
+        return {
+          ok: true,
+          items: items.map((item) => ({
+            tokenAddress: item.token,
+            symbol: "USDT",
+            name: "Tether USD",
+            decimals: 6,
+            ok: true,
+          })),
+        };
+      },
+      async queryBalanceBatch() {
+        return {
+          ok: true,
+          items: [
+            {
+              ownerAddress: "TA5DvvvmYbS75o3DKtgy2ATAGVHhpFkRLe",
+              tokenAddress: "TXL6rJbvmjD46zeN1JssfgxvSo99qC8MRT",
+              balance: 1000000n,
+              ok: true,
+            },
+          ],
+        };
+      },
+    },
+  }));
+
+  assert.equal(res.ok, true);
+  assert.equal(res.snapshot.items.length, 1);
+  assert.equal(res.snapshot.items[0].decimals, 6);
+  assert.equal(metadataCalls.length, 1);
+  assert.equal(metadataCalls[0][0].callerAddress, "TA5DvvvmYbS75o3DKtgy2ATAGVHhpFkRLe");
+});
+
 test("assets:query assets.query supports btc native and brc20 in one call", async () => {
   const res = await task.run(createCtx({
     action: "assets.query",

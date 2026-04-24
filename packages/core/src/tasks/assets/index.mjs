@@ -456,6 +456,14 @@ async function queryTrxSnapshot(trxItems, adapters, sharedInput = {}) {
     const pairs = uniquePairs(items);
     const tokens = unique(items.map((i) => i.token));
     const callInput = { ...sharedInput, network };
+    const tokenCallerMap = new Map();
+    for (const item of items) {
+      const tokenKey = normalizeTokenKey(item.token);
+      if (!tokenKey || tokenCallerMap.has(tokenKey)) continue;
+      const owner = String(item.address ?? "").trim();
+      if (!owner) continue;
+      tokenCallerMap.set(tokenKey, owner);
+    }
 
     const configMeta = buildTrxConfigMetadataMap(tokens, network);
     const missingForConfig = tokens.filter((token) => !configMeta.has(normalizeTokenKey(token)));
@@ -470,7 +478,10 @@ async function queryTrxSnapshot(trxItems, adapters, sharedInput = {}) {
     let metadataRes = { ok: true, items: [] };
     try {
       metadataRes = missingForRpc.length > 0
-        ? await adapters.trx.queryMetadataBatch(missingForRpc.map((token) => ({ token })), callInput)
+        ? await adapters.trx.queryMetadataBatch(missingForRpc.map((token) => ({
+          token,
+          callerAddress: tokenCallerMap.get(normalizeTokenKey(token)) ?? null,
+        })), callInput)
         : { ok: true, items: [] };
     } catch (error) {
       metadataRes = {
