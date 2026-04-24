@@ -1,6 +1,9 @@
 import { defineTask } from "../../execute/define-task.mjs";
 import { buildActionDispatcher } from "../../execute/action-dispatcher.mjs";
 import { aggregateAssetSnapshot } from "../../modules/assets-engine/snapshot-aggregate.mjs";
+import { getCachedTokenMetadataMap, putCachedTokenMetadata } from "../../modules/assets-engine/token-metadata-cache.mjs";
+import { resolveEvmToken } from "../../apps/evm/configs/tokens.js";
+import { resolveTrxToken } from "../../apps/trx/config/tokens.js";
 import {
   queryEvmTokenMetadataBatch,
 } from "../../apps/evm/assets/token-metadata.mjs";
@@ -109,6 +112,70 @@ function metadataMap(rows = []) {
   return map;
 }
 
+function normalizeTokenKey(token) {
+  return String(token ?? "").trim().toLowerCase();
+}
+
+function toMetadataRowFromConfig(chain, tokenAddress, resolved) {
+  return {
+    chain,
+    tokenAddress: String(tokenAddress ?? resolved?.address ?? "").trim(),
+    name: String(resolved?.name ?? "").trim() || null,
+    symbol: String(resolved?.symbol ?? "").trim() || null,
+    decimals: Number.isFinite(Number(resolved?.decimals)) ? Number(resolved.decimals) : null,
+  };
+}
+
+function buildEvmConfigMetadataMap(tokens = [], network = null) {
+  const map = new Map();
+  for (const token of tokens) {
+    const key = normalizeTokenKey(token);
+    if (!key) continue;
+    try {
+      const resolved = resolveEvmToken({ network, key: token });
+      const row = toMetadataRowFromConfig("evm", resolved?.address ?? token, resolved);
+      map.set(key, row);
+      if (row.tokenAddress) {
+        map.set(normalizeTokenKey(row.tokenAddress), row);
+      }
+    } catch {
+      // 配置中不存在则忽略，交给缓存/RPC
+    }
+  }
+  return map;
+}
+
+function buildTrxConfigMetadataMap(tokens = [], network = null) {
+  const map = new Map();
+  for (const token of tokens) {
+    const key = normalizeTokenKey(token);
+    if (!key) continue;
+
+    if (key === "native") {
+      map.set(key, {
+        chain: "trx",
+        tokenAddress: "native",
+        name: "TRON",
+        symbol: "TRX",
+        decimals: 6,
+      });
+      continue;
+    }
+
+    try {
+      const resolved = resolveTrxToken({ network, key: token });
+      const row = toMetadataRowFromConfig("trx", resolved?.address ?? token, resolved);
+      map.set(key, row);
+      if (row.tokenAddress) {
+        map.set(normalizeTokenKey(row.tokenAddress), row);
+      }
+    } catch {
+      // 配置中不存在则忽略，交给缓存/RPC
+    }
+  }
+  return map;
+}
+
 function decimalToRaw(value, decimals) {
   const scale = Number.isFinite(Number(decimals)) ? Math.max(0, Math.floor(Number(decimals))) : 0;
   const raw = String(value ?? "").trim();
@@ -167,14 +234,39 @@ async function queryEvmSnapshot(evmItems, adapters, sharedInput = {}) {
     const callInput = { ...sharedInput, network: networkHint };
 
     const metadataTokens = unique(items.map((item) => item.token)).filter((t) => t.toLowerCase() !== "native");
+    const configMeta = buildEvmConfigMetadataMap(metadataTokens, networkHint);
+    const missingForConfig = metadataTokens.filter((token) => !configMeta.has(normalizeTokenKey(token)));
+    const cachedMeta = await getCachedTokenMetadataMap({
+      chain: "evm",
+      network: networkHint || "default",
+      tokens: missingForConfig,
+    });
+    const missingForRpc = missingForConfig.filter((token) => !cachedMeta.has(normalizeTokenKey(token)));
+
     const [balanceRes, metadataRes] = await Promise.all([
       adapters.evm.queryBalanceBatch(pairs, callInput),
-      metadataTokens.length > 0
-        ? adapters.evm.queryMetadataBatch(metadataTokens.map((token) => ({ token })), callInput)
+      missingForRpc.length > 0
+        ? adapters.evm.queryMetadataBatch(missingForRpc.map((token) => ({ token })), callInput)
         : Promise.resolve({ ok: true, items: [] }),
     ]);
 
-    const meta = metadataMap(metadataRes?.items ?? []);
+    const freshMetaRows = (metadataRes?.items ?? []).filter((row) => {
+      const tokenKey = normalizeTokenKey(row?.tokenAddress);
+      return tokenKey && row?.ok !== false;
+    });
+    if (freshMetaRows.length > 0) {
+      await putCachedTokenMetadata({
+        chain: "evm",
+        network: networkHint || "default",
+        items: freshMetaRows,
+      });
+    }
+
+    const meta = metadataMap([
+      ...configMeta.values(),
+      ...cachedMeta.values(),
+      ...freshMetaRows,
+    ]);
 
     for (const item of balanceRes?.items ?? []) {
       if (item?.ok === false) {
@@ -308,14 +400,25 @@ async function queryTrxSnapshot(trxItems, adapters, sharedInput = {}) {
     const tokens = unique(items.map((i) => i.token));
     const callInput = { ...sharedInput, network };
 
+    const configMeta = buildTrxConfigMetadataMap(tokens, network);
+    const missingForConfig = tokens.filter((token) => !configMeta.has(normalizeTokenKey(token)));
+    const cachedMeta = await getCachedTokenMetadataMap({
+      chain: "trx",
+      network,
+      tokens: missingForConfig,
+    });
+    const missingForRpc = missingForConfig.filter((token) => !cachedMeta.has(normalizeTokenKey(token)));
+
     const balanceRes = await adapters.trx.queryBalanceBatch(pairs, callInput);
     let metadataRes = { ok: true, items: [] };
     try {
-      metadataRes = await adapters.trx.queryMetadataBatch(tokens.map((token) => ({ token })), callInput);
+      metadataRes = missingForRpc.length > 0
+        ? await adapters.trx.queryMetadataBatch(missingForRpc.map((token) => ({ token })), callInput)
+        : { ok: true, items: [] };
     } catch (error) {
       metadataRes = {
         ok: false,
-        items: tokens.map((token) => ({
+        items: missingForRpc.map((token) => ({
           chain: "trx",
           tokenAddress: token,
           name: null,
@@ -327,7 +430,23 @@ async function queryTrxSnapshot(trxItems, adapters, sharedInput = {}) {
       };
     }
 
-    const meta = metadataMap(metadataRes?.items ?? []);
+    const freshMetaRows = (metadataRes?.items ?? []).filter((row) => {
+      const tokenKey = normalizeTokenKey(row?.tokenAddress);
+      return tokenKey && row?.ok !== false;
+    });
+    if (freshMetaRows.length > 0) {
+      await putCachedTokenMetadata({
+        chain: "trx",
+        network,
+        items: freshMetaRows,
+      });
+    }
+
+    const meta = metadataMap([
+      ...configMeta.values(),
+      ...cachedMeta.values(),
+      ...freshMetaRows,
+    ]);
 
     for (const item of metadataRes?.items ?? []) {
       if (item?.ok === false) {

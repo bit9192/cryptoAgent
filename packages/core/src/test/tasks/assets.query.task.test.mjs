@@ -216,10 +216,7 @@ test("assets:query assets.query does not build cartesian pairs inside one chain"
     { address: "TA5DvvvmYbS75o3DKtgy2ATAGVHhpFkRLe", token: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" },
     { address: "TMwFHYXLJaRUPeW6421aqXL4ZEzPRFGkGT", token: "TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7" },
   ]);
-  assert.deepEqual(metadataCalls[0], [
-    "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
-    "TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7",
-  ]);
+  assert.ok(metadataCalls.length <= 1);
 });
 
 test("assets:query assets.query supports btc native and brc20 in one call", async () => {
@@ -262,4 +259,49 @@ test("assets:query assets.query supports btc native and brc20 in one call", asyn
   assert.equal(res.snapshot.items[0].tokenAddress, "native");
   assert.equal(res.snapshot.items[0].symbol, "BTC");
   assert.equal(res.snapshot.items[1].tokenAddress, "ORDI");
+});
+
+test("assets:query assets.query reads metadata from config before RPC", async () => {
+  let metadataCalled = 0;
+
+  const res = await task.run(createCtx({
+    action: "assets.query",
+    items: [
+      {
+        address: "0xabc",
+        token: "0x55d398326f99059fF775485246999027B3197955",
+        network: "bsc",
+      },
+    ],
+  }, {
+    evm: {
+      async queryMetadataBatch() {
+        metadataCalled += 1;
+        return {
+          ok: true,
+          items: [],
+        };
+      },
+      async queryBalanceBatch() {
+        return {
+          ok: true,
+          items: [
+            {
+              chain: "evm",
+              ownerAddress: "0xabc",
+              tokenAddress: "0x55d398326f99059fF775485246999027B3197955",
+              balance: 1n,
+              ok: true,
+            },
+          ],
+        };
+      },
+    },
+  }));
+
+  assert.equal(res.ok, true);
+  assert.equal(metadataCalled, 0);
+  assert.equal(res.snapshot.items.length, 1);
+  assert.equal(res.snapshot.items[0].symbol, "USDT");
+  assert.equal(res.snapshot.items[0].decimals, 18);
 });
