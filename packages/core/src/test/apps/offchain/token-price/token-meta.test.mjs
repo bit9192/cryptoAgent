@@ -418,3 +418,47 @@ test("token meta: EVM 地址远端优先使用链上 ERC20 读取", async () => 
   assert.equal(evmReaderCalled, 1);
   assert.equal(sourceCalled, 0);
 });
+
+test("token meta: TRX 地址远端优先使用链上 TRC20 读取", async () => {
+  let trxReaderCalled = 0;
+  let sourceCalled = 0;
+
+  const res = await queryTokenMeta({
+    query: "TXL6rJbvmjD46zeN1JssfgxvSo99qC8MRT",
+    network: "mainnet",
+  }, {
+    forceRemote: true,
+    async trxMetadataReader(item) {
+      trxReaderCalled += 1;
+      return {
+        chain: "trx",
+        network: item.network,
+        tokenAddress: item.query,
+        name: "Sundog",
+        symbol: "SUNDOG",
+        decimals: 18,
+      };
+    },
+    tokenInfoSource: {
+      async getTokenInfo() {
+        sourceCalled += 1;
+        return {
+          baseToken: {
+            address: "TXL6rJbvmjD46zeN1JssfgxvSo99qC8MRT",
+            symbol: "SUNDOG",
+            name: "Sundog",
+            decimals: 0,
+          },
+          chainId: "tron",
+        };
+      },
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.source, "remote");
+  assert.equal(res.chain, "trx");
+  assert.equal(res.decimals, 18);
+  assert.equal(trxReaderCalled, 1);
+  assert.equal(sourceCalled, 0);
+});

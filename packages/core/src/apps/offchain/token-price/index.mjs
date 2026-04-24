@@ -4,6 +4,7 @@ import { resolveEvmToken } from "../../evm/configs/tokens.js";
 import { resolveBtcToken } from "../../btc/config/tokens.js";
 import { resolveTrxToken } from "../../trx/config/tokens.js";
 import { createErc20 } from "../../evm/erc20.mjs";
+import { queryTrxTokenMetadata } from "../../trx/assets/token-metadata.mjs";
 import {
   getCachedTokenMetadataMap,
   putCachedTokenMetadata,
@@ -229,6 +230,29 @@ async function resolveFromRemote(item, options, cacheApi) {
               name,
               symbol,
               decimals,
+            };
+          }
+        }
+      }
+
+      if (queryKind === "address" && !resolved && detectAddressKind(item.query) === "trx") {
+        if (typeof options.trxMetadataReader === "function") {
+          resolved = await options.trxMetadataReader(item, options);
+        } else {
+          const meta = await queryTrxTokenMetadata({
+            tokenAddress: item.query,
+            network: item.network ?? undefined,
+            networkName: item.network ?? undefined,
+            callerAddress: options.trxCallerAddress ?? options.callerAddress ?? undefined,
+          });
+          if (meta && typeof meta === "object") {
+            resolved = {
+              chain: "trx",
+              network: item.network ?? "mainnet",
+              tokenAddress: item.query,
+              name: meta.name ?? null,
+              symbol: meta.symbol ?? null,
+              decimals: meta.decimals ?? null,
             };
           }
         }

@@ -288,7 +288,7 @@ test("assets:query assets.query passes callerAddress to trx metadata batch", asy
     items: [
       {
         address: "TA5DvvvmYbS75o3DKtgy2ATAGVHhpFkRLe",
-        token: "TXL6rJbvmjD46zeN1JssfgxvSo99qC8MRT",
+        token: "custom-token-1",
         network: "mainnet",
       },
     ],
@@ -313,7 +313,7 @@ test("assets:query assets.query passes callerAddress to trx metadata batch", asy
           items: [
             {
               ownerAddress: "TA5DvvvmYbS75o3DKtgy2ATAGVHhpFkRLe",
-              tokenAddress: "TXL6rJbvmjD46zeN1JssfgxvSo99qC8MRT",
+              tokenAddress: "custom-token-1",
               balance: 1000000n,
               ok: true,
             },
