@@ -264,9 +264,11 @@
 2. Slice A 测试样本已结构化到 price-test-data.md
 3. Slice A 接口草案与测试草案已写入本文件
 4. 已实现最小 `queryTokenMeta/queryTokenMetaBatch` 闭环，覆盖配置命中、缓存命中、远端回写缓存、mixed chain batch
+5. 默认远端兜底已接入 DexScreener source，不再依赖外部临时注入 remoteResolver
+6. invalid-path 已补：空 query、非法地址样式输入
 
 下一步：
 
-1. 为 Slice A 增补更多 invalid / edge / security 样本
+1. 为 Slice A 增补 security-case 与缓存 TTL 行为测试
 2. 讨论是否需要将 token meta 暴露到 task 层
 3. Slice A 稳定后，再进入 Slice B：token price 查询能力

@@ -123,6 +123,65 @@ test("token meta: 远端命中并回写缓存", async () => {
   assert.equal(remoteCalled, 1);
 });
 
+test("token meta: 默认使用 DexScreener 作为远端兜底", async () => {
+  const cache = createMemoryCache();
+  const oldFetch = globalThis.fetch;
+
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    status: 200,
+    async json() {
+      if (!String(url).includes("/search?q=SUNX")) {
+        throw new Error(`unexpected url: ${url}`);
+      }
+      return {
+        pairs: [
+          {
+            chainId: "tron",
+            dexId: "sunswap",
+            pairAddress: "TPAIR",
+            priceUsd: "0.5",
+            liquidity: { usd: 500000 },
+            volume: { h24: 120000 },
+            baseToken: {
+              address: "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+              name: "SUN",
+              symbol: "SUN",
+            },
+            quoteToken: {
+              address: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+              name: "Tether USD",
+              symbol: "USDT",
+            },
+          },
+        ],
+      };
+    },
+  });
+
+  try {
+    const first = await queryTokenMeta({
+      query: "SUNX",
+      network: "mainnet",
+      kind: "symbol",
+    }, { cache });
+
+    const second = await queryTokenMeta({
+      query: "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+      network: "mainnet",
+    }, { cache });
+
+    assert.equal(first.ok, true);
+    assert.equal(first.source, "remote");
+    assert.equal(first.chain, "trx");
+    assert.equal(first.symbol, "SUN");
+    assert.equal(second.ok, true);
+    assert.equal(second.source, "cache");
+  } finally {
+    globalThis.fetch = oldFetch;
+  }
+});
+
 test("token meta: mixed chain batch 查询", async () => {
   const res = await queryTokenMetaBatch([
     { query: "USDT", network: "bsc", kind: "symbol" },
@@ -139,5 +198,16 @@ test("token meta: 非法空 query 抛错", async () => {
   await assert.rejects(
     async () => await queryTokenMeta({ query: "   " }),
     /query 不能为空/,
+  );
+});
+
+test("token meta: 非法地址样式输入抛错", async () => {
+  await assert.rejects(
+    async () => await queryTokenMeta({ query: "0x123" }),
+    /非法地址/,
+  );
+  await assert.rejects(
+    async () => await queryTokenMeta({ query: "T123" }),
+    /非法地址/,
   );
 });

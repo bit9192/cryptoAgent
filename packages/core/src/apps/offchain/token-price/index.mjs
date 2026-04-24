@@ -1,4 +1,5 @@
 import { detectAddressKind } from "../address-validators.mjs";
+import { DexScreenerSource } from "../sources/dexscreener/index.mjs";
 import { resolveEvmToken } from "../../evm/configs/tokens.js";
 import { resolveBtcToken } from "../../btc/config/tokens.js";
 import { resolveTrxToken } from "../../trx/config/tokens.js";
@@ -14,6 +15,21 @@ function normalizeString(value) {
 
 function normalizeLower(value) {
   return normalizeString(value).toLowerCase();
+}
+
+function looksLikeMalformedAddress(query) {
+  const value = normalizeString(query);
+  if (!value) return false;
+  if (value.startsWith("0x")) {
+    return !/^0x[a-fA-F0-9]{40}$/.test(value);
+  }
+  if (/^T/i.test(value)) {
+    return !/^T[1-9A-HJ-NP-Za-km-z]{25,34}$/.test(value);
+  }
+  if (/^(bc1|tb1|bcrt1|[13mn2])/i.test(value)) {
+    return detectAddressKind(value) == null;
+  }
+  return false;
 }
 
 function normalizeItems(input) {
@@ -32,6 +48,9 @@ function normalizeItems(input) {
     const query = normalizeString(item.query ?? item.address ?? item.symbol ?? item.name ?? item.key);
     if (!query) {
       throw new Error("query 不能为空");
+    }
+    if (looksLikeMalformedAddress(query)) {
+      throw new Error(`非法地址: ${query}`);
     }
     const network = normalizeString(item.network) || null;
     const kind = normalizeLower(item.kind || "auto") || "auto";
@@ -53,6 +72,44 @@ function normalizeResolvedRow(row = {}, fallback = {}) {
     name: normalizeString(row.name) || null,
     decimals: Number.isFinite(Number(row.decimals)) ? Number(row.decimals) : null,
   };
+}
+
+function mapDexScreenerChainId(chainId) {
+  const raw = normalizeLower(chainId);
+  if (["ethereum", "eth"].includes(raw)) return { chain: "evm", network: "eth" };
+  if (["bsc", "binance-smart-chain"].includes(raw)) return { chain: "evm", network: "bsc" };
+  if (["tron", "trx"].includes(raw)) return { chain: "trx", network: "mainnet" };
+  return { chain: null, network: null };
+}
+
+function normalizeRemoteTokenInfo(raw, item) {
+  if (!raw || typeof raw !== "object") return null;
+
+  const baseToken = raw.baseToken ?? null;
+  const quoteToken = raw.quoteToken ?? null;
+  const preferred = baseToken?.address ? baseToken : (quoteToken?.address ? quoteToken : null);
+  const chainLike = mapDexScreenerChainId(raw.chainId);
+  const tokenAddress = normalizeString(preferred?.address);
+  if (!tokenAddress) return null;
+
+  return {
+    chain: chainLike.chain,
+    network: item.network ?? chainLike.network,
+    tokenAddress,
+    symbol: normalizeString(preferred?.symbol) || null,
+    name: normalizeString(preferred?.name) || null,
+    decimals: Number.isFinite(Number(preferred?.decimals)) ? Number(preferred.decimals) : null,
+  };
+}
+
+let _defaultDexScreenerSource = null;
+
+async function getDefaultDexScreenerSource() {
+  if (_defaultDexScreenerSource) return _defaultDexScreenerSource;
+  const source = new DexScreenerSource();
+  await source.init();
+  _defaultDexScreenerSource = source;
+  return source;
 }
 
 function resolveConfigCandidates(item) {
@@ -137,8 +194,17 @@ async function resolveFromCache(item, cacheApi) {
 }
 
 async function resolveFromRemote(item, options, cacheApi) {
-  if (typeof options.remoteResolver !== "function") return null;
-  const resolved = await options.remoteResolver(item);
+  let resolved = null;
+  if (typeof options.remoteResolver === "function") {
+    resolved = await options.remoteResolver(item);
+  } else {
+    const source = options.tokenInfoSource ?? await getDefaultDexScreenerSource();
+    if (source && typeof source.getTokenInfo === "function") {
+      const tokenInfo = await source.getTokenInfo(item.query);
+      resolved = normalizeRemoteTokenInfo(tokenInfo, item);
+    }
+  }
+
   if (!resolved || typeof resolved !== "object") return null;
   const normalized = normalizeResolvedRow(resolved, {
     chain: resolved.chain ?? detectAddressKind(resolved.tokenAddress ?? item.query),
