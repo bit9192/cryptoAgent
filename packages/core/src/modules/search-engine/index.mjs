@@ -101,17 +101,38 @@ function normalizeCandidate(raw, defaults = {}) {
   if (!raw || typeof raw !== "object") return null;
   const chain = String(raw.chain ?? defaults.chain ?? "").trim();
   const network = String(raw.network ?? defaults.network ?? "").trim();
-  const tokenAddress = String(raw.tokenAddress ?? raw.address ?? "").trim();
-  if (!chain || !network || !tokenAddress) return null;
+  const address = String(raw.address ?? raw.tokenAddress ?? "").trim();
+  const tokenAddress = String(raw.tokenAddress ?? address).trim();
+  if (!chain || !network || !address) return null;
+  const domain = normalizeDomain(raw.domain ?? defaults.domain ?? "token");
 
   const confidenceNum = Number(raw.confidence);
   const confidence = Number.isFinite(confidenceNum)
     ? Math.max(0, Math.min(1, confidenceNum))
     : 0.5;
 
+  const normalizedId = String(raw.id ?? `${normalizeLower(domain)}:${normalizeLower(chain)}:${normalizeLower(network)}:${normalizeLower(address)}`);
+  const title = raw.title != null
+    ? String(raw.title)
+    : String(raw.name ?? raw.symbol ?? raw.tokenAddress ?? raw.address ?? "");
+
+  let extra = {};
+  if (raw.extra && typeof raw.extra === "object" && !Array.isArray(raw.extra)) {
+    extra = { ...raw.extra };
+  }
+  if (raw.txHash != null) extra.txHash = raw.txHash;
+  if (raw.routeSummary != null) extra.routeSummary = raw.routeSummary;
+  if (raw.riskLevel != null) extra.riskLevel = raw.riskLevel;
+  if (raw.tags != null) extra.tags = raw.tags;
+  if (raw.score != null) extra.score = raw.score;
+
   return {
+    domain,
+    id: normalizedId,
+    title,
     chain,
     network,
+    address,
     tokenAddress,
     symbol: raw.symbol == null ? null : String(raw.symbol),
     name: raw.name == null ? null : String(raw.name),
@@ -119,6 +140,7 @@ function normalizeCandidate(raw, defaults = {}) {
     source: String(raw.source ?? defaults.source ?? "provider"),
     providerId: String(raw.providerId ?? defaults.providerId ?? "unknown"),
     confidence,
+    extra,
   };
 }
 
@@ -160,7 +182,7 @@ function dedupeAndSortCandidates(candidates, query, input = {}, rankConfig = {})
   const queryLower = normalizeLower(query);
 
   for (const row of candidates) {
-    const key = `${normalizeLower(row.chain)}:${normalizeLower(row.network)}:${normalizeLower(row.tokenAddress)}`;
+    const key = String(row.id ?? `${normalizeLower(row.chain)}:${normalizeLower(row.network)}:${normalizeLower(row.address ?? row.tokenAddress)}`);
     const old = dedupMap.get(key);
     if (!old || row.confidence > old.confidence) {
       dedupMap.set(key, row);
@@ -477,6 +499,7 @@ export function createSearchEngine(options = {}) {
 
           const normalizedRows = (Array.isArray(rows) ? rows : [])
             .map((row) => normalizeCandidate(row, {
+              domain,
               chain: provider.chain,
               network: toCandidateNetwork(row, provider, input),
               source: "provider",

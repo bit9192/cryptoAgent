@@ -33,9 +33,10 @@
 
 当前进度：
 
-1. 仅完成切片计划
+1. 已完成 TRS-1：trade-search 协议样本
+2. 已完成 TS-5：trade domain mock provider 协议回归测试
 
 下一步：
 
-1. 样本先行
-2. 再开发实现
+1. TRS-2：接入首个真实链 provider（evm）
+2. TRS-3：任务层接入与命令验证

@@ -459,3 +459,96 @@ test("search-engine: 多链排序支持 chainPriority 配置", async () => {
   assert.equal(res.items.length, 2);
   assert.equal(res.items[0].chain, "trx");
 });
+
+test("search-engine: trade domain 使用统一 SearchItem 协议", async () => {
+  const engine = createSearchEngine({ withDefaultProviders: false });
+  engine.registerProvider({
+    id: "trade-mock",
+    chain: "evm",
+    networks: ["eth"],
+    capabilities: ["trade"],
+    async searchTrade() {
+      return [{
+        domain: "trade",
+        chain: "evm",
+        network: "eth",
+        id: "trade:eth:0xabc",
+        title: "Swap ETH/USDT",
+        address: "0xabc",
+        confidence: 0.9,
+        txHash: "0xabc",
+        routeSummary: "uni-v3",
+      }];
+    },
+  });
+
+  const res = await engine.search({ domain: "trade", query: "0xabc", kind: "txHash" });
+  assert.equal(res.ok, true);
+  assert.equal(res.items.length, 1);
+  assert.equal(res.items[0].domain, "trade");
+  assert.equal(res.items[0].id, "trade:eth:0xabc");
+  assert.equal(res.items[0].address, "0xabc");
+  assert.equal(res.items[0].extra.txHash, "0xabc");
+});
+
+test("search-engine: contract domain 支持 title/address/extra", async () => {
+  const engine = createSearchEngine({ withDefaultProviders: false });
+  engine.registerProvider({
+    id: "contract-mock",
+    chain: "evm",
+    networks: ["eth"],
+    capabilities: ["contract"],
+    async searchContract() {
+      return [{
+        domain: "contract",
+        chain: "evm",
+        network: "eth",
+        address: "0xfeed00000000000000000000000000000000beef",
+        name: "Router V3",
+        title: "Uniswap Router",
+        confidence: 0.88,
+        riskLevel: "low",
+        tags: ["dex", "router"],
+      }];
+    },
+  });
+
+  const res = await engine.search({ domain: "contract", query: "router" });
+  assert.equal(res.ok, true);
+  assert.equal(res.items.length, 1);
+  assert.equal(res.items[0].domain, "contract");
+  assert.equal(res.items[0].title, "Uniswap Router");
+  assert.equal(res.items[0].address, "0xfeed00000000000000000000000000000000beef");
+  assert.equal(res.items[0].extra.riskLevel, "low");
+});
+
+test("search-engine: address domain 支持 summary extra", async () => {
+  const engine = createSearchEngine({ withDefaultProviders: false });
+  engine.registerProvider({
+    id: "address-mock",
+    chain: "trx",
+    networks: ["mainnet"],
+    capabilities: ["address"],
+    async searchAddress(input) {
+      return [{
+        domain: "address",
+        chain: "trx",
+        network: "mainnet",
+        address: String(input.query),
+        title: "TRX Wallet Summary",
+        confidence: 0.91,
+        extra: {
+          assetCount: 3,
+          totalUsd: 125.5,
+        },
+      }];
+    },
+  });
+
+  const res = await engine.search({ domain: "address", query: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" });
+  assert.equal(res.ok, true);
+  assert.equal(res.items.length, 1);
+  assert.equal(res.items[0].domain, "address");
+  assert.equal(res.items[0].title, "TRX Wallet Summary");
+  assert.equal(res.items[0].extra.assetCount, 3);
+});

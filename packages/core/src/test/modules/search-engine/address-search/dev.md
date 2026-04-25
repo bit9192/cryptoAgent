@@ -33,9 +33,10 @@
 
 当前进度：
 
-1. 仅完成切片计划
+1. 已完成 AS-1：address-search 协议样本
+2. 已完成 TS-5：address domain mock provider 协议回归测试
 
 下一步：
 
-1. 样本先行
-2. 再开发实现
+1. AS-2：接入首个真实链 provider（evm/trx）
+2. AS-3：地址摘要字段与安全过滤联调

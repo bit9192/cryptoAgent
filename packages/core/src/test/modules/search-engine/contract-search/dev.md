@@ -33,9 +33,10 @@
 
 当前进度：
 
-1. 仅完成切片计划
+1. 已完成 CS-1：contract-search 协议样本
+2. 已完成 TS-5：contract domain mock provider 协议回归测试
 
 下一步：
 
-1. 样本先行
-2. 再开发实现
+1. CS-2：接入首个真实链 provider（evm）
+2. CS-3：标签与风险字段校验增强

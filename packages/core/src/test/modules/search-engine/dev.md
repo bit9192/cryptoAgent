@@ -45,6 +45,26 @@
 2. 子模块 dev 文档已建立
 3. 可直接进入 S-1 开发
 
+### Slice S-5：trade/contract/address 协议接入与 mock 验证
+
+本次只做：
+
+1. 统一 SearchItem 输出字段（domain/id/title/address/extra）
+2. SearchEngine 支持三域按统一协议分发（mock provider）
+3. 补齐三域样本并新增协议回归测试
+
+本次不做：
+
+1. 真实链 trade/contract/address provider 实现
+2. 任务层和 CLI 展示接入
+3. 链上深度检索算法
+
+验收标准：
+
+1. 三域都可通过 registerProvider + search 走通统一返回结构
+2. 旧 token-search 回归不破坏
+3. 样本覆盖 happy/edge/invalid/security
+
 ## 4. 子模块映射
 
 1. token-search: symbol/name/tokenId 候选检索
@@ -59,8 +79,9 @@
 1. 已完成 search 模块计划拆分
 2. 已完成 token-search TS-1（最小闭环）
 3. 已补齐 token-search 样本与单测
+4. 已完成 token-search TS-2~TS-4（注册式、缓存、trx与排序）
 
 下一步：
 
-1. 进入 token-search TS-2：接入 request-engine queryShared
-2. 进入 trade-search TRS-1：协议与样本
+1. 进入 S-5：trade/contract/address 协议接入与 mock 验证
+2. 再进入各链真实 provider 替换切片
