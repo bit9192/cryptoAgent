@@ -401,3 +401,61 @@ test("search-engine: forceRemote=true 跳过缓存", async () => {
 
   assert.equal(called, 2);
 });
+
+test("token-search: 默认 providers 包含 trx-config 并可命中 usdt", async () => {
+  const engine = createTokenSearchEngine();
+  const res = await engine.search({ query: "usdt", network: "trx", kind: "symbol" });
+
+  assert.equal(res.ok, true);
+  assert.ok(res.candidates.length >= 1);
+  assert.equal(res.candidates[0].chain, "trx");
+  assert.equal(res.candidates[0].network, "mainnet");
+  assert.equal(String(res.candidates[0].symbol).toUpperCase(), "USDT");
+});
+
+test("search-engine: 多链排序支持 chainPriority 配置", async () => {
+  const engine = createSearchEngine({
+    withDefaultProviders: false,
+    chainPriority: {
+      trx: 30,
+      evm: 5,
+    },
+  });
+
+  engine.registerProvider({
+    id: "evm-a",
+    chain: "evm",
+    networks: ["eth"],
+    capabilities: ["token"],
+    async searchToken() {
+      return [{
+        chain: "evm",
+        network: "eth",
+        tokenAddress: "0x1111111111111111111111111111111111111111",
+        symbol: "ABC",
+        confidence: 0.7,
+      }];
+    },
+  });
+
+  engine.registerProvider({
+    id: "trx-a",
+    chain: "trx",
+    networks: ["mainnet"],
+    capabilities: ["token"],
+    async searchToken() {
+      return [{
+        chain: "trx",
+        network: "mainnet",
+        tokenAddress: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+        symbol: "ABC",
+        confidence: 0.7,
+      }];
+    },
+  });
+
+  const res = await engine.search({ domain: "token", query: "abc" });
+  assert.equal(res.ok, true);
+  assert.equal(res.items.length, 2);
+  assert.equal(res.items[0].chain, "trx");
+});

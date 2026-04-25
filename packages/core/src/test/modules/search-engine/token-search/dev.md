@@ -79,8 +79,9 @@
 3. 已新增并通过 TS-1 单测（聚合/去重/limit/安全）
 4. 已完成 TS-2：注册式 provider 接口与统一 search 协议
 5. 已完成 TS-3：request-engine queryShared 去重缓存接入
+6. 已完成 TS-4：接入 trx provider 与多链排序优先级
 
 下一步：
 
-1. TS-4：扩展到 trx provider 并补多链排序策略
-2. TS-5：trade/contract/address 三域按统一协议接入
+1. TS-5：trade/contract/address 三域按统一协议接入
+2. TS-6：search task 接入统一 SearchEngine 入口

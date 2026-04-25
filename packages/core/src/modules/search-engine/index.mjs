@@ -1,5 +1,7 @@
 import { resolveEvmToken } from "../../apps/evm/configs/tokens.js";
 import { resolveBtcToken } from "../../apps/btc/config/tokens.js";
+import { resolveTrxToken } from "../../apps/trx/config/tokens.js";
+import { normalizeTrxNetworkName } from "../../apps/trx/config/networks.js";
 import { createRequestEngine } from "../request-engine/index.mjs";
 
 const SUPPORTED_DOMAINS = new Set(["token", "trade", "contract", "address"]);
@@ -20,6 +22,15 @@ function normalizeDomain(domain) {
     throw new TypeError(`不支持的 search domain: ${String(domain ?? "")}`);
   }
   return value;
+}
+
+function normalizeNetworkHint(value) {
+  const raw = normalizeLower(value);
+  if (!raw) return "";
+  if (["eth", "ethereum", "mainnet", "evm"].includes(raw)) return raw;
+  if (["trx", "tron"].includes(raw)) return "trx";
+  if (["btc", "bitcoin"].includes(raw)) return "btc";
+  return raw;
 }
 
 function stableStringify(value) {
@@ -111,7 +122,40 @@ function normalizeCandidate(raw, defaults = {}) {
   };
 }
 
-function dedupeAndSortCandidates(candidates, query) {
+function resolveCandidateRank(candidate, input = {}, rankConfig = {}) {
+  let rank = 0;
+  const chain = normalizeLower(candidate.chain);
+  const network = normalizeLower(candidate.network);
+  const inputChain = normalizeLower(input.chain);
+  const inputNetwork = normalizeNetworkHint(input.network);
+
+  if (inputChain && inputChain === chain) rank += 200;
+  if (inputNetwork) {
+    if (inputNetwork === network) rank += 160;
+    if (inputNetwork === "trx" && chain === "trx") rank += 150;
+    if (inputNetwork === "btc" && chain === "btc") rank += 150;
+    if (inputNetwork === "evm" && chain === "evm") rank += 150;
+  }
+
+  if (network === "mainnet") rank += 6;
+
+  const chainPriority = rankConfig.chainPriority && typeof rankConfig.chainPriority === "object"
+    ? rankConfig.chainPriority
+    : {};
+  const networkPriority = rankConfig.networkPriority && typeof rankConfig.networkPriority === "object"
+    ? rankConfig.networkPriority
+    : {};
+
+  const chainWeight = Number(chainPriority[chain]);
+  const networkWeight = Number(networkPriority[network]);
+
+  if (Number.isFinite(chainWeight)) rank += chainWeight;
+  if (Number.isFinite(networkWeight)) rank += networkWeight;
+
+  return rank;
+}
+
+function dedupeAndSortCandidates(candidates, query, input = {}, rankConfig = {}) {
   const dedupMap = new Map();
   const queryLower = normalizeLower(query);
 
@@ -128,6 +172,9 @@ function dedupeAndSortCandidates(candidates, query) {
     const aExact = normalizeLower(a.symbol) === queryLower ? 1 : 0;
     const bExact = normalizeLower(b.symbol) === queryLower ? 1 : 0;
     if (aExact !== bExact) return bExact - aExact;
+    const aRank = resolveCandidateRank(a, input, rankConfig);
+    const bRank = resolveCandidateRank(b, input, rankConfig);
+    if (aRank !== bRank) return bRank - aRank;
     if (a.confidence !== b.confidence) return b.confidence - a.confidence;
     return normalizeLower(a.tokenAddress).localeCompare(normalizeLower(b.tokenAddress));
   });
@@ -183,6 +230,37 @@ function createDefaultProviders() {
             decimals: token.decimals,
             source: "config",
             confidence: 0.9,
+          }];
+        } catch {
+          return [];
+        }
+      },
+    },
+    {
+      id: "trx-config",
+      chain: "trx",
+      networks: ["mainnet", "nile", "shasta", "local"],
+      capabilities: ["token"],
+      async searchToken(input) {
+        try {
+          const requested = String(input.network ?? "").trim();
+          const network = requested
+            ? (requested === "trx" ? "mainnet" : normalizeTrxNetworkName(requested))
+            : "mainnet";
+
+          const token = resolveTrxToken({
+            key: input.query,
+            network,
+          });
+          return [{
+            chain: "trx",
+            network,
+            tokenAddress: token.address,
+            symbol: token.symbol,
+            name: token.name,
+            decimals: token.decimals,
+            source: "config",
+            confidence: 0.92,
           }];
         } catch {
           return [];
@@ -259,8 +337,17 @@ function isProviderMatch(provider, filter = {}) {
     return false;
   }
   if (filter.network) {
-    const wanted = normalizeLower(filter.network);
-    const hit = provider.networks.some((net) => normalizeLower(net) === wanted);
+    const wanted = normalizeNetworkHint(filter.network);
+    let hit = provider.networks.some((net) => normalizeLower(net) === wanted);
+    if (!hit && wanted === "trx") {
+      hit = normalizeLower(provider.chain) === "trx";
+    }
+    if (!hit && wanted === "btc") {
+      hit = normalizeLower(provider.chain) === "btc";
+    }
+    if (!hit && wanted === "evm") {
+      hit = normalizeLower(provider.chain) === "evm";
+    }
     if (!hit) return false;
   }
   return true;
@@ -278,6 +365,14 @@ function toCandidateNetwork(row, provider, input) {
 
 export function createSearchEngine(options = {}) {
   const providerMap = new Map();
+  const rankConfig = {
+    chainPriority: options.chainPriority && typeof options.chainPriority === "object"
+      ? options.chainPriority
+      : {},
+    networkPriority: options.networkPriority && typeof options.networkPriority === "object"
+      ? options.networkPriority
+      : {},
+  };
   const cacheNamespace = String(options.cacheNamespace ?? "search-engine").trim() || "search-engine";
   const requestEngine = options.requestEngine ?? createRequestEngine({
     defaultTtlMs: Number.isFinite(Number(options.defaultCacheTtlMs))
@@ -404,7 +499,7 @@ export function createSearchEngine(options = {}) {
         }
       }));
 
-      const items = dedupeAndSortCandidates(allCandidates, input.query).slice(0, limit);
+      const items = dedupeAndSortCandidates(allCandidates, input.query, input, rankConfig).slice(0, limit);
 
       return {
         ok: true,
@@ -471,6 +566,8 @@ export function createTokenSearchEngine(options = {}) {
   const engine = createSearchEngine({
     providers,
     withDefaultProviders: options.withDefaultProviders,
+    chainPriority: options.chainPriority,
+    networkPriority: options.networkPriority,
   });
 
   async function search(input = {}) {

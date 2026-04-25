@@ -20,6 +20,10 @@
 - 输入：同 query 连续调用 2 次
 - 期望：provider 仅执行 1 次
 
+5. 默认 trx provider 命中
+- 输入：`query=usdt, network=trx`
+- 期望：候选包含 `chain=trx, network=mainnet`
+
 ## 2. edge-case
 
 1. 重复候选去重
@@ -37,6 +41,10 @@
 4. 并发同请求合并
 - 输入：同 query 并发调用 3 次
 - 期望：provider 仅执行 1 次
+
+5. 多链排序优先级
+- 输入：evm/trx 同 symbol 同 confidence，配置 chainPriority(trx>evm)
+- 期望：trx 候选排在前面
 
 ## 3. invalid-case
 
