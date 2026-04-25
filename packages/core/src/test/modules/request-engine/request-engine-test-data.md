@@ -60,3 +60,39 @@
 - PRIVATE_KEY_PLACEHOLDER
 - PASSWORD_PLACEHOLDER
 - SECRET_PLACEHOLDER
+
+## 6. RQ-2 增补样本（分域 TTL + 失效策略）
+
+### happy-path
+
+1. requestTTL 与 chainTTL 独立生效
+- 输入：requestTTL=500ms, chainTTL=2000ms
+- 期望：request 过期后，chain 仍可命中
+
+2. prefix 批量失效（requestPrefix）
+- 输入：requestKey 为 `price:*` 和 `balance:*`
+- 期望：仅 `price:*` 被失效
+
+3. prefix 批量失效（chainPrefix）
+- 输入：chainKey 为 `token:ordi:*` 与 `token:btc:*`
+- 期望：仅 `token:ordi:*` 被失效
+
+### edge-case
+
+1. prefix 无匹配
+- 输入：不存在的前缀
+- 期望：不抛错，删除计数为 0
+
+2. 仅传 requestPrefix 或仅传 chainPrefix
+- 输入：只给一个前缀
+- 期望：另一个域不受影响
+
+### invalid-case
+
+1. requestPrefix 非字符串
+- 输入：requestPrefix=123
+- 期望：抛 TypeError
+
+2. chainPrefix 空字符串
+- 输入：chainPrefix=""
+- 期望：抛 TypeError

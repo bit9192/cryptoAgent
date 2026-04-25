@@ -31,6 +31,26 @@
 2. 一次多链返回后，第二链命中 chainKey 缓存
 3. 提供最小统计用于 debug
 
+### Slice RQ-2：缓存策略细化（分域 TTL + 失效策略）
+
+本次只做：
+
+1. 分域 TTL：支持 request 和 chain 独立 TTL
+2. 失效策略：支持按 requestPrefix / chainPrefix 批量失效
+3. 最小统计补充：prefix 失效计数
+
+本次不做：
+
+1. 分布式缓存同步
+2. LRU 驱逐
+3. 预热和后台刷新
+
+验收标准：
+
+1. requestTTL 过期不影响 chainTTL 命中（反之亦然）
+2. prefix 失效仅影响命中的 key 集合
+3. RQ-1 测试不回归，RQ-2 新测试通过
+
 ## 3. 当前进度 / 下一步
 
 当前进度：
@@ -38,8 +58,9 @@
 1. 已完成 RQ-1 的最小实现（fetchShared / getChainSlice / invalidate / getStats）
 2. 已补充 request-engine 测试样本（happy/edge/invalid/security）
 3. 已新增 request-engine 单测并通过
+4. 已完成 RQ-2（分域 TTL + prefix 失效策略）并通过回归
 
 下一步：
 
-1. 进入 RQ-2（缓存策略细化，如分域 TTL 与失效策略）
-2. 评估与 data-engine/search-engine 的接入点
+1. 评估与 data-engine/search-engine 的接入点
+2. 规划 RQ-3（可观测性增强：按 key 命中分布、过期回收统计）

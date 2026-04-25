@@ -139,3 +139,134 @@ test("request-engine: 安全输出不泄露缓存原文", async () => {
   assert.equal(typeof ack.requestDeleted, "boolean");
   assert.equal(typeof ack.chainDeleted, "boolean");
 });
+
+test("request-engine: requestTTL 与 chainTTL 独立生效", async () => {
+  let now = 1_000;
+  let calls = 0;
+  const engine = createRequestEngine({ now: () => now });
+
+  const fetcher = async () => {
+    calls += 1;
+    return {
+      chains: {
+        "asset:ordi:btc": { chain: "btc", v: calls },
+      },
+    };
+  };
+
+  const fanout = (response) => response.chains;
+
+  const first = await engine.getChainSlice({
+    requestKey: "asset:ordi:all",
+    chainKey: "asset:ordi:btc",
+    fetcher,
+    fanout,
+    ttlPolicy: {
+      requestTtlMs: 500,
+      chainTtlMs: 2_000,
+    },
+  });
+  assert.equal(first.v, 1);
+  assert.equal(calls, 1);
+
+  now = 1_700;
+  const second = await engine.getChainSlice({
+    requestKey: "asset:ordi:all",
+    chainKey: "asset:ordi:btc",
+    fetcher,
+    fanout,
+    ttlPolicy: {
+      requestTtlMs: 500,
+      chainTtlMs: 2_000,
+    },
+  });
+
+  // request cache 已过期，但 chain cache 仍有效，不应重新 fetch
+  assert.equal(second.v, 1);
+  assert.equal(calls, 1);
+});
+
+test("request-engine: invalidate 支持 requestPrefix 批量失效", async () => {
+  let calls = 0;
+  const engine = createRequestEngine();
+
+  const fetcher = async () => {
+    calls += 1;
+    return { v: calls };
+  };
+
+  await engine.fetchShared({ requestKey: "price:ordi", fetcher });
+  await engine.fetchShared({ requestKey: "price:btc", fetcher });
+  await engine.fetchShared({ requestKey: "balance:btc", fetcher });
+  assert.equal(calls, 3);
+
+  const ack = engine.invalidate({ requestPrefix: "price:" });
+  assert.equal(ack.requestDeletedCount, 2);
+  assert.equal(ack.chainDeletedCount, 0);
+
+  await engine.fetchShared({ requestKey: "price:ordi", fetcher });
+  await engine.fetchShared({ requestKey: "balance:btc", fetcher });
+
+  // price:ordi 被失效后重拉 + balance:btc 仍命中
+  assert.equal(calls, 4);
+});
+
+test("request-engine: invalidate 支持 chainPrefix 批量失效", async () => {
+  let calls = 0;
+  const engine = createRequestEngine();
+
+  const fetcher = async () => {
+    calls += 1;
+    return {
+      chains: {
+        "token:ordi:btc": { chain: "btc", v: calls },
+        "token:ordi:evm": { chain: "evm", v: calls },
+        "token:btc:btc": { chain: "btc", v: calls },
+      },
+    };
+  };
+
+  const fanout = (response) => response.chains;
+
+  await engine.getChainSlice({
+    requestKey: "token:all",
+    chainKey: "token:ordi:btc",
+    fetcher,
+    fanout,
+  });
+
+  const ack = engine.invalidate({ chainPrefix: "token:ordi:" });
+  assert.equal(ack.requestDeletedCount, 0);
+  assert.equal(ack.chainDeletedCount, 2);
+
+  // ordi 被清掉，btc 保留
+  const kept = await engine.getChainSlice({
+    requestKey: "token:all",
+    chainKey: "token:btc:btc",
+    fetcher,
+    fanout,
+  });
+  assert.equal(kept.chain, "btc");
+
+  const dropped = await engine.getChainSlice({
+    requestKey: "token:all",
+    chainKey: "token:ordi:evm",
+    fetcher,
+    fanout,
+  });
+  assert.equal(dropped.chain, "evm");
+});
+
+test("request-engine: invalid 的 prefix 入参会抛错", async () => {
+  const engine = createRequestEngine();
+
+  assert.throws(
+    () => engine.invalidate({ requestPrefix: 123 }),
+    /requestPrefix/,
+  );
+
+  assert.throws(
+    () => engine.invalidate({ chainPrefix: "" }),
+    /chainPrefix/,
+  );
+});

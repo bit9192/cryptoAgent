@@ -10,6 +10,12 @@ function assertFunction(value, fieldName) {
   }
 }
 
+function assertNonNegativeNumber(value, fieldName) {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new TypeError(`${fieldName} 必须是非负数字`);
+  }
+}
+
 function isFresh(entry, nowMs) {
   return entry && typeof entry.expireAt === "number" && entry.expireAt > nowMs;
 }
@@ -19,6 +25,49 @@ function normalizeFanoutMap(rawMap) {
     return {};
   }
   return rawMap;
+}
+
+function resolveTtlPolicy(input = {}, defaultTtlMs) {
+  const { ttlMs, ttlPolicy } = input;
+
+  let requestTtlMs = defaultTtlMs;
+  let chainTtlMs = defaultTtlMs;
+
+  if (ttlMs != null) {
+    assertNonNegativeNumber(ttlMs, "ttlMs");
+    requestTtlMs = ttlMs;
+    chainTtlMs = ttlMs;
+  }
+
+  if (ttlPolicy != null) {
+    if (!ttlPolicy || typeof ttlPolicy !== "object" || Array.isArray(ttlPolicy)) {
+      throw new TypeError("ttlPolicy 必须是对象");
+    }
+    if (ttlPolicy.requestTtlMs != null) {
+      assertNonNegativeNumber(ttlPolicy.requestTtlMs, "ttlPolicy.requestTtlMs");
+      requestTtlMs = ttlPolicy.requestTtlMs;
+    }
+    if (ttlPolicy.chainTtlMs != null) {
+      assertNonNegativeNumber(ttlPolicy.chainTtlMs, "ttlPolicy.chainTtlMs");
+      chainTtlMs = ttlPolicy.chainTtlMs;
+    }
+  }
+
+  return {
+    requestTtlMs,
+    chainTtlMs,
+  };
+}
+
+function deleteByPrefix(map, prefix) {
+  let deletedCount = 0;
+  for (const key of map.keys()) {
+    if (key.startsWith(prefix)) {
+      map.delete(key);
+      deletedCount += 1;
+    }
+  }
+  return deletedCount;
 }
 
 export function createRequestEngine(options = {}) {
@@ -40,6 +89,7 @@ export function createRequestEngine(options = {}) {
     fetchCount: 0,
     fanoutWriteCount: 0,
     invalidateCount: 0,
+    invalidateByPrefixCount: 0,
   };
 
   function setRequestCache(requestKey, value, ttlMs) {
@@ -78,9 +128,9 @@ export function createRequestEngine(options = {}) {
     const {
       requestKey,
       fetcher,
-      ttlMs = defaultTtlMs,
       fanout,
     } = input;
+    const ttlPolicy = resolveTtlPolicy(input, defaultTtlMs);
 
     assertNonEmptyString(requestKey, "requestKey");
     assertFunction(fetcher, "fetcher");
@@ -99,14 +149,14 @@ export function createRequestEngine(options = {}) {
     const promise = (async () => {
       stats.fetchCount += 1;
       const response = await fetcher();
-      setRequestCache(requestKey, response, ttlMs);
+      setRequestCache(requestKey, response, ttlPolicy.requestTtlMs);
 
       if (fanout) {
         assertFunction(fanout, "fanout");
         const fanoutMap = normalizeFanoutMap(fanout(response));
         for (const [chainKey, chainSlice] of Object.entries(fanoutMap)) {
           if (!chainKey) continue;
-          setChainCache(chainKey, chainSlice, ttlMs);
+          setChainCache(chainKey, chainSlice, ttlPolicy.chainTtlMs);
           stats.fanoutWriteCount += 1;
         }
       }
@@ -129,8 +179,8 @@ export function createRequestEngine(options = {}) {
       chainKey,
       fetcher,
       fanout,
-      ttlMs = defaultTtlMs,
     } = input;
+    const ttlPolicy = resolveTtlPolicy(input, defaultTtlMs);
 
     assertNonEmptyString(requestKey, "requestKey");
     assertNonEmptyString(chainKey, "chainKey");
@@ -145,8 +195,8 @@ export function createRequestEngine(options = {}) {
     const response = await fetchShared({
       requestKey,
       fetcher,
-      ttlMs,
       fanout,
+      ttlPolicy,
     });
 
     const chainAfterFanout = getChainCache(chainKey);
@@ -157,7 +207,7 @@ export function createRequestEngine(options = {}) {
     const fallbackMap = normalizeFanoutMap(fanout(response));
     if (Object.prototype.hasOwnProperty.call(fallbackMap, chainKey)) {
       const value = fallbackMap[chainKey];
-      setChainCache(chainKey, value, ttlMs);
+      setChainCache(chainKey, value, ttlPolicy.chainTtlMs);
       stats.fanoutWriteCount += 1;
       return value;
     }
@@ -169,33 +219,68 @@ export function createRequestEngine(options = {}) {
     const {
       requestKey,
       chainKey,
+      requestPrefix,
+      chainPrefix,
       all = false,
     } = input;
 
     let requestDeleted = false;
     let chainDeleted = false;
+    let requestDeletedCount = 0;
+    let chainDeletedCount = 0;
 
     if (all) {
       requestDeleted = requestCache.size > 0;
       chainDeleted = chainCache.size > 0;
+      requestDeletedCount = requestCache.size;
+      chainDeletedCount = chainCache.size;
       requestCache.clear();
       chainCache.clear();
       stats.invalidateCount += 1;
-      return { requestDeleted, chainDeleted };
+      return {
+        requestDeleted,
+        chainDeleted,
+        requestDeletedCount,
+        chainDeletedCount,
+      };
+    }
+
+    if (requestPrefix != null) {
+      assertNonEmptyString(requestPrefix, "requestPrefix");
+      requestDeletedCount += deleteByPrefix(requestCache, requestPrefix);
+    }
+
+    if (chainPrefix != null) {
+      assertNonEmptyString(chainPrefix, "chainPrefix");
+      chainDeletedCount += deleteByPrefix(chainCache, chainPrefix);
+    }
+
+    if (requestDeletedCount > 0 || chainDeletedCount > 0) {
+      stats.invalidateByPrefixCount += 1;
     }
 
     if (requestKey != null) {
       assertNonEmptyString(requestKey, "requestKey");
       requestDeleted = requestCache.delete(requestKey);
+      if (requestDeleted) requestDeletedCount += 1;
     }
 
     if (chainKey != null) {
       assertNonEmptyString(chainKey, "chainKey");
       chainDeleted = chainCache.delete(chainKey);
+      if (chainDeleted) chainDeletedCount += 1;
     }
 
+    requestDeleted = requestDeleted || requestDeletedCount > 0;
+    chainDeleted = chainDeleted || chainDeletedCount > 0;
+
     stats.invalidateCount += 1;
-    return { requestDeleted, chainDeleted };
+    return {
+      requestDeleted,
+      chainDeleted,
+      requestDeletedCount,
+      chainDeletedCount,
+    };
   }
 
   function getStats() {
