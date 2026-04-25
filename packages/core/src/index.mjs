@@ -79,3 +79,6 @@ export {
 export {
 	aggregateAssetSnapshot,
 } from "./modules/assets-engine/index.mjs";
+export {
+	createRequestEngine,
+} from "./modules/request-engine/index.mjs";

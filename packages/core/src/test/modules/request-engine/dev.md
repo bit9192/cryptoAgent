@@ -35,9 +35,11 @@
 
 当前进度：
 
-1. 仅完成切片计划
+1. 已完成 RQ-1 的最小实现（fetchShared / getChainSlice / invalidate / getStats）
+2. 已补充 request-engine 测试样本（happy/edge/invalid/security）
+3. 已新增 request-engine 单测并通过
 
 下一步：
 
-1. 先补 request-engine 样本
-2. 再进入实现
+1. 进入 RQ-2（缓存策略细化，如分域 TTL 与失效策略）
+2. 评估与 data-engine/search-engine 的接入点

@@ -144,6 +144,27 @@ Search Engine:
 }
 ```
 
+### 2.5 聚合责任矩阵（核心边界）
+
+该矩阵用于固定“谁负责聚合什么”，避免后续开发把聚合逻辑散落到 task 或 cli。
+
+| 板块 | 聚合对象 | 负责内容 | 不负责内容 |
+|------|----------|----------|------------|
+| **Wallet 模块** | Wallet Providers（多链） | 账户树、解锁状态、派生地址统一视图 | 不做 token/trade/contract/address 搜索聚合 |
+| **Search Engine** | Search Providers（多链） | token/trade/contract/address 搜索并发、去重、打分、排序、标准化输出 | 不做通用链数据查询聚合（余额/交易明细/区块状态） |
+| **Data Engine**（或 Query Engine） | Net Providers（多链） | 余额、交易、区块、合约读取等通用链数据聚合 | 不做搜索相关 ranking 和结果解释 |
+| **Request Engine** | 请求执行层（跨模块） | 请求去重、in-flight 合并、分层缓存、超时/重试策略 | 不承载业务语义和结果业务排序 |
+| **Task/Execute** | 业务流程 | 任务编排、状态机、调用顺序、回滚和重试流程控制 | 不实现搜索聚合或链数据聚合算法 |
+| **CLI/Server** | 输入输出层 | 参数输入、结果展示、交互状态 | 不实现任何聚合逻辑 |
+
+#### 一句话边界
+
+- Wallet 聚合钱包能力。
+- Search Engine 聚合搜索能力。
+- Data Engine 聚合链数据能力（Net Providers）。
+- Request Engine 提供统一请求基础设施。
+- Task/Execute 只做编排，不实现聚合算法。
+
 ---
 
 ## 三、数据流
