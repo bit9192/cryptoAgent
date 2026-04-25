@@ -2,14 +2,23 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import task from "../../tasks/assets/index.mjs";
+import { createRequestEngine } from "../../modules/request-engine/index.mjs";
 
-function createCtx(input, assetsAdapters = null, interactFn = null, tokenMetaOptions = null, tokenPriceOptions = null) {
+function createCtx(
+  input,
+  assetsAdapters = null,
+  interactFn = null,
+  tokenMetaOptions = null,
+  tokenPriceOptions = null,
+  requestEngine = null,
+) {
   return {
     input: () => input,
     assetsAdapters,
     interact: interactFn ?? undefined,
     tokenMetaOptions,
     tokenPriceOptions,
+    requestEngine: requestEngine ?? undefined,
   };
 }
 
@@ -119,6 +128,101 @@ test("assets:query assets.token-price resolves price with debug stats", async ()
   assert.equal(res.stats.totalInput, 2);
   assert.equal(res.stats.uniqueInput, 1);
   assert.equal(res.stats.dedupeHits, 1);
+});
+
+test("assets:query assets.token-meta reuses request-engine cache across runs", async () => {
+  let remoteCalls = 0;
+  const requestEngine = createRequestEngine();
+
+  const input = {
+    action: "assets.token-meta",
+    query: "0xb45e6dd851df10961d1aad912baf220168fcaa25",
+    network: "bsc",
+    kind: "address",
+    forceRemote: true,
+  };
+
+  const tokenMetaOptions = {
+    cache: {
+      async getMap() { return new Map(); },
+      async find() { return null; },
+      async put() { return 1; },
+    },
+    async remoteResolver(item) {
+      remoteCalls += 1;
+      return {
+        chain: "evm",
+        network: item.network,
+        tokenAddress: item.query,
+        symbol: "TOK",
+        name: "Token",
+        decimals: 18,
+      };
+    },
+  };
+
+  const r1 = await task.run(createCtx(input, null, null, tokenMetaOptions, null, requestEngine));
+  const r2 = await task.run(createCtx(input, null, null, tokenMetaOptions, null, requestEngine));
+
+  assert.equal(r1.ok, true);
+  assert.equal(r2.ok, true);
+  assert.equal(remoteCalls, 1);
+});
+
+test("assets:query assets.token-price reuses request-engine cache across runs", async () => {
+  let priceBatchCalls = 0;
+  let metaRemoteCalls = 0;
+  const requestEngine = createRequestEngine();
+
+  const input = {
+    action: "assets.token-price",
+    query: "0xb45e6dd851df10961d1aad912baf220168fcaa25",
+    network: "bsc",
+    kind: "address",
+    forceRemote: true,
+    metaForceRemote: true,
+  };
+
+  const tokenPriceOptions = {
+    tokenMetaOptions: {
+      cache: {
+        async getMap() { return new Map(); },
+        async find() { return null; },
+        async put() { return 1; },
+      },
+      async remoteResolver(item) {
+        metaRemoteCalls += 1;
+        return {
+          chain: "evm",
+          network: item.network,
+          tokenAddress: item.query,
+          symbol: "TOK",
+          name: "Token",
+          decimals: 18,
+        };
+      },
+    },
+    cache: {
+      async getMap() { return new Map(); },
+      async put() { return 1; },
+    },
+    async priceBatchResolver(tokens) {
+      priceBatchCalls += 1;
+      const out = {};
+      for (const token of tokens) {
+        out[token] = { usd: 2 };
+      }
+      return out;
+    },
+  };
+
+  const r1 = await task.run(createCtx(input, null, null, null, tokenPriceOptions, requestEngine));
+  const r2 = await task.run(createCtx(input, null, null, null, tokenPriceOptions, requestEngine));
+
+  assert.equal(r1.ok, true);
+  assert.equal(r2.ok, true);
+  assert.equal(priceBatchCalls, 1);
+  assert.equal(metaRemoteCalls, 1);
 });
 
 // ─── assets.query — triplet object items ──────────────────────
@@ -321,13 +425,14 @@ test("assets:query assets.query does not build cartesian pairs inside one chain"
 
 test("assets:query assets.query passes callerAddress to trx metadata batch", async () => {
   const metadataCalls = [];
+  const testToken = "custom-caller-token-z9x8";
 
   const res = await task.run(createCtx({
     action: "assets.query",
     items: [
       {
         address: "TA5DvvvmYbS75o3DKtgy2ATAGVHhpFkRLe",
-        token: "custom-token-1",
+        token: testToken,
         network: "mainnet",
       },
     ],
@@ -352,7 +457,7 @@ test("assets:query assets.query passes callerAddress to trx metadata batch", asy
           items: [
             {
               ownerAddress: "TA5DvvvmYbS75o3DKtgy2ATAGVHhpFkRLe",
-              tokenAddress: "custom-token-1",
+              tokenAddress: testToken,
               balance: 1000000n,
               ok: true,
             },

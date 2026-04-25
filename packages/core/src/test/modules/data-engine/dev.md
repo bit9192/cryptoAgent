@@ -38,8 +38,10 @@
 1. 已完成 DQ-1：新增 createDataQueryGateway 薄层接入 request-engine
 2. 已补充 DQ-1 测试样本清单
 3. 已新增并通过 DQ-1 相关单测
+4. 已完成 DQ-2：assets.token-meta / assets.token-price 入口接入 queryShared
+5. 已新增任务层接入回归测试并通过
 
 下一步：
 
-1. 评估在 assets 查询入口接入 query gateway（不改链实现）
-2. 规划 DQ-2：多链余额聚合入口最小接入
+1. 规划 DQ-3：assets.query（多链余额聚合）入口接入 queryChain
+2. 设计 queryKey 规范（task 维度统一）

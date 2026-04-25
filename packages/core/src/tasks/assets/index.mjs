@@ -1,6 +1,7 @@
 import { defineTask } from "../../execute/define-task.mjs";
 import { buildActionDispatcher } from "../../execute/action-dispatcher.mjs";
 import { aggregateAssetSnapshot } from "../../modules/assets-engine/snapshot-aggregate.mjs";
+import { createDataQueryGateway } from "../../modules/data-engine/index.mjs";
 import { getCachedTokenMetadataMap, putCachedTokenMetadata } from "../../modules/assets-engine/token-metadata-cache.mjs";
 import { resolveEvmToken } from "../../apps/evm/configs/tokens.js";
 import { resolveBtcToken } from "../../apps/btc/config/tokens.js";
@@ -91,6 +92,56 @@ function parseQueryItems(input) {
 
 function unique(items = []) {
   return [...new Set(items)];
+}
+
+function stableStringify(value) {
+  if (value === null || value === undefined) return String(value);
+  if (typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((x) => stableStringify(x)).join(",")}]`;
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(",")}}`;
+}
+
+function normalizeQueryItemForKey(item = {}) {
+  return {
+    query: String(item.query ?? "").trim().toLowerCase(),
+    network: String(item.network ?? "").trim().toLowerCase(),
+    kind: String(item.kind ?? "auto").trim().toLowerCase(),
+  };
+}
+
+function buildBatchRequestKey(action, items = [], options = {}) {
+  const normalizedItems = items.map((item) => normalizeQueryItemForKey(item));
+  const shape = {
+    action,
+    items: normalizedItems,
+    options: {
+      forceRemote: Boolean(options.forceRemote),
+      metaForceRemote: options.metaForceRemote == null ? null : Boolean(options.metaForceRemote),
+      cacheMaxAgeMs: Number.isFinite(Number(options.cacheMaxAgeMs)) ? Number(options.cacheMaxAgeMs) : null,
+      metaCacheMaxAgeMs: Number.isFinite(Number(options.metaCacheMaxAgeMs))
+        ? Number(options.metaCacheMaxAgeMs)
+        : null,
+      debugStats: Boolean(options.debugStats),
+    },
+  };
+  return `${action}:${stableStringify(shape)}`;
+}
+
+function resolveDataQueryGateway(ctx = {}) {
+  if (ctx?.dataQueryGateway && typeof ctx.dataQueryGateway === "object") {
+    return ctx.dataQueryGateway;
+  }
+  if (!ctx?.requestEngine) {
+    return null;
+  }
+  if (ctx.__dataQueryGateway) {
+    return ctx.__dataQueryGateway;
+  }
+  ctx.__dataQueryGateway = createDataQueryGateway({
+    requestEngine: ctx.requestEngine,
+  });
+  return ctx.__dataQueryGateway;
 }
 
 function uniquePairs(items = []) {
@@ -585,7 +636,18 @@ async function runAssetsTokenMeta(ctx, input = {}) {
     options.cacheMaxAgeMs = Number(input.cacheMaxAgeMs);
   }
 
-  const result = await queryTokenMetaBatch(items, options);
+  const dataQueryGateway = resolveDataQueryGateway(ctx);
+  const fetcher = async () => await queryTokenMetaBatch(items, options);
+  const requestKey = buildBatchRequestKey("assets.token-meta", items, options);
+
+  const result = dataQueryGateway
+    ? await dataQueryGateway.queryShared({
+      requestKey,
+      fetcher,
+      ttlPolicy: ctx?.dataQueryTtlPolicy,
+    })
+    : await fetcher();
+
   return {
     action: "assets.token-meta",
     ...result,
@@ -619,7 +681,18 @@ async function runAssetsTokenPrice(ctx, input = {}) {
     options.metaCacheMaxAgeMs = Number(input.metaCacheMaxAgeMs);
   }
 
-  const result = await queryTokenPriceBatch(items, options);
+  const dataQueryGateway = resolveDataQueryGateway(ctx);
+  const fetcher = async () => await queryTokenPriceBatch(items, options);
+  const requestKey = buildBatchRequestKey("assets.token-price", items, options);
+
+  const result = dataQueryGateway
+    ? await dataQueryGateway.queryShared({
+      requestKey,
+      fetcher,
+      ttlPolicy: ctx?.dataQueryTtlPolicy,
+    })
+    : await fetcher();
+
   return {
     action: "assets.token-price",
     ...result,
