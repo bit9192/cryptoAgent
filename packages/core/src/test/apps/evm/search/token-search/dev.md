@@ -149,7 +149,7 @@
 
 ## 5. 测试映射（先样本后测试）
 
-对应文件（待创建）：
+对应文件：
 
 1. test-data：src/test/apps/evm/search/token-search/token-search-test-data.md
 2. test：src/test/apps/evm/search/token-search/token-search.test.mjs
@@ -175,10 +175,14 @@
 2. 已确认当前阶段采用“EVM 独立开发，暂不接主 search”策略。
 3. 已确认接口最小集为 searchToken + tokenRiskCheck。
 4. 已确认流动性检测归 trade-search，token-search 仅保留摘要引用。
+5. 已完成 token-search-test-data.md 样本落地（覆盖四类样本）。
+6. 已完成 token-search.test.mjs 与 token-risk-check.test.mjs（TDD）。
+7. 已完成 ETS-1 模块化实现：token-provider/query-parser/resolver/normalizer。
+8. 已完成 tokenRiskCheck 最小聚合实现与降级策略（无真实远端风险源）。
+9. ETS-1 切片测试已通过（10/10）。
 
 下一步：
 
-1. 先创建 token-search-test-data.md，补齐四类样本。
-2. 再创建 token-search.test.mjs（TDD，先失败）。
-3. 新增 token-risk-check.test.mjs（TDD，先失败）。
-4. 最后进入 ETS-1 实现。
+1. 进入 ETS-2：补充 token profile 字段结构与映射。
+2. 保持主 search 不变，仅在 EVM 侧迭代并扩展测试样本。
+3. ETS-2 稳定后再考虑 composition root 装配接入。
