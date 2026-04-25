@@ -2,6 +2,7 @@ import { parseTokenSearchInput } from "./token-query-parser.mjs";
 import { resolveEvmTokenCandidates } from "./token-resolver.mjs";
 import { normalizeEvmTokenSearchItems } from "./token-normalizer.mjs";
 import { tokenRiskCheck } from "./token-risk-check.mjs";
+import { queryEvmTokenMetadata } from "../assets/token-metadata.mjs";
 import { queryEvmTokenMetadataBatch } from "../assets/token-metadata.mjs";
 import { enrichTokenSearchBatchWithOnchainMetadata } from "./token-batch-enricher.mjs";
 import { evmNetworks } from "../configs/networks.js";
@@ -23,12 +24,54 @@ export function createEvmTokenSearchProvider(options = {}) {
   const parseInput = options.parseInput ?? parseTokenSearchInput;
   const resolveCandidates = options.resolveCandidates ?? resolveEvmTokenCandidates;
   const normalizeItems = options.normalizeItems ?? normalizeEvmTokenSearchItems;
+  const metadataSingleReader = options.metadataSingleReader ?? queryEvmTokenMetadata;
   const metadataBatchReader = options.metadataBatchReader ?? queryEvmTokenMetadataBatch;
 
-  function runSingle(input = {}) {
+  async function hydrateSingleAddressItem(item, parsed) {
+    try {
+      const meta = await metadataSingleReader({
+        tokenAddress: item.tokenAddress,
+        network: parsed.network,
+        networkName: parsed.network,
+        multicall: options.multicall,
+        chainId: options.chainId,
+        contractOverrides: options.contractOverrides,
+      });
+
+      return {
+        ...item,
+        name: meta?.name ?? item.name,
+        symbol: meta?.symbol ?? item.symbol,
+        decimals: meta?.decimals ?? item.decimals,
+        extra: {
+          ...(item.extra && typeof item.extra === "object" ? item.extra : {}),
+          metadataSource: "single-reader",
+        },
+      };
+    } catch {
+      return item;
+    }
+  }
+
+  async function runSingle(input = {}) {
     const parsed = parseInput(input);
-    const tokens = resolveCandidates(parsed);
-    const items = normalizeItems(tokens, parsed);
+    let tokens = resolveCandidates(parsed);
+    if (tokens.length === 0 && parsed.queryKind === "address") {
+      // Address search should at least return a placeholder candidate, even if config misses.
+      tokens = [{
+        key: null,
+        symbol: null,
+        name: null,
+        decimals: null,
+        address: parsed.query,
+      }];
+    }
+
+    let items = normalizeItems(tokens, parsed);
+    if (items.length > 0 && parsed.queryKind === "address") {
+      items = await Promise.all(items.map(async (item) => await hydrateSingleAddressItem(item, parsed)));
+    }
+
     return {
       ok: true,
       query: parsed.query,
@@ -53,7 +96,8 @@ export function createEvmTokenSearchProvider(options = {}) {
     capabilities: ["token"],
     async searchToken(input = {}) {
       try {
-        return runSingle(input).items;
+        const row = await runSingle(input);
+        return row.items;
       } catch {
         return [];
       }
@@ -63,9 +107,9 @@ export function createEvmTokenSearchProvider(options = {}) {
         throw new TypeError("searchTokenBatch 输入必须是数组");
       }
 
-      const baseRows = input.map((entry) => {
+      const baseRows = await Promise.all(input.map(async (entry) => {
         try {
-          return runSingle(entry);
+          return await runSingle(entry);
         } catch {
           return {
             ok: true,
@@ -83,7 +127,7 @@ export function createEvmTokenSearchProvider(options = {}) {
             },
           };
         }
-      });
+      }));
 
       return await enrichTokenSearchBatchWithOnchainMetadata(baseRows, {
         metadataBatchReader,

@@ -49,6 +49,44 @@ test("evm token-search: address query returns matched token", async () => {
   assert.equal(String(items[0].tokenAddress).toLowerCase(), "0xdac17f958d2ee523a2206206994597c13d831ec7");
 });
 
+test("evm token-search: unknown address still returns placeholder candidate", async () => {
+  const provider = createEvmTokenSearchProvider({
+    metadataSingleReader: async () => {
+      throw new Error("not-found");
+    },
+  });
+
+  const items = await provider.searchToken({
+    query: "0x26d21254E5B01979c0831E7310AD1Ba1887dAa8E",
+    network: "bsc",
+  });
+
+  assert.equal(items.length > 0, true);
+  assert.equal(String(items[0].tokenAddress).toLowerCase(), "0x26d21254e5b01979c0831e7310ad1ba1887daa8e");
+});
+
+test("evm token-search: address candidate can be enriched by single metadata reader", async () => {
+  const provider = createEvmTokenSearchProvider({
+    metadataSingleReader: async () => ({
+      tokenAddress: "0x26d21254E5B01979c0831E7310AD1Ba1887dAa8E",
+      name: "Mock Token",
+      symbol: "MOCK",
+      decimals: 18,
+    }),
+  });
+
+  const items = await provider.searchToken({
+    query: "0x26d21254E5B01979c0831E7310AD1Ba1887dAa8E",
+    network: "bsc",
+  });
+
+  assert.equal(items.length > 0, true);
+  assert.equal(items[0].name, "Mock Token");
+  assert.equal(items[0].symbol, "MOCK");
+  assert.equal(items[0].decimals, 18);
+  assert.equal(items[0].extra.metadataSource, "single-reader");
+});
+
 test("evm token-search: name query supports exact match", async () => {
   const items = await searchToken({
     query: "Tether USD",
