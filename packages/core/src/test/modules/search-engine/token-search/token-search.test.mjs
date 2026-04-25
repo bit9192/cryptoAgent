@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createTokenSearchEngine } from "../../../../modules/search-engine/index.mjs";
+import {
+  createSearchEngine,
+  createTokenSearchEngine,
+} from "../../../../modules/search-engine/index.mjs";
 
 test("token-search: happy path 聚合跨链候选并输出 sourceStats", async () => {
   const engine = createTokenSearchEngine({
@@ -9,7 +12,8 @@ test("token-search: happy path 聚合跨链候选并输出 sourceStats", async (
       {
         id: "btc-local",
         chain: "btc",
-        network: "mainnet",
+        networks: ["mainnet"],
+        capabilities: ["token"],
         async search() {
           return [{
             chain: "btc",
@@ -25,7 +29,8 @@ test("token-search: happy path 聚合跨链候选并输出 sourceStats", async (
       {
         id: "evm-local",
         chain: "evm",
-        network: "eth",
+        networks: ["eth"],
+        capabilities: ["token"],
         async search() {
           return [{
             chain: "evm",
@@ -63,7 +68,8 @@ test("token-search: edge 去重同链同地址候选", async () => {
       {
         id: "p1",
         chain: "evm",
-        network: "eth",
+        networks: ["eth"],
+        capabilities: ["token"],
         async search() {
           return [{
             chain: "evm",
@@ -78,7 +84,8 @@ test("token-search: edge 去重同链同地址候选", async () => {
       {
         id: "p2",
         chain: "evm",
-        network: "eth",
+        networks: ["eth"],
+        capabilities: ["token"],
         async search() {
           return [{
             chain: "evm",
@@ -104,7 +111,8 @@ test("token-search: edge limit 生效", async () => {
       {
         id: "p1",
         chain: "btc",
-        network: "mainnet",
+        networks: ["mainnet"],
+        capabilities: ["token"],
         async search() {
           return [
             {
@@ -129,7 +137,8 @@ test("token-search: edge limit 生效", async () => {
       {
         id: "p2",
         chain: "evm",
-        network: "eth",
+        networks: ["eth"],
+        capabilities: ["token"],
         async search() {
           return [{
             chain: "evm",
@@ -161,7 +170,7 @@ test("token-search: invalid provider 定义抛错", async () => {
     createTokenSearchEngine({
       providers: [{ id: "x" }],
     });
-  }, /providers\[0\]\.(chain|network|search) 必须是/);
+  }, /providers\[0\]\.(chain|networks) 必须/);
 });
 
 test("token-search: security provider 错误不泄露敏感信息", async () => {
@@ -170,7 +179,8 @@ test("token-search: security provider 错误不泄露敏感信息", async () => 
       {
         id: "p1",
         chain: "evm",
-        network: "eth",
+        networks: ["eth"],
+        capabilities: ["token"],
         async search() {
           throw new Error("PRIVATE_KEY_PLACEHOLDER");
         },
@@ -184,4 +194,118 @@ test("token-search: security provider 错误不泄露敏感信息", async () => 
   assert.equal(res.sourceStats.failed, 1);
   assert.equal(raw.includes("PRIVATE_KEY_PLACEHOLDER"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(res.sourceStats, "errors"), false);
+});
+
+test("search-engine: registerProvider 后可立即搜索", async () => {
+  const engine = createSearchEngine({ withDefaultProviders: false });
+  engine.registerProvider({
+    id: "sol-provider",
+    chain: "sol",
+    networks: ["mainnet"],
+    capabilities: ["token"],
+    async searchToken(input) {
+      if (String(input.query).toLowerCase() !== "bonk") return [];
+      return [{
+        chain: "sol",
+        network: "mainnet",
+        tokenAddress: "dezxaz8z7pnrnzzkpjnnedj9zjrmz6eqf4jyehkyx7s",
+        symbol: "BONK",
+        name: "Bonk",
+        confidence: 0.9,
+      }];
+    },
+  });
+
+  const res = await engine.search({
+    domain: "token",
+    query: "bonk",
+    chain: "sol",
+    network: "mainnet",
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.items.length, 1);
+  assert.equal(res.items[0].chain, "sol");
+  assert.equal(res.items[0].symbol, "BONK");
+});
+
+test("search-engine: listProviders 支持 domain/chain/network 过滤", () => {
+  const engine = createSearchEngine({ withDefaultProviders: false });
+  engine.registerProvider({
+    id: "evm-token",
+    chain: "evm",
+    networks: ["eth", "bsc"],
+    capabilities: ["token"],
+    async searchToken() {
+      return [];
+    },
+  });
+  engine.registerProvider({
+    id: "evm-contract",
+    chain: "evm",
+    networks: ["eth"],
+    capabilities: ["contract"],
+    async searchContract() {
+      return [];
+    },
+  });
+
+  assert.equal(engine.listProviders({ domain: "token" }).length, 1);
+  assert.equal(engine.listProviders({ chain: "evm", network: "bsc" }).length, 1);
+  assert.equal(engine.listProviders({ domain: "contract", network: "eth" }).length, 1);
+});
+
+test("search-engine: 重复注册同 id 应抛错", () => {
+  const engine = createSearchEngine({ withDefaultProviders: false });
+  engine.registerProvider({
+    id: "dup-id",
+    chain: "evm",
+    networks: ["eth"],
+    capabilities: ["token"],
+    async searchToken() {
+      return [];
+    },
+  });
+
+  assert.throws(() => {
+    engine.registerProvider({
+      id: "dup-id",
+      chain: "btc",
+      networks: ["mainnet"],
+      capabilities: ["token"],
+      async searchToken() {
+        return [];
+      },
+    });
+  }, /provider 已存在/);
+});
+
+test("search-engine: unregisterProvider 后 provider 不再参与搜索", async () => {
+  const engine = createSearchEngine({ withDefaultProviders: false });
+  engine.registerProvider({
+    id: "tmp-provider",
+    chain: "evm",
+    networks: ["eth"],
+    capabilities: ["token"],
+    async searchToken() {
+      return [{
+        chain: "evm",
+        network: "eth",
+        tokenAddress: "0x1234567890123456789012345678901234567890",
+        symbol: "TMP",
+        name: "Temp",
+        confidence: 0.9,
+      }];
+    },
+  });
+
+  const before = await engine.search({ domain: "token", query: "tmp", network: "eth" });
+  assert.equal(before.items.length, 1);
+  assert.equal(engine.hasProvider("tmp-provider"), true);
+
+  assert.equal(engine.unregisterProvider("tmp-provider"), true);
+  assert.equal(engine.hasProvider("tmp-provider"), false);
+
+  const after = await engine.search({ domain: "token", query: "tmp", network: "eth" });
+  assert.equal(after.items.length, 0);
 });

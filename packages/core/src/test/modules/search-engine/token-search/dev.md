@@ -30,6 +30,26 @@
 2. 候选包含 chain/network/source/confidence
 3. 旧资产查询能力不回归
 
+### Slice TS-2：注册式 provider 与统一 search 协议
+
+本次只做：
+
+1. SearchEngine 提供 register/unregister/list/has API
+2. provider 支持 capabilities + networks 标准字段
+3. token-search 复用 SearchEngine 并保持兼容返回结构（candidates）
+
+本次不做：
+
+1. request-engine 缓存接入
+2. trade/contract/address 业务实现
+3. provider 热更新持久化
+
+验收标准：
+
+1. 新链 provider 可通过 registerProvider 注入并被搜索调用
+2. 可按 domain/chain/network 列举 provider
+3. 原 TS-1 测试全部通过
+
 ## 3. 当前进度 / 下一步
 
 当前进度：
@@ -37,8 +57,9 @@
 1. 已完成 TS-1：token-search 最小闭环实现
 2. 已补充 token-search 四类测试样本
 3. 已新增并通过 TS-1 单测（聚合/去重/limit/安全）
+4. 已完成 TS-2：注册式 provider 接口与统一 search 协议
 
 下一步：
 
-1. TS-2：接入 request-engine 做 queryShared 去重缓存
-2. TS-3：扩展到 trx provider 并补多链排序策略
+1. TS-3：接入 request-engine 做 queryShared 去重缓存
+2. TS-4：扩展到 trx provider 并补多链排序策略
