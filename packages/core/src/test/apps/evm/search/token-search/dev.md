@@ -207,9 +207,12 @@
 15. 已完成 ETS-3：contract 风险输入融合（contractChecker/input.contractRisk）。
 16. 已完成 ETS-3：sources 细化字段（name/status/level/score/flagsCount/reason/updatedAt）。
 17. ETS-3 + ETS-4 回归测试通过（18/18）。
+18. 已完成 ETS-2：extra.project 标准结构落地（description/website/docs/logo/social）。
+19. 已完成 ETS-2：本地 profile 配置映射（eth/bsc 示例）与空值结构稳定。
+20. ETS-2 + ETS-3 + ETS-4 回归测试通过（20/20）。
 
 下一步：
 
-1. 进入 ETS-2：补充 token profile 字段结构与映射。
-2. 保持主 search 不变，仅在 EVM 侧迭代并扩展测试样本。
-3. ETS-2 稳定后再评估 composition root 装配接入窗口。
+1. 在主 search composition root 评估接入 EVM token provider（保持核心引擎不变）。
+2. 补充 profile 多网络样本（含 bsc/未来扩展网络）与冲突策略测试。
+3. 继续保持 EVM 侧模块化迭代，不跨域混入 trade/contract 业务细节。

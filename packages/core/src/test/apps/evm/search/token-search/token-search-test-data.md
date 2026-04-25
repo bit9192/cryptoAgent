@@ -66,6 +66,16 @@ expected:
 - 批量 metadata reader 被调用一次
 - 返回候选中 decimals/name/symbol 可被链上数据覆盖
 
+### searchToken-h6: profile 字段来自本地配置映射
+
+input:
+- query: usdt
+- network: eth
+
+expected:
+- extra.project 字段存在
+- website/docs/social 等字段结构稳定
+
 ### tokenRiskCheck-h1: 风险摘要正常返回
 
 input:
@@ -126,6 +136,17 @@ expected:
 - 第 1 项正常返回
 - 第 2 项降级为空结果
 - 不抛出批量级异常
+
+### searchToken-e5: profile 未配置时保留空值结构
+
+input:
+- query: weth
+- network: eth
+
+expected:
+- extra.project 字段仍存在
+- description/website/docs/logo 为 null
+- social 子字段结构固定
 
 ### tokenRiskCheck-e1: 市场风险源缺失
 

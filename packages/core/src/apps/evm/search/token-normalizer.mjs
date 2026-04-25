@@ -1,3 +1,5 @@
+import { resolveEvmTokenProfile } from "../configs/token-profiles.js";
+
 function normalizeLower(value) {
   return String(value ?? "").trim().toLowerCase();
 }
@@ -29,6 +31,13 @@ export function normalizeEvmTokenSearchItems(tokens = [], input = {}) {
         confidence: 0.9,
         extra: {
           key: token?.key ?? null,
+          project: resolveEvmTokenProfile({
+            network,
+            key: token?.key,
+            symbol,
+            address,
+            tokenAddress: address,
+          }),
         },
       };
     })

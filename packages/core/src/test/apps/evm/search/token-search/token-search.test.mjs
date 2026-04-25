@@ -122,6 +122,35 @@ test("evm token-search: provider exposes batch search interface", async () => {
   assert.equal(Array.isArray(batch[1].items), true);
 });
 
+test("evm token-search: project profile is mapped from local config", async () => {
+  const items = await searchToken({
+    query: "usdt",
+    network: "eth",
+  });
+
+  assert.equal(items.length > 0, true);
+  assert.equal(typeof items[0].extra, "object");
+  assert.equal(typeof items[0].extra.project, "object");
+  assert.equal(items[0].extra.project.website, "https://tether.to");
+  assert.equal(typeof items[0].extra.project.social, "object");
+});
+
+test("evm token-search: project profile keeps null-safe shape when config missing", async () => {
+  const items = await searchToken({
+    query: "weth",
+    network: "eth",
+  });
+
+  assert.equal(items.length > 0, true);
+  const project = items[0].extra.project;
+  assert.equal(typeof project, "object");
+  assert.equal(project.description, null);
+  assert.equal(project.website, null);
+  assert.equal(project.docs, null);
+  assert.equal(project.logo, null);
+  assert.deepEqual(Object.keys(project.social).sort(), ["discord", "github", "telegram", "twitter"]);
+});
+
 test("evm token-search: batch metadata uses one multicall reader call per network", async () => {
   let callCount = 0;
   const provider = createEvmTokenSearchProvider({
