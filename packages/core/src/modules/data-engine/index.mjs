@@ -2,6 +2,10 @@ const SUPPORTED_OPS = new Set([
   "eq", "ne", "gt", "gte", "lt", "lte", "in", "contains", "exists",
 ]);
 
+import {
+  createRequestEngine,
+} from "../request-engine/index.mjs";
+
 export {
   createRuleRegistry,
   saveRuleSpec,
@@ -397,9 +401,47 @@ export function sanitizeForChannel(options = {}) {
   return walk(data);
 }
 
+export function createDataQueryGateway(options = {}) {
+  const {
+    requestEngine = createRequestEngine(),
+  } = options;
+
+  if (!requestEngine || typeof requestEngine !== "object") {
+    throw new TypeError("requestEngine 必须是对象");
+  }
+  if (typeof requestEngine.fetchShared !== "function") {
+    throw new TypeError("requestEngine.fetchShared 必须是函数");
+  }
+  if (typeof requestEngine.getChainSlice !== "function") {
+    throw new TypeError("requestEngine.getChainSlice 必须是函数");
+  }
+  if (typeof requestEngine.invalidate !== "function") {
+    throw new TypeError("requestEngine.invalidate 必须是函数");
+  }
+  if (typeof requestEngine.getStats !== "function") {
+    throw new TypeError("requestEngine.getStats 必须是函数");
+  }
+
+  return {
+    queryShared(input = {}) {
+      return requestEngine.fetchShared(input);
+    },
+    queryChain(input = {}) {
+      return requestEngine.getChainSlice(input);
+    },
+    invalidateQueryCache(input = {}) {
+      return requestEngine.invalidate(input);
+    },
+    getQueryStats() {
+      return requestEngine.getStats();
+    },
+  };
+}
+
 export default {
   extractData,
   computeData,
   sanitizeForChannel,
   validateRuleSpec,
+  createDataQueryGateway,
 };

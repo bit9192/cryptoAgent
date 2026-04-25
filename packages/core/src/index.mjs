@@ -80,5 +80,8 @@ export {
 	aggregateAssetSnapshot,
 } from "./modules/assets-engine/index.mjs";
 export {
+	createDataQueryGateway,
+} from "./modules/data-engine/index.mjs";
+export {
 	createRequestEngine,
 } from "./modules/request-engine/index.mjs";

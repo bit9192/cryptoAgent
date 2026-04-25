@@ -8,6 +8,7 @@ import {
   computeData,
   sanitizeForChannel,
   validateRuleSpec,
+  createDataQueryGateway,
 } from "../../../modules/data-engine/index.mjs";
 
 const FIXTURES = path.resolve(
@@ -216,4 +217,80 @@ test("data-engine compute: bigint 模式 groupBy 聚合", () => {
 
   assert.equal(grouped.USDT, 3000000n);
   assert.equal(grouped.TRX, 500000n);
+});
+
+test("data-engine query gateway: queryShared 并发去重", async () => {
+  let calls = 0;
+  const gateway = createDataQueryGateway();
+
+  const fetcher = async () => {
+    calls += 1;
+    return { ok: true, value: 99 };
+  };
+
+  const [a, b, c] = await Promise.all([
+    gateway.queryShared({ requestKey: "data:shared", fetcher }),
+    gateway.queryShared({ requestKey: "data:shared", fetcher }),
+    gateway.queryShared({ requestKey: "data:shared", fetcher }),
+  ]);
+
+  assert.equal(calls, 1);
+  assert.deepEqual(a, b);
+  assert.deepEqual(b, c);
+});
+
+test("data-engine query gateway: queryChain fanout 命中缓存", async () => {
+  let calls = 0;
+  const gateway = createDataQueryGateway();
+
+  const fetcher = async () => {
+    calls += 1;
+    return {
+      chains: {
+        "asset:btc": { chain: "btc", amount: 1 },
+        "asset:evm": { chain: "evm", amount: 2 },
+      },
+      privateKey: "PRIVATE_KEY_PLACEHOLDER",
+    };
+  };
+
+  const fanout = (response) => response.chains;
+
+  const btc = await gateway.queryChain({
+    requestKey: "asset:all",
+    chainKey: "asset:btc",
+    fetcher,
+    fanout,
+  });
+  const evm = await gateway.queryChain({
+    requestKey: "asset:all",
+    chainKey: "asset:evm",
+    fetcher,
+    fanout,
+  });
+
+  assert.equal(calls, 1);
+  assert.equal(btc.chain, "btc");
+  assert.equal(evm.chain, "evm");
+});
+
+test("data-engine query gateway: stats 不泄露敏感缓存原文", async () => {
+  const gateway = createDataQueryGateway();
+
+  await gateway.queryShared({
+    requestKey: "secret:key",
+    fetcher: async () => ({
+      privateKey: "PRIVATE_KEY_PLACEHOLDER",
+      secret: "SECRET_PLACEHOLDER",
+    }),
+  });
+
+  const stats = gateway.getQueryStats();
+  const raw = JSON.stringify(stats);
+
+  assert(!raw.includes("PRIVATE_KEY_PLACEHOLDER"));
+  assert(!raw.includes("SECRET_PLACEHOLDER"));
+
+  const ack = gateway.invalidateQueryCache({ requestPrefix: "secret:" });
+  assert.equal(ack.requestDeletedCount, 1);
 });
