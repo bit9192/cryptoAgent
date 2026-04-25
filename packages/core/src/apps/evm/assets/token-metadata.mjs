@@ -97,7 +97,7 @@ async function querySingleTokenMetadataFallback(tokenAddress, options = {}) {
 		token.symbol().catch(() => null),
 		token.decimals().catch(() => null),
 	]);
-
+	
 	return normalizeMetadataRow({
 		tokenAddress,
 		name,
@@ -178,7 +178,7 @@ export async function queryEvmTokenMetadataBatch(items = [], options = {}) {
 		decimals: buildMetadataCallRequest(item.tokenAddress, "decimals"),
 	}));
 	const rows = await multicallClient.call(requestShape, options);
-
+	
 	const normalizedRows = await Promise.all(rows.map(async (row) => {
 		const normalized = normalizeMetadataRow(row);
 		if (!needsMetadataFallback(normalized)) {

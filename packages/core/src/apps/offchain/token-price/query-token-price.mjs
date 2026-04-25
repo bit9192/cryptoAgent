@@ -1,5 +1,7 @@
 import { DexScreenerSource } from "../sources/dexscreener/index.mjs";
 import { CoinGeckoSource } from "../sources/coingecko/index.mjs";
+import { BinanceTickerSource } from "../sources/binance/index.mjs";
+import { SwapV2Source } from "../sources/swapv2/index.mjs";
 import { resolveEvmToken } from "../../evm/configs/tokens.js";
 import {
   getCachedTokenPriceMap,
@@ -66,6 +68,8 @@ function buildCacheApi(options = {}) {
 
 let _defaultDexScreenerSource = null;
 let _defaultCoinGeckoSource = null;
+let _defaultBinanceSource = null;
+let _defaultSwapV2Source = null;
 
 async function getDefaultDexScreenerSource() {
   if (_defaultDexScreenerSource) return _defaultDexScreenerSource;
@@ -80,6 +84,22 @@ async function getDefaultCoinGeckoSource() {
   const source = new CoinGeckoSource();
   await source.init();
   _defaultCoinGeckoSource = source;
+  return source;
+}
+
+async function getDefaultBinanceSource() {
+  if (_defaultBinanceSource) return _defaultBinanceSource;
+  const source = new BinanceTickerSource();
+  await source.init();
+  _defaultBinanceSource = source;
+  return source;
+}
+
+async function getDefaultSwapV2Source() {
+  if (_defaultSwapV2Source) return _defaultSwapV2Source;
+  const source = new SwapV2Source();
+  await source.init();
+  _defaultSwapV2Source = source;
   return source;
 }
 
@@ -154,7 +174,7 @@ function buildStablecoinGuardWarning(meta, priceUsd, options = {}) {
   return null;
 }
 
-async function resolveRemotePriceMap(requests = [], options = {}) {
+async function resolveRemotePriceMap(requests = [], options = {}, context = {}) {
   if (requests.length === 0) return new Map();
 
   const queryTokens = requests
@@ -205,19 +225,32 @@ async function resolveRemotePriceMap(requests = [], options = {}) {
 
     const map = new Map();
     let sources = [];
+    const tokenMetas = new Map();
+
+    for (const item of requests) {
+      tokenMetas.set(normalizeLower(item.queryToken), item.meta ?? null);
+    }
 
     if (Array.isArray(options.priceSources)) {
       sources = options.priceSources.filter((source) => source && typeof source.getPrice === "function");
     } else if (options.priceSource && typeof options.priceSource.getPrice === "function") {
       sources = [options.priceSource];
     } else {
+      const binance = await getDefaultBinanceSource();
       const coinGecko = await getDefaultCoinGeckoSource();
       const defaultSource = await getDefaultDexScreenerSource();
+      const swapV2 = await getDefaultSwapV2Source();
+      if (binance && typeof binance.getPrice === "function") {
+        sources.push(binance);
+      }
       if (coinGecko && typeof coinGecko.getPrice === "function") {
         sources.push(coinGecko);
       }
       if (defaultSource && typeof defaultSource.getPrice === "function") {
         sources.push(defaultSource);
+      }
+      if (swapV2 && typeof swapV2.getPrice === "function") {
+        sources.push(swapV2);
       }
     }
 
@@ -234,7 +267,11 @@ async function resolveRemotePriceMap(requests = [], options = {}) {
       let remote = null;
       try {
         metric.attempts += 1;
-        remote = await source.getPrice([...remaining]);
+        remote = await source.getPrice([...remaining], {
+          chain: context.chain ?? null,
+          network: context.network ?? null,
+          tokenMetas,
+        });
       } catch {
         metric.errors += 1;
         continue;
@@ -332,7 +369,10 @@ export async function queryTokenPriceBatchByMeta(metaItems = [], options = {}) {
       requests.push({ key, queryToken });
     }
 
-    const remoteResolved = await resolveRemotePriceMap(requests, options);
+    const remoteResolved = await resolveRemotePriceMap(requests, options, {
+      chain: group.chain,
+      network: group.network,
+    });
     const remoteMap = remoteResolved?.map instanceof Map ? remoteResolved.map : new Map();
     if (stats && Array.isArray(remoteResolved?.sourceStats)) {
       for (const row of remoteResolved.sourceStats) {

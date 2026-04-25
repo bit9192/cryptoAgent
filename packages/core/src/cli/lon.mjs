@@ -18,6 +18,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import process from "node:process";
 
 import { parseCliCommand, askPassword, askText, askConfirm, askSelect } from "./ui.mjs";
+import {
+  applyExecEntryToPanel,
+  createLonPanelState,
+  renderLonTopPanel,
+  setPanelAwaitingInput,
+  setPanelRunning,
+} from "./lon-panel.mjs";
 import createWallet from "../apps/wallet/index.mjs";
 import {
   execute,
@@ -98,6 +105,7 @@ function createSession(initArgs) {
     execLog: [],
     lastResult: null,
     lastResume: null,
+    panel: createLonPanelState(),
   };
 }
 
@@ -165,6 +173,11 @@ function makeInteractHandler(session) {
     session.interactionActive = true;
     const fields = Array.isArray(opts.fields) ? opts.fields : [];
     try {
+    setPanelAwaitingInput(
+      session.panel,
+      opts.message ?? opts.type ?? "任务请求输入",
+      fields,
+    );
     const payload = {};
 
     if (session.autoConfirm && opts.type === "task.interact.confirm") {
@@ -206,6 +219,9 @@ function makeInteractHandler(session) {
     return { payload };
     } finally {
       session.interactionActive = false;
+      if (session.panel.status === "awaiting_input") {
+        setPanelRunning(session.panel, session.panel.task);
+      }
       if (fields.length > 0) {
         session.skipNextLine = true;
       }
@@ -217,11 +233,16 @@ function makeInteractHandler(session) {
 
 function logExec(session, entry) {
   session.execLog.push(entry);
+  applyExecEntryToPanel(session.panel, entry);
   if (entry.status === "ok") {
     session.lastResult = entry.result;
   } else if (entry.status === "paused") {
     session.lastResume = entry.token;
   }
+}
+
+function printTopPanel(session) {
+  console.log(renderLonTopPanel(session));
 }
 
 async function runTask(session, taskId, args, resumeToken) {
@@ -235,6 +256,7 @@ async function runTask(session, taskId, args, resumeToken) {
   const interact = makeInteractHandler(session);
 
   console.log(`  [task] 正在执行: ${taskId}`);
+  setPanelRunning(session.panel, taskId);
 
   const result = await execute(
     {
@@ -838,6 +860,8 @@ async function runRepl(session) {
   const network = session.network ? `@${session.network}` : "";
   const prompt = () => `lon[${modeLabel}${network}]> `;
 
+  printTopPanel(session);
+
   // 重新赋值动态 prompt（mode/network 可能中途变化）
   rl.setPrompt(prompt());
   rl.prompt();
@@ -849,6 +873,7 @@ async function runRepl(session) {
       }
       if (session.skipNextLine) {
         session.skipNextLine = false;
+        printTopPanel(session);
         rl.prompt();
         return;
       }
@@ -863,6 +888,7 @@ async function runRepl(session) {
         console.error(`  [error] ${err.message}`);
       }
       // 更新 prompt（mode 可能已改变）
+      printTopPanel(session);
       rl.setPrompt(prompt());
       rl.resume();
       rl.prompt();
@@ -893,7 +919,8 @@ function printBanner(session) {
   if (process.env.LON_EXIT_WATCHER_ON_CLOSE === "1") {
     console.log("  hot-reload:  已启用（--watch 模式）");
   }
-  console.log("  输入 help 查看命令列表\n");
+  console.log("  输入 help 查看命令列表");
+  console.log("  上方为结果面板，下方为命令输入区\n");
 }
 
 // ─── 入口 ─────────────────────────────────────────────────────

@@ -347,3 +347,135 @@
 1. 主源失败次源命中时，stats 中能看到 source 级错误与命中
 2. 主源部分命中时，stats 中能看到次源补齐命中
 3. 旧测试不回归
+
+## 13. 当前切片计划（进行中）
+
+### Slice B-4：Binance 批量报价优先
+
+本次只做：
+
+1. 新增 Binance 价格源适配器（支持一次性拉全量 ticker price）
+2. 默认价格源顺序调整为 Binance -> CoinGecko -> DexScreener
+3. 与现有 fallback/diagnostics 兼容，不改 task 输入
+
+本次不做：
+
+1. 历史 K 线与波动率
+2. 多源加权融合
+3. CEX 深度与成交量加权
+
+验收标准：
+
+1. BTC/ETH/BNB 等主流币可优先命中 Binance 价格
+2. Binance 未命中或失败时可自动回退到次源
+3. 旧测试不回归
+
+## 14. 当前切片计划（进行中）
+
+### Slice B-5：swap reserves 兜底
+
+本次只做：
+
+1. 复用现有 `swapV2` 合约 getter 和 pair reserves 计算逻辑
+2. 为 BSC / EVM 地址型 token 增加链上流动性兜底
+3. 保持价格源分层，不把 swap 计算散到 task / cli
+
+本次不做：
+
+1. 新协议报价逻辑
+2. 多池加权与路径搜索
+3. 1inch / 其他第三方 swap API 接入
+
+验收标准：
+
+1. Pancake / Uniswap V2 类型 pair 可按 reserves 计算出价格
+2. 当 DexScreener 无 pair 时，swap reserve 兜底可补齐价格
+3. 旧测试不回归
+
+## 15. 当前切片计划（进行中）
+
+### Slice M-1：token-meta 远端网络优先匹配
+
+本次只做：
+
+1. 修复 `forceRemote=true` 下 symbol 查询的跨网误匹配
+2. DexScreener 远端候选按 `network` 优先筛选后再选最佳 pair
+3. 保持现有 config/cache/remote 语义不变
+
+本次不做：
+
+1. token-meta 接入 CEX 多源
+2. 远端多源加权与排序配置化
+3. 任务参数结构变更
+
+验收标准：
+
+1. `arkm + network=eth + forceRemote=true` 可解析出 eth 地址
+2. 未指定 network 时仍保持原有最佳 pair 行为
+3. 旧测试不回归
+
+## 15. 当前切片计划（进行中）
+
+### Slice P-1：price 侧 symbol 精确匹配同步
+
+本次只做：
+
+1. DexScreener `getPrice` 增加 symbol/name 精确匹配优先
+2. price pipeline 调 source 时透传 chain/network 上下文
+3. 保持 Binance/CoinGecko 优先顺序不变
+
+本次不做：
+
+1. 价格源路由规则配置化
+2. DEX 多池加权聚合
+3. task 输入参数变更
+
+验收标准：
+
+1. 相似 symbol 干扰下，价格查询优先命中精确 symbol 资产
+2. 指定 network 时，DexScreener 价格候选优先匹配对应链
+3. 旧测试不回归
+
+## 16. 当前切片计划（进行中）
+
+### Slice M-2：token-meta 增加 CoinGecko 第二接口
+
+本次只做：
+
+1. token-meta 远端查询改为 CoinGecko + DexScreener 多源兜底
+2. unresolved 候选列表支持跨 source 合并去重
+3. 不改变 task 输入参数
+
+本次不做：
+
+1. 候选打分配置化
+2. 新增第三方付费接口
+3. 价格侧路由改动
+
+验收标准：
+
+1. `AAVE/UNI + network=eth` 在远端路径有更高命中稳定性
+2. unresolved 时 candidates 可包含多源候选
+3. 旧测试不回归
+
+## 17. 当前切片计划（进行中）
+
+### Slice P-2：BTC / BRC20 价格 ID 兜底
+
+本次只做：
+
+1. 修复 BTC / BRC20 symbol 在 CoinGecko 价格查询时的 id 不匹配问题
+2. 保持现有价格源顺序不变，仅在 CoinGecko 源内部补 symbol/name 到 coin id 的兜底
+3. 兼容现有 token meta 传入的 BTC 配置项，不改 task / cli 参数
+
+本次不做：
+
+1. 新增 BTC 专用第三方价格源
+2. 批量 symbol 搜索结果打分配置化
+3. SATS / RATS 等更多币种的额外路由策略
+
+验收标准：
+
+1. `ORDI + network=btc + forceRemote=true` 可返回价格
+2. CoinGecko 已能直接命中的现有 EVM / BTC native 行为不回归
+3. 旧测试不回归

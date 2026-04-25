@@ -14,6 +14,49 @@ function normalizeTokenKey(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
+function pickPairsByTokenRelevance(pairs = [], tokenQuery) {
+  const query = normalizeTokenKey(tokenQuery);
+  if (!query || isAddressLike(tokenQuery)) return pairs;
+
+  const symbolMatches = pairs.filter((pair) => {
+    const baseSymbol = normalizeTokenKey(pair?.baseToken?.symbol);
+    const quoteSymbol = normalizeTokenKey(pair?.quoteToken?.symbol);
+    return baseSymbol === query || quoteSymbol === query;
+  });
+  if (symbolMatches.length > 0) return symbolMatches;
+
+  const nameMatches = pairs.filter((pair) => {
+    const baseName = normalizeTokenKey(pair?.baseToken?.name);
+    const quoteName = normalizeTokenKey(pair?.quoteToken?.name);
+    return baseName === query || quoteName === query;
+  });
+  if (nameMatches.length > 0) return nameMatches;
+
+  return pairs;
+}
+
+function normalizeNetworkName(network) {
+  const raw = String(network ?? "").trim().toLowerCase();
+  if (!raw) return null;
+  if (raw === "ethereum") return "eth";
+  if (raw === "binance-smart-chain") return "bsc";
+  if (raw === "trx") return "mainnet";
+  return raw;
+}
+
+function getPreferredDexChainIds(network) {
+  const net = normalizeNetworkName(network);
+  if (!net) return null;
+  if (net === "eth") return new Set(["ethereum", "eth"]);
+  if (net === "bsc") return new Set(["bsc", "binance-smart-chain"]);
+  if (net === "mainnet") return new Set(["tron", "trx"]);
+  if (net === "polygon") return new Set(["polygon"]);
+  if (net === "arb" || net === "arbitrum") return new Set(["arbitrum", "arb"]);
+  if (net === "op" || net === "optimism") return new Set(["optimism", "op"]);
+  if (net === "base") return new Set(["base"]);
+  return new Set([net]);
+}
+
 function deriveTokenUsdPriceFromPair(pair, tokenQuery) {
   if (!pair) return null;
 
@@ -39,9 +82,18 @@ function deriveTokenUsdPriceFromPair(pair, tokenQuery) {
   return baseUsd;
 }
 
-function pickBestPair(pairs = []) {
+function pickBestPair(pairs = [], options = {}) {
   if (!Array.isArray(pairs) || pairs.length === 0) return null;
-  const sorted = [...pairs].sort((a, b) => {
+  const preferredChainIds = options.preferredChainIds instanceof Set
+    ? options.preferredChainIds
+    : null;
+
+  const inPreferredChain = preferredChainIds && preferredChainIds.size > 0
+    ? pairs.filter((pair) => preferredChainIds.has(String(pair?.chainId ?? "").trim().toLowerCase()))
+    : [];
+
+  const pool = inPreferredChain.length > 0 ? inPreferredChain : pairs;
+  const sorted = [...pool].sort((a, b) => {
     const liqA = Number(a?.liquidity?.usd ?? 0);
     const liqB = Number(b?.liquidity?.usd ?? 0);
     if (liqB !== liqA) return liqB - liqA;
@@ -70,6 +122,15 @@ function normalizePair(pair) {
     info: pair.info ?? null,
     labels: pair.labels ?? [],
   };
+}
+
+function mapChainIdToChainNetwork(chainId) {
+  const raw = String(chainId ?? "").trim().toLowerCase();
+  if (["ethereum", "eth"].includes(raw)) return { chain: "evm", network: "eth" };
+  if (["bsc", "binance-smart-chain"].includes(raw)) return { chain: "evm", network: "bsc" };
+  if (["tron", "trx"].includes(raw)) return { chain: "trx", network: "mainnet" };
+  if (["bitcoin", "btc"].includes(raw)) return { chain: "btc", network: "mainnet" };
+  return { chain: null, network: null };
 }
 
 export class DexScreenerSource extends DataSourceBase {
@@ -134,14 +195,16 @@ export class DexScreenerSource extends DataSourceBase {
     return data?.pairs ?? [];
   }
 
-  async getPrice(tokens) {
+  async getPrice(tokens, options = {}) {
     const start = Date.now();
     const tokenList = Array.isArray(tokens) ? tokens : [tokens];
     const out = {};
+    const preferredChainIds = getPreferredDexChainIds(options.network);
 
     for (const token of tokenList) {
       const pairs = await this.resolvePairs(token);
-      const best = pickBestPair(pairs);
+      const relevantPairs = pickPairsByTokenRelevance(pairs, token);
+      const best = pickBestPair(relevantPairs, { preferredChainIds });
       const priceUsd = deriveTokenUsdPriceFromPair(best, token);
       out[String(token)] = best
         ? {
@@ -159,10 +222,12 @@ export class DexScreenerSource extends DataSourceBase {
     return out;
   }
 
-  async getTokenInfo(token) {
+  async getTokenInfo(token, options = {}) {
     const start = Date.now();
     const pairs = await this.resolvePairs(token);
-    const best = pickBestPair(pairs);
+    const preferredChainIds = getPreferredDexChainIds(options.network);
+    const relevantPairs = pickPairsByTokenRelevance(pairs, token);
+    const best = pickBestPair(relevantPairs, { preferredChainIds });
 
     this.recordSuccess(Date.now() - start);
 
@@ -186,6 +251,53 @@ export class DexScreenerSource extends DataSourceBase {
       info: best.info ?? null,
       labels: best.labels ?? [],
     };
+  }
+
+  async getTokenCandidates(token, options = {}) {
+    const start = Date.now();
+    const pairs = await this.resolvePairs(token);
+    const preferredChainIds = getPreferredDexChainIds(options.network);
+    const relevantPairs = pickPairsByTokenRelevance(pairs, token);
+
+    const ranked = [...relevantPairs].sort((a, b) => {
+      const aPreferred = preferredChainIds?.has?.(String(a?.chainId ?? "").trim().toLowerCase()) ? 1 : 0;
+      const bPreferred = preferredChainIds?.has?.(String(b?.chainId ?? "").trim().toLowerCase()) ? 1 : 0;
+      if (bPreferred !== aPreferred) return bPreferred - aPreferred;
+      const liqA = Number(a?.liquidity?.usd ?? 0);
+      const liqB = Number(b?.liquidity?.usd ?? 0);
+      if (liqB !== liqA) return liqB - liqA;
+      const volA = Number(a?.volume?.h24 ?? 0);
+      const volB = Number(b?.volume?.h24 ?? 0);
+      return volB - volA;
+    });
+
+    const dedup = new Map();
+    for (const pair of ranked) {
+      const base = pair?.baseToken ?? null;
+      const quote = pair?.quoteToken ?? null;
+      for (const tokenSide of [base, quote]) {
+        const tokenAddress = String(tokenSide?.address ?? "").trim();
+        if (!tokenAddress) continue;
+        const { chain, network } = mapChainIdToChainNetwork(pair?.chainId);
+        const key = `${String(pair?.chainId ?? "").toLowerCase()}:${tokenAddress.toLowerCase()}`;
+        if (dedup.has(key)) continue;
+        dedup.set(key, {
+          chain,
+          network,
+          chainId: pair?.chainId ?? null,
+          tokenAddress,
+          symbol: tokenSide?.symbol ?? null,
+          name: tokenSide?.name ?? null,
+          dexId: pair?.dexId ?? null,
+          pairAddress: pair?.pairAddress ?? null,
+          liquidityUsd: toNumberOrNull(pair?.liquidity?.usd),
+          volume24h: toNumberOrNull(pair?.volume?.h24),
+        });
+      }
+    }
+
+    this.recordSuccess(Date.now() - start);
+    return [...dedup.values()].slice(0, Math.max(1, Number(options.limit ?? 10)));
   }
 }
 

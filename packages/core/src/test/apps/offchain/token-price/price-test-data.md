@@ -10,6 +10,8 @@
 - cUSDT -> 0xf650C3d88D12dB855b8bf7D11Be6C55A4e07dCC9
 - fxs -> 0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0
 - arkm -> 0x6E2a43be0B1d33b726f0CA3b8de60b3482b8b050
+- UNI (eth) -> 0x1f9840a85d5af5bf1d1762f925bdaddc4201f984
+- AAVE (eth) -> 0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DdAe9
 
 ### trx
 
@@ -46,6 +48,8 @@
 
 - ETH (eth) -> 价格应可解析（`priceUsd > 0`）
 - USDT (bsc) -> 价格应可解析（`priceUsd > 0`）
+- ORDI (btc) -> 价格应可解析（`priceUsd > 0`）
+- XPS (bsc) -> 0x8E9b87caD37610D60120A1f48AA1036e24a3831a
 - SUN (trx) -> 价格应可解析（`priceUsd > 0`）
 
 ### edge-case
@@ -54,6 +58,12 @@
 - 同 token 重复输入：应触发去重，避免重复远端调用
 - 远端返回 `priceUsd` 缺失：可降级 unresolved
 - 主源仅返回部分 token：次源应补齐缺失 token
+- 相似 symbol 干扰：应优先精确 symbol 对应 token 的价格
+
+### meta-remote-network-case
+
+- `kind=symbol + forceRemote=true + network=eth` 时，远端候选应优先选择 eth 对应地址
+- 不指定 network 时可继续按流动性最佳 pair 选择
 
 ### fallback-case
 
@@ -64,6 +74,8 @@
 
 - 空 query
 - 未解析 symbol：`not-a-token`
+- unresolved symbol 时应返回 candidates 列表（同 symbol 候选）
+- unresolved symbol candidates 可包含多 source 合并结果
 
 ### security-case
 
@@ -73,5 +85,10 @@
 
 - debugStats 应包含 source 级命中统计
 - 主源报错时应记录 source error 计数
+
+### source-priority-case
+
+- 主流币（BTC/ETH/BNB）优先命中 Binance 批量报价
+- Binance 未命中时自动回退 CoinGecko / DexScreener
 
 

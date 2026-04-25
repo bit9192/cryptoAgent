@@ -74,6 +74,58 @@ token 价格
 再结合现已实现的 数据引擎 完成 对地址的筛选，如 资产最多的 evm 地址，持有最多的 资产
 这种类型的筛选尽量封装到 ai 可以用简单 参数查询
 
+**已经实现了基本的地址余额查询**
+
+下一步计划
+token 查询
+* 根据 name 查地址，根据地址 查 name decimal symbol
+* 根据 address 查询 token 风险
+* token 价格查询
+* token 配置，配置本地各链的默认 token，后面可以提供一个配置余额，一个地址查询本地配置的 token 余额列表
+
+asset 和 wallet 组合
+可以 使用 key name 查询对应的 token 
 
 # 1.0 可用标准
 可以用 测试 keys 完成 导入 备份 恢复 余额查看 转账
+
+
+
+# 后期开发
+专门做一个 模块，通过各平台检索 根据 token 的 symbol 或者 其他信息 获取 token 的详细信息，包括 流动性 流通量
+
+需要完善 token search 功能，通过 name 查询 token 各种问题
+还有 通过 一个 地址 查到价格 即使这个 token 是加了 两层 pair
+还有对 token 的 交易 检查
+不同链 的 token search 不同
+要做的 能覆盖长尾token
+
+还有个 address search ，把地址的 所有 资产 查询出来，包括不同链的
+再来个 contract search ，对合约解析 包括 交易解析
+这三个 search 是三个大的模块，决定了 agent 的能力，所以应当是一个大模块
+
+# 开发计划
+## search 板块
+token search 
+trade search
+contract search
+address search
+
+## search 架构
+和 provider 一样，基于每条链独立开发一个 searchprovider，在用一个 action 集成
+比如 搜索 ordi ，action -> btc chain token search + evm ... -> 汇总到 action -> 处理输出
+
+## 数据结构讨论
+
+数据数 + 数据操作，在缓存中维护一颗 wallet tree ，每个 钱包的 name 地址 余额 交易记录 等 放到 tree 里，再提供一系列操作接口修改 tree
+
+类似前端 的 数据绑定 ui 的思路，以 tree 为 核心维护
+
+## cli 界面修改
+
+分为 上下部分，上面 显示结果，下面负责输入，显示面板 可以在一些情况下提供输入，比如配置私钥时
+
+
+
+
+ task assets:query assets.token-price --query 0xb45e6dd851df10961d1aad912baf220168fcaa25 --network bsc --forceRemote true --debugStats true

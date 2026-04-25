@@ -1,9 +1,0 @@
-{
-  "sourceNetwork": "eth",
-  "sourceChainId": 1,
-  "sourceRpcUrl": "https://eth-mainnet.nodereal.io/v1/1659dfb40aa24bbb8153a677b98064d7",
-  "localRpcUrl": "http://127.0.0.1:8545",
-  "localChainId": 31337,
-  "blockNumber": 24947475,
-  "createdAt": "2026-04-24T04:42:06.754Z"
-}

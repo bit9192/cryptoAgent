@@ -144,7 +144,7 @@ export const defaultBtcNetworkName = String(process.env.BTC_NETWORK || "regtest"
 export function normalizeBtcNetworkName(value) {
 	const raw = String(value ?? "").trim().toLowerCase();
 	if (raw === "" || raw === "regtest") return "regtest";
-	if (raw === "main" || raw === "mainnet") return "mainnet";
+	if (raw === "main" || raw === "mainnet" || raw === "btc" || raw === "bitcoin") return "mainnet";
 	if (raw === "test" || raw === "testnet") return "testnet";
 	if (raw === "sig" || raw === "signet") return "signet";
 	throw new Error(`不支持的 BTC 网络: ${value ?? ""}`);

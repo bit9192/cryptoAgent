@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { DexScreenerSource } from "../../../apps/offchain/sources/dexscreener/index.mjs";
+import { CoinGeckoSource } from "../../../apps/offchain/sources/coingecko/index.mjs";
 
 function makeJsonResponse(data) {
   return {
@@ -159,6 +160,86 @@ test("dexscreener getPairInfo: 返回标准化 pair 数据", async () => {
     assert.equal(pair.dexId, "sunswap");
     assert.equal(pair.priceUsd, 1.01);
     assert.equal(pair.liquidityUsd, 3000000);
+  } finally {
+    globalThis.fetch = oldFetch;
+  }
+});
+
+test("dexscreener getPrice: symbol 查询应优先精确匹配并按network优先选候选", async () => {
+  const source = new DexScreenerSource();
+  await source.init();
+
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    assert.match(String(url), /\/search\?q=arkm/);
+    return makeJsonResponse({
+      pairs: [
+        {
+          chainId: "bsc",
+          dexId: "pancakeswap",
+          pairAddress: "0xbsc-high",
+          priceUsd: "2.0",
+          liquidity: { usd: 9000000 },
+          volume: { h24: 500000 },
+          baseToken: { address: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", name: "Arkham", symbol: "ARKM" },
+          quoteToken: { address: "0x55d398326f99059fF775485246999027B3197955", name: "Tether USD", symbol: "USDT" },
+        },
+        {
+          chainId: "ethereum",
+          dexId: "uniswap",
+          pairAddress: "0xeth-arkm",
+          priceUsd: "1.5",
+          liquidity: { usd: 1000000 },
+          volume: { h24: 120000 },
+          baseToken: { address: "0x6E2a43be0B1d33b726f0CA3b8de60b3482b8b050", name: "Arkham", symbol: "ARKM" },
+          quoteToken: { address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", name: "Tether USD", symbol: "USDT" },
+        },
+        {
+          chainId: "ethereum",
+          dexId: "uniswap",
+          pairAddress: "0xeth-wrong",
+          priceUsd: "0.002",
+          liquidity: { usd: 10000000 },
+          volume: { h24: 900000 },
+          baseToken: { address: "0xEe8268E6996f32De4DB966B5feCFFbD7ed93f512", name: "DARK ELON MUSK", symbol: "DARKMUSK" },
+          quoteToken: { address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", name: "Tether USD", symbol: "USDT" },
+        },
+      ],
+    });
+  };
+
+  try {
+    const out = await source.getPrice("arkm", { network: "eth" });
+    const price = out.arkm;
+    assert.equal(price.chainId, "ethereum");
+    assert.equal(price.pairAddress, "0xeth-arkm");
+    assert.equal(price.usd, 1.5);
+  } finally {
+    globalThis.fetch = oldFetch;
+  }
+});
+
+test("coingecko getPrice: bsc 合约地址可通过 token_price 接口返回价格", async () => {
+  const source = new CoinGeckoSource();
+  await source.init();
+
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    assert.match(String(url), /\/simple\/token_price\/binance-smart-chain/);
+    assert.match(String(url), /contract_addresses=0x8e9b87cad37610d60120a1f48aa1036e24a3831a/);
+    return makeJsonResponse({
+      "0x8e9b87cad37610d60120a1f48aa1036e24a3831a": {
+        usd: 0.123,
+        usd_24h_change: 1.5,
+      },
+    });
+  };
+
+  try {
+    const out = await source.getPrice("0x8e9b87caD37610D60120A1f48AA1036e24a3831a", { network: "bsc" });
+    const price = out["0x8e9b87caD37610D60120A1f48AA1036e24a3831a"];
+    assert.equal(price.usd, 0.123);
+    assert.equal(price.platform, "binance-smart-chain");
   } finally {
     globalThis.fetch = oldFetch;
   }

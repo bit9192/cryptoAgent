@@ -5,6 +5,10 @@ import {
   queryTokenPrice,
   queryTokenPriceBatch,
 } from "../../../../apps/offchain/token-price/index.mjs";
+import { queryTokenPriceBatchByMeta } from "../../../../apps/offchain/token-price/query-token-price.mjs";
+import { BinanceTickerSource } from "../../../../apps/offchain/sources/binance/index.mjs";
+import { CoinGeckoSource } from "../../../../apps/offchain/sources/coingecko/index.mjs";
+import { SwapV2Source } from "../../../../apps/offchain/sources/swapv2/index.mjs";
 
 function createMemoryPriceCache() {
   const records = new Map();
@@ -211,6 +215,74 @@ test("token price: btc native 会映射到 bitcoin ID 查询远端价格", async
   assert.equal(res.priceUsd, 77590);
 });
 
+test("token price: btc brc20 symbol 可通过 CoinGecko 搜索 coin id 后命中价格", async () => {
+  const coinGecko = new CoinGeckoSource();
+  await coinGecko.init();
+
+  const oldFetch = globalThis.fetch;
+  const calledUrls = [];
+  globalThis.fetch = async (url) => {
+    calledUrls.push(String(url));
+
+    if (String(url).includes("/search?query=ordi")) {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            coins: [
+              { id: "ordinals", symbol: "ordi", name: "Ordinals", market_cap_rank: 120 },
+            ],
+          };
+        },
+      };
+    }
+
+    if (String(url).includes("/simple/price?ids=ordinals")) {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            ordinals: {
+              usd: 42.5,
+              usd_24h_change: 3.2,
+            },
+          };
+        },
+      };
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {};
+      },
+    };
+  };
+
+  try {
+    const res = await queryTokenPrice({
+      query: "ordi",
+      network: "btc",
+      kind: "symbol",
+    }, {
+      forceRemote: true,
+      priceSources: [coinGecko],
+    });
+
+    assert.equal(res.ok, true);
+    assert.equal(res.chain, "btc");
+    assert.equal(res.tokenAddress, "ordi");
+    assert.equal(res.priceUsd, 42.5);
+    assert.ok(calledUrls.some((url) => url.includes("/search?query=ordi")));
+    assert.ok(calledUrls.some((url) => url.includes("/simple/price?ids=ordinals")));
+  } finally {
+    globalThis.fetch = oldFetch;
+  }
+});
+
 test("token price: 主源失败时次源可fallback成功", async () => {
   const brokenSource = {
     async getPrice() {
@@ -320,4 +392,126 @@ test("token price: debugStats 包含 source 级命中与错误统计", async () 
   assert.equal(broken.errors, 1);
   assert.equal(fallback.attempts, 1);
   assert.equal(fallback.hits, 1);
+});
+
+test("token price: Binance 源可作为首源命中并减少回退调用", async () => {
+  const binance = new BinanceTickerSource();
+  await binance.init();
+
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    async json() {
+      return [
+        { symbol: "BTCUSDT", price: "77777.7" },
+      ];
+    },
+  });
+
+  const fallback = {
+    calls: 0,
+    async getPrice() {
+      this.calls += 1;
+      return {};
+    },
+  };
+
+  try {
+    const res = await queryTokenPrice({
+      query: "BTC",
+      network: "btc",
+      kind: "symbol",
+    }, {
+      forceRemote: true,
+      priceSources: [binance, fallback],
+    });
+
+    assert.equal(res.ok, true);
+    assert.equal(res.priceUsd, 77777.7);
+    assert.equal(fallback.calls, 0);
+  } finally {
+    globalThis.fetch = oldFetch;
+  }
+});
+
+test("token price: bsc 地址价格可通过 CoinGecko 合约接口命中", async () => {
+  const coinGecko = new CoinGeckoSource();
+  await coinGecko.init();
+
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    status: 200,
+    async json() {
+      if (String(url).includes("/simple/token_price/binance-smart-chain")) {
+        return {
+          "0x8e9b87cad37610d60120a1f48aa1036e24a3831a": {
+            usd: 0.456,
+            usd_24h_change: 2.3,
+          },
+        };
+      }
+      return {};
+    },
+  });
+
+  try {
+    const res = await queryTokenPrice({
+      query: "0x8E9b87caD37610D60120A1f48AA1036e24a3831a",
+      network: "bsc",
+      kind: "address",
+    }, {
+      forceRemote: true,
+      priceSources: [coinGecko],
+    });
+
+    assert.equal(res.ok, true);
+    assert.equal(res.source, "remote");
+    assert.equal(res.priceUsd, 0.456);
+  } finally {
+    globalThis.fetch = oldFetch;
+  }
+});
+
+test("token price: bsc 地址价格可通过现有 swapV2 reserves 命中", async () => {
+  const swapV2 = new SwapV2Source({
+    factoryGetter: async () => ({
+      async getPair(tokenA, tokenB) {
+        assert.equal(String(tokenA).toLowerCase(), "0x8e9b87cad37610d60120a1f48aa1036e24a3831a");
+        assert.equal(String(tokenB).toLowerCase(), "0x55d398326f99059ff775485246999027b3197955");
+        return "0x7bdc4515ba3c8b8890d4e21585865cc5d139f3ef";
+      },
+    }),
+    pairGetter: async () => ({
+      async getReserves() {
+        return [100000000000000000000n, 123000000000000000000n];
+      },
+      async token0() {
+        return "0x8e9b87cad37610d60120a1f48aa1036e24a3831a";
+      },
+      async token1() {
+        return "0x55d398326f99059ff775485246999027b3197955";
+      },
+    }),
+  });
+  await swapV2.init();
+
+  const res = await queryTokenPriceBatchByMeta([
+    {
+      ok: true,
+      chain: "evm",
+      network: "bsc",
+      tokenAddress: "0x8e9b87cad37610d60120a1f48aa1036e24a3831a",
+      symbol: "XPS",
+      name: "X-PARALLEL SPACE",
+      decimals: 18,
+    },
+  ], {
+    priceSources: [swapV2],
+  });
+
+  assert.equal(res.items[0].ok, true);
+  assert.equal(res.items[0].priceUsd, 1.23);
+  assert.equal(res.items[0].source, "remote");
 });

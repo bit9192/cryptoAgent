@@ -73,15 +73,14 @@ export const dataSourceConfigs = {
     retryAttempts: 3,
   },
 
-  // 1inch - DEX 价格聚合、交换数据
-  oneInch: {
-    enabled: false, // 默认禁用
+  // SwapV2 - 链上 reserves 价格兜底
+  swapv2: {
+    enabled: true,
     priority: 6,
-    description: "DEX aggregation, swap quotes",
-    capabilities: ["getPrice", "getSwapQuote"],
-    apiKey: process.env.ONE_INCH_API_KEY ?? "",
-    timeout: 3000,
-    cacheTTL: 30000, // 30 秒（价格实时性要求高）
+    description: "On-chain V2 reserve pricing",
+    capabilities: ["getPrice"],
+    timeout: 10000,
+    cacheTTL: 10000,
   },
 
   // DeFiLlama （自定义扩展示例）
@@ -103,8 +102,8 @@ export const dataSourceConfigs = {
  * 当首选源失败时，按顺序尝试备用源
  */
 export const fallbackRules = {
-  // 获取价格：优先 CoinGecko，备用 DexScreener、Llama、1Inch
-  getPrice: ["coingecko", "dexscreener", "llama", "oneInch"],
+  // 获取价格：优先 CoinGecko，备用 DexScreener、Llama、SwapV2
+  getPrice: ["coingecko", "dexscreener", "llama", "swapv2"],
 
   // 获取链信息：优先 ChainList，备用 Llama
   getChainInfo: ["chainlist", "llama"],
@@ -130,8 +129,8 @@ export const fallbackRules = {
   // 获取交易数据：Etherscan
   getTxData: ["etherscan"],
 
-  // 获取 Swap 报价：1Inch 优先
-  getSwapQuote: ["oneInch"],
+  // 获取 Swap 报价：交给链上 swap 组件处理
+  getSwapQuote: ["swapv2"],
 
   // 获取收益数据：DefiLlama
   getYields: ["defiLlama", "llama"],

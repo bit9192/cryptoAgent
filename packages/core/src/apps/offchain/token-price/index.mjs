@@ -1,5 +1,6 @@
 import { detectAddressKind } from "../address-validators.mjs";
 import { DexScreenerSource } from "../sources/dexscreener/index.mjs";
+import { CoinGeckoSource } from "../sources/coingecko/index.mjs";
 import { resolveEvmToken } from "../../evm/configs/tokens.js";
 import { resolveBtcToken } from "../../btc/config/tokens.js";
 import { resolveTrxToken } from "../../trx/config/tokens.js";
@@ -37,6 +38,14 @@ function normalizeNetworkName(network) {
   return raw;
 }
 
+function detectAddressKindSafe(value) {
+  try {
+    return detectAddressKind(value);
+  } catch {
+    return null;
+  }
+}
+
 function inferExpectedChainFromNetwork(network) {
   const net = normalizeNetworkName(network);
   if (!net) return null;
@@ -55,12 +64,12 @@ function inferExpectedChainFromNetwork(network) {
 function isRemoteMatchForItem(item, normalized) {
   const queryKind = inferQueryKind(item);
   const tokenAddress = normalizeString(normalized?.tokenAddress);
-  const tokenKind = detectAddressKind(tokenAddress);
+  const tokenKind = detectAddressKindSafe(tokenAddress);
   const expectedNetwork = normalizeNetworkName(item.network);
   const actualNetwork = normalizeNetworkName(normalized?.network);
 
   if (queryKind === "address") {
-    const expected = detectAddressKind(item.query);
+    const expected = detectAddressKindSafe(item.query);
     if (!expected) return true;
     if (tokenKind !== expected) return false;
     if (expectedNetwork && actualNetwork && expectedNetwork !== actualNetwork) return false;
@@ -90,7 +99,7 @@ function looksLikeMalformedAddress(query) {
   const looksLikeBtcAddress = /^(bc1|tb1|bcrt1)[ac-hj-np-z02-9]{11,71}$/i.test(value)
     || /^[13mn2][a-km-zA-HJ-NP-Z1-9]{25,62}$/.test(value);
   if (looksLikeBtcAddress) {
-    return detectAddressKind(value) == null;
+    return detectAddressKindSafe(value) == null;
   }
   return false;
 }
@@ -123,7 +132,7 @@ function normalizeItems(input) {
 
 function inferQueryKind(item) {
   if (item.kind && item.kind !== "auto") return item.kind;
-  return detectAddressKind(item.query) ? "address" : "symbol";
+  return detectAddressKindSafe(item.query) ? "address" : "symbol";
 }
 
 function normalizeResolvedRow(row = {}, fallback = {}) {
@@ -148,9 +157,38 @@ function mapDexScreenerChainId(chainId) {
 function normalizeRemoteTokenInfo(raw, item) {
   if (!raw || typeof raw !== "object") return null;
 
+  if (raw.tokenAddress) {
+    const address = normalizeString(raw.tokenAddress);
+    const tokenAddress = address.startsWith("0x") ? address.toLowerCase() : address;
+    return {
+      chain: raw.chain ?? inferExpectedChainFromNetwork(item?.network),
+      network: raw.network ?? null,
+      tokenAddress,
+      symbol: normalizeString(raw.symbol) || null,
+      name: normalizeString(raw.name) || null,
+      decimals: Number.isFinite(Number(raw.decimals)) ? Number(raw.decimals) : null,
+    };
+  }
+
   const baseToken = raw.baseToken ?? null;
   const quoteToken = raw.quoteToken ?? null;
-  const preferred = baseToken?.address ? baseToken : (quoteToken?.address ? quoteToken : null);
+  const query = normalizeLower(item?.query);
+  const baseSymbol = normalizeLower(baseToken?.symbol);
+  const quoteSymbol = normalizeLower(quoteToken?.symbol);
+  const baseName = normalizeLower(baseToken?.name);
+  const quoteName = normalizeLower(quoteToken?.name);
+
+  let preferred = null;
+  if (query && (baseSymbol === query || baseName === query)) {
+    preferred = baseToken;
+  } else if (query && (quoteSymbol === query || quoteName === query)) {
+    preferred = quoteToken;
+  } else if (baseToken?.address) {
+    preferred = baseToken;
+  } else if (quoteToken?.address) {
+    preferred = quoteToken;
+  }
+
   const chainLike = mapDexScreenerChainId(raw.chainId);
   const tokenAddress = normalizeString(preferred?.address);
   if (!tokenAddress) return null;
@@ -217,6 +255,7 @@ function resolveNativeTokenCandidate(query, network) {
 }
 
 let _defaultDexScreenerSource = null;
+let _defaultCoinGeckoSource = null;
 
 async function getDefaultDexScreenerSource() {
   if (_defaultDexScreenerSource) return _defaultDexScreenerSource;
@@ -224,6 +263,20 @@ async function getDefaultDexScreenerSource() {
   await source.init();
   _defaultDexScreenerSource = source;
   return source;
+}
+
+async function getDefaultCoinGeckoSource() {
+  if (_defaultCoinGeckoSource) return _defaultCoinGeckoSource;
+  const source = new CoinGeckoSource({ timeout: 10000 });
+  await source.init();
+  _defaultCoinGeckoSource = source;
+  return source;
+}
+
+async function getDefaultTokenInfoSources() {
+  const coinGecko = await getDefaultCoinGeckoSource();
+  const dexscreener = await getDefaultDexScreenerSource();
+  return [coinGecko, dexscreener].filter(Boolean);
 }
 
 function resolveConfigCandidates(item) {
@@ -250,7 +303,7 @@ function resolveConfigCandidates(item) {
   };
 
   if (kind === "address") {
-    const detected = detectAddressKind(query);
+    const detected = detectAddressKindSafe(query);
     if (detected === "evm") maybeResolve("evm", resolveEvmToken, { network, address: query });
     if (detected === "btc") maybeResolve("btc", resolveBtcToken, { network, address: query });
     if (detected === "trx") maybeResolve("trx", resolveTrxToken, { network, address: query });
@@ -294,7 +347,7 @@ function buildCacheApi(options = {}) {
 
 async function resolveFromCache(item, cacheApi, options = {}) {
   const kind = inferQueryKind(item);
-  const chain = kind === "address" ? detectAddressKind(item.query) : null;
+  const chain = kind === "address" ? detectAddressKindSafe(item.query) : null;
   const maxAgeMs = options.cacheMaxAgeMs;
 
   if (kind === "address" && chain) {
@@ -321,7 +374,7 @@ async function resolveFromCache(item, cacheApi, options = {}) {
 async function enrichResolvedMetadata(item, normalized, options = {}) {
   if (!normalized?.tokenAddress || !normalized?.chain) return normalized;
 
-  if (normalized.chain === "evm" && detectAddressKind(normalized.tokenAddress) === "evm") {
+  if (normalized.chain === "evm" && detectAddressKindSafe(normalized.tokenAddress) === "evm") {
     try {
       let meta = null;
       if (typeof options.evmMetadataReader === "function") {
@@ -355,7 +408,7 @@ async function enrichResolvedMetadata(item, normalized, options = {}) {
     }
   }
 
-  if (normalized.chain === "trx" && detectAddressKind(normalized.tokenAddress) === "trx") {
+  if (normalized.chain === "trx" && detectAddressKindSafe(normalized.tokenAddress) === "trx") {
     try {
       let meta = null;
       if (typeof options.trxMetadataReader === "function") {
@@ -396,7 +449,7 @@ async function resolveFromRemote(item, options, cacheApi) {
       resolved = await options.remoteResolver(item, options);
     } else {
       const queryKind = inferQueryKind(item);
-      if (queryKind === "address" && detectAddressKind(item.query) === "evm") {
+      if (queryKind === "address" && detectAddressKindSafe(item.query) === "evm") {
         if (typeof options.evmMetadataReader === "function") {
           resolved = await options.evmMetadataReader(item, options);
         } else {
@@ -424,7 +477,7 @@ async function resolveFromRemote(item, options, cacheApi) {
         }
       }
 
-      if (queryKind === "address" && !resolved && detectAddressKind(item.query) === "trx") {
+      if (queryKind === "address" && !resolved && detectAddressKindSafe(item.query) === "trx") {
         if (typeof options.trxMetadataReader === "function") {
           resolved = await options.trxMetadataReader(item, options);
         } else {
@@ -447,10 +500,29 @@ async function resolveFromRemote(item, options, cacheApi) {
         }
       }
 
-      const source = options.tokenInfoSource ?? await getDefaultDexScreenerSource();
-      if (!resolved && source && typeof source.getTokenInfo === "function") {
-        const tokenInfo = await source.getTokenInfo(item.query);
-        resolved = normalizeRemoteTokenInfo(tokenInfo, item);
+      const sources = Array.isArray(options.tokenInfoSources)
+        ? options.tokenInfoSources
+        : (options.tokenInfoSource ? [options.tokenInfoSource] : await getDefaultTokenInfoSources());
+      for (const source of sources) {
+        if (resolved) break;
+        if (!source || typeof source.getTokenInfo !== "function") continue;
+        try {
+          const tokenInfo = await source.getTokenInfo(item.query, {
+            network: item.network,
+            queryKind,
+          });
+          const candidate = normalizeRemoteTokenInfo(tokenInfo, item);
+          if (!candidate) continue;
+          const normalizedCandidate = normalizeResolvedRow(candidate, {
+            chain: candidate.chain ?? detectAddressKindSafe(candidate.tokenAddress ?? item.query),
+            network: candidate.network ?? null,
+          });
+          if (!normalizedCandidate.tokenAddress) continue;
+          if (!isRemoteMatchForItem(item, normalizedCandidate)) continue;
+          resolved = normalizedCandidate;
+        } catch {
+          // ignore this source and continue fallback
+        }
       }
     }
   } catch {
@@ -459,7 +531,7 @@ async function resolveFromRemote(item, options, cacheApi) {
 
   if (!resolved || typeof resolved !== "object") return null;
   const normalized = normalizeResolvedRow(resolved, {
-    chain: resolved.chain ?? detectAddressKind(resolved.tokenAddress ?? item.query),
+    chain: resolved.chain ?? detectAddressKindSafe(resolved.tokenAddress ?? item.query),
     network: resolved.network ?? item.network,
   });
   if (!normalized.tokenAddress) return null;
@@ -474,6 +546,35 @@ async function resolveFromRemote(item, options, cacheApi) {
     items: [enriched],
   });
   return { ...enriched, source: "remote" };
+}
+
+async function resolveRemoteCandidates(item, options = {}) {
+  const sources = Array.isArray(options.tokenInfoSources)
+    ? options.tokenInfoSources
+    : (options.tokenInfoSource ? [options.tokenInfoSource] : await getDefaultTokenInfoSources());
+
+  const out = [];
+  const dedup = new Set();
+
+  for (const source of sources) {
+    try {
+      if (!source || typeof source.getTokenCandidates !== "function") continue;
+      const candidates = await source.getTokenCandidates(item.query, {
+        network: item.network,
+        limit: Number(options.candidateLimit ?? 10),
+      });
+      for (const row of Array.isArray(candidates) ? candidates : []) {
+        const key = `${normalizeLower(row?.chain)}:${normalizeLower(row?.network)}:${normalizeLower(row?.tokenAddress)}:${normalizeLower(row?.symbol)}`;
+        if (dedup.has(key)) continue;
+        dedup.add(key);
+        out.push(row);
+      }
+    } catch {
+      // ignore source-level candidate errors
+    }
+  }
+
+  return out;
 }
 
 export async function queryTokenMetaBatch(input = [], options = {}) {
@@ -583,6 +684,12 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
       source: "unresolved",
       error: `未解析 token: ${item.query}`,
     };
+    if (queryKind === "symbol") {
+      const candidates = await resolveRemoteCandidates(item, options);
+      if (candidates.length > 0) {
+        output.candidates = candidates;
+      }
+    }
     if (stats) stats.unresolved += 1;
     dedupResultMap.set(dedupKey, output);
     results.push(output);

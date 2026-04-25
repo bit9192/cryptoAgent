@@ -35,6 +35,18 @@ export async function loadContractArtifact(input = {}) {
   const text = await fs.readFile(artifactPath, "utf8");
   const artifact = JSON.parse(text);
 
+  if ((!Array.isArray(artifact?.abi) || artifact.abi.length === 0) && matched.abiPath) {
+    try {
+      const abiText = await fs.readFile(path.resolve(String(matched.abiPath)), "utf8");
+      const abi = JSON.parse(abiText);
+      if (Array.isArray(abi) && abi.length > 0) {
+        artifact.abi = abi;
+      }
+    } catch {
+      // 保持原始 artifact，不影响已有加载流程
+    }
+  }
+
   return {
     manifestPath,
     artifactPath,

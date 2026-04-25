@@ -76,6 +76,19 @@ test("token meta: 配置命中 symbol -> address", async () => {
   assert.equal(res.name, "Ordinals");
 });
 
+test("token meta: btc network 别名可命中 BRC20 配置", async () => {
+  const res = await queryTokenMeta({
+    query: "ordi",
+    network: "btc",
+    kind: "symbol",
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.source, "config");
+  assert.equal(res.tokenAddress, "ordi");
+  assert.equal(res.symbol, "ORDI");
+});
+
 test("token meta: 缓存命中 address -> meta", async () => {
   const cache = createMemoryCache();
   await cache.put({
@@ -318,6 +331,161 @@ test("token meta: kind=symbol 时 T 前缀 query 不应被当成非法地址", a
   assert.equal(res.source, "remote");
   assert.equal(res.symbol, "TST");
   assert.equal(res.decimals, 18);
+});
+
+test("token meta: forceRemote symbol 在指定network时优先匹配对应链候选", async () => {
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    status: 200,
+    async json() {
+      if (!String(url).includes("/search?q=arkm")) {
+        throw new Error(`unexpected url: ${url}`);
+      }
+      return {
+        pairs: [
+          {
+            chainId: "bsc",
+            dexId: "pancakeswap",
+            pairAddress: "0xbscpair",
+            priceUsd: "1.0",
+            liquidity: { usd: 9000000 },
+            volume: { h24: 800000 },
+            baseToken: {
+              address: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+              name: "Arkham",
+              symbol: "ARKM",
+            },
+            quoteToken: {
+              address: "0x55d398326f99059fF775485246999027B3197955",
+              name: "Tether USD",
+              symbol: "USDT",
+            },
+          },
+          {
+            chainId: "ethereum",
+            dexId: "uniswap",
+            pairAddress: "0xethpair",
+            priceUsd: "1.01",
+            liquidity: { usd: 1000000 },
+            volume: { h24: 120000 },
+            baseToken: {
+              address: "0x6E2a43be0B1d33b726f0CA3b8de60b3482b8b050",
+              name: "Arkham",
+              symbol: "ARKM",
+            },
+            quoteToken: {
+              address: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+              name: "Tether USD",
+              symbol: "USDT",
+            },
+          },
+        ],
+      };
+    },
+  });
+
+  try {
+    const res = await queryTokenMeta({
+      query: "arkm",
+      network: "eth",
+      kind: "symbol",
+    }, {
+      forceRemote: true,
+      evmMetadataBatchReader: async () => ({ ok: true, items: [] }),
+    });
+
+    assert.equal(res.ok, true);
+
+  test("token meta: ETH 上 UNI symbol 可命中本地配置", async () => {
+    const res = await queryTokenMeta({
+      query: "UNI",
+      network: "eth",
+      kind: "symbol",
+    });
+
+    assert.equal(res.ok, true);
+    assert.equal(res.source, "config");
+    assert.equal(String(res.tokenAddress).toLowerCase(), "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984");
+    assert.equal(res.symbol, "UNI");
+  });
+    assert.equal(res.source, "remote");
+    assert.equal(res.network, "eth");
+    assert.equal(String(res.tokenAddress).toLowerCase(), "0x6e2a43be0b1d33b726f0ca3b8de60b3482b8b050");
+  } finally {
+    globalThis.fetch = oldFetch;
+  }
+});
+
+test("token meta: forceRemote symbol 应优先精确匹配symbol避免相似币误命中", async () => {
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    status: 200,
+    async json() {
+      if (!String(url).includes("/search?q=arkm")) {
+        throw new Error(`unexpected url: ${url}`);
+      }
+      return {
+        pairs: [
+          {
+            chainId: "ethereum",
+            dexId: "uniswap",
+            pairAddress: "0xhigh-liq-wrong",
+            priceUsd: "0.002",
+            liquidity: { usd: 9000000 },
+            volume: { h24: 800000 },
+            baseToken: {
+              address: "0xEe8268E6996f32De4DB966B5feCFFbD7ed93f512",
+              name: "DARK ELON MUSK",
+              symbol: "DARKMUSK",
+            },
+            quoteToken: {
+              address: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+              name: "Tether USD",
+              symbol: "USDT",
+            },
+          },
+          {
+            chainId: "ethereum",
+            dexId: "uniswap",
+            pairAddress: "0xlower-liq-correct",
+            priceUsd: "1.5",
+            liquidity: { usd: 1000000 },
+            volume: { h24: 120000 },
+            baseToken: {
+              address: "0x6E2a43be0B1d33b726f0CA3b8de60b3482b8b050",
+              name: "Arkham",
+              symbol: "ARKM",
+            },
+            quoteToken: {
+              address: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+              name: "Tether USD",
+              symbol: "USDT",
+            },
+          },
+        ],
+      };
+    },
+  });
+
+  try {
+    const res = await queryTokenMeta({
+      query: "arkm",
+      network: "eth",
+      kind: "symbol",
+    }, {
+      forceRemote: true,
+      evmMetadataBatchReader: async () => ({ ok: true, items: [] }),
+    });
+
+    assert.equal(res.ok, true);
+    assert.equal(res.source, "remote");
+    assert.equal(String(res.tokenAddress).toLowerCase(), "0x6e2a43be0b1d33b726f0ca3b8de60b3482b8b050");
+    assert.equal(String(res.symbol).toUpperCase(), "ARKM");
+  } finally {
+    globalThis.fetch = oldFetch;
+  }
 });
 
 test("token meta: 远端异常不泄露敏感信息并降级", async () => {
@@ -593,6 +761,139 @@ test("token meta: symbol 远端命中后会补齐 EVM decimals", async () => {
   assert.equal(res.source, "remote");
   assert.equal(res.decimals, 18);
   assert.equal(evmReaderCalled, 1);
+});
+
+test("token meta: unresolved symbol 返回候选列表", async () => {
+  const tokenInfoSource = {
+    async getTokenInfo() {
+      return null;
+    },
+    async getTokenCandidates() {
+      return [
+        {
+          chain: "evm",
+          network: "eth",
+          chainId: "ethereum",
+          tokenAddress: "0x1111111111111111111111111111111111111111",
+          symbol: "UNI",
+          name: "Uniswap",
+          dexId: "uniswap",
+          pairAddress: "0xpair1",
+        },
+      ];
+    },
+  };
+
+  const res = await queryTokenMeta({
+    query: "unix",
+    network: "eth",
+    kind: "symbol",
+  }, {
+    forceRemote: true,
+    tokenInfoSource,
+  });
+
+  assert.equal(res.ok, false);
+  assert.equal(res.source, "unresolved");
+  assert.ok(Array.isArray(res.candidates));
+  assert.equal(res.candidates.length, 1);
+  assert.equal(String(res.candidates[0].symbol).toUpperCase(), "UNI");
+});
+
+test("token meta: tokenInfoSources 可按顺序回退到次源", async () => {
+  const solanaFirst = {
+    async getTokenInfo() {
+      return {
+        chain: null,
+        network: null,
+        tokenAddress: "So11111111111111111111111111111111111111112",
+        symbol: "AAVE",
+        name: "Aave (Solana)",
+      };
+    },
+  };
+  const ethSecond = {
+    async getTokenInfo() {
+      return {
+        chain: "evm",
+        network: "eth",
+        tokenAddress: "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9",
+        symbol: "AAVE",
+        name: "Aave",
+      };
+    },
+  };
+
+  const res = await queryTokenMeta({
+    query: "aave",
+    network: "eth",
+    kind: "symbol",
+  }, {
+    forceRemote: true,
+    tokenInfoSources: [solanaFirst, ethSecond],
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.source, "remote");
+  assert.equal(res.network, "eth");
+  assert.equal(String(res.tokenAddress).toLowerCase(), "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9");
+});
+
+test("token meta: unresolved candidates 合并多source并去重", async () => {
+  const sourceA = {
+    async getTokenInfo() {
+      return null;
+    },
+    async getTokenCandidates() {
+      return [
+        {
+          chain: "evm",
+          network: "eth",
+          tokenAddress: "0x1111111111111111111111111111111111111111",
+          symbol: "AAVE",
+          name: "Aave",
+        },
+      ];
+    },
+  };
+
+  const sourceB = {
+    async getTokenInfo() {
+      return null;
+    },
+    async getTokenCandidates() {
+      return [
+        {
+          chain: "evm",
+          network: "eth",
+          tokenAddress: "0x1111111111111111111111111111111111111111",
+          symbol: "AAVE",
+          name: "Aave",
+        },
+        {
+          chain: "evm",
+          network: "bsc",
+          tokenAddress: "0x2222222222222222222222222222222222222222",
+          symbol: "AAVE",
+          name: "Aave BSC",
+        },
+      ];
+    },
+  };
+
+  const res = await queryTokenMeta({
+    query: "aavex",
+    network: "eth",
+    kind: "symbol",
+  }, {
+    forceRemote: true,
+    tokenInfoSources: [sourceA, sourceB],
+  });
+
+  assert.equal(res.ok, false);
+  assert.equal(res.source, "unresolved");
+  assert.ok(Array.isArray(res.candidates));
+  assert.equal(res.candidates.length, 2);
 });
 
 test("token meta: bsc 上 bnb symbol 可解析为 native", async () => {

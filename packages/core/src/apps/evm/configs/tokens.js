@@ -22,6 +22,12 @@ const EVM_DEFAULT_TOKENS = Object.freeze({
       decimals: 6,
       address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
     }),
+    uni: Object.freeze({
+      name: "Uniswap",
+      symbol: "UNI",
+      decimals: 18,
+      address: "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984",
+    }),
   }),
   56: Object.freeze({
     wbnb: Object.freeze({
