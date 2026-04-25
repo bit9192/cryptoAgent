@@ -2,6 +2,7 @@ import { resolveEvmToken } from "../../apps/evm/configs/tokens.js";
 import { resolveBtcToken } from "../../apps/btc/config/tokens.js";
 import { resolveTrxToken } from "../../apps/trx/config/tokens.js";
 import { normalizeTrxNetworkName } from "../../apps/trx/config/networks.js";
+import { DexScreenerSource } from "../../apps/offchain/sources/dexscreener/index.mjs";
 import { createRequestEngine } from "../request-engine/index.mjs";
 
 const SUPPORTED_DOMAINS = new Set(["token", "trade", "contract", "address"]);
@@ -31,6 +32,32 @@ function normalizeNetworkHint(value) {
   if (["trx", "tron"].includes(raw)) return "trx";
   if (["btc", "bitcoin"].includes(raw)) return "btc";
   return raw;
+}
+
+function mapDexChainIdToEvmNetwork(chainId, fallbackNetwork = "eth") {
+  const raw = normalizeLower(chainId);
+  if (["ethereum", "eth"].includes(raw)) return "eth";
+  if (["bsc", "binance-smart-chain"].includes(raw)) return "bsc";
+  return fallbackNetwork;
+}
+
+function createDefaultDexScreenerSource() {
+  const source = new DexScreenerSource();
+  let initPromise = null;
+
+  async function ensureInit() {
+    if (!initPromise) {
+      initPromise = source.init();
+    }
+    await initPromise;
+  }
+
+  return {
+    async getTokenInfo(query, options) {
+      await ensureInit();
+      return await source.getTokenInfo(query, options);
+    },
+  };
 }
 
 function stableStringify(value) {
@@ -205,6 +232,8 @@ function dedupeAndSortCandidates(candidates, query, input = {}, rankConfig = {})
 }
 
 function createDefaultProviders() {
+  const dexScreener = createDefaultDexScreenerSource();
+
   return [
     {
       id: "btc-config",
@@ -256,6 +285,50 @@ function createDefaultProviders() {
         } catch {
           return [];
         }
+      },
+    },
+    {
+      id: "evm-trade-dexscreener",
+      chain: "evm",
+      networks: ["eth", "bsc"],
+      capabilities: ["trade"],
+      async searchTrade(input) {
+        const query = String(input?.query ?? "").trim();
+        if (!query) return [];
+
+        const requestedNetwork = normalizeNetworkHint(input?.network) || "eth";
+        const info = await dexScreener.getTokenInfo(query, {
+          network: requestedNetwork,
+        });
+        if (!info || !info.pairAddress) return [];
+
+        const network = mapDexChainIdToEvmNetwork(info.chainId, requestedNetwork);
+        const baseSymbol = String(info?.baseToken?.symbol ?? "").trim();
+        const quoteSymbol = String(info?.quoteToken?.symbol ?? "").trim();
+        const dexId = String(info?.dexId ?? "dex").trim();
+        const pairAddress = String(info.pairAddress).trim();
+
+        return [{
+          domain: "trade",
+          chain: "evm",
+          network,
+          id: `trade:evm:${network}:${normalizeLower(pairAddress)}`,
+          title: `${baseSymbol || "TOKEN"}/${quoteSymbol || "QUOTE"} @ ${dexId}`,
+          address: pairAddress,
+          source: "remote",
+          confidence: 0.86,
+          extra: {
+            dexId,
+            chainId: info.chainId ?? null,
+            pairAddress,
+            baseToken: info.baseToken ?? null,
+            quoteToken: info.quoteToken ?? null,
+            priceUsd: info.priceUsd ?? null,
+            liquidityUsd: info.liquidityUsd ?? null,
+            volume24h: info.volume24h ?? null,
+            routeSummary: `${dexId}:${baseSymbol || "TOKEN"}/${quoteSymbol || "QUOTE"}`,
+          },
+        }];
       },
     },
     {

@@ -552,3 +552,60 @@ test("search-engine: address domain 支持 summary extra", async () => {
   assert.equal(res.items[0].title, "TRX Wallet Summary");
   assert.equal(res.items[0].extra.assetCount, 3);
 });
+
+test("search-engine: 默认 evm-trade provider 可命中 DexScreener", async () => {
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const text = String(url);
+    assert.match(text, /dexscreener/);
+    assert.match(text, /search\?q=ARKM/);
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          pairs: [
+            {
+              chainId: "ethereum",
+              dexId: "uniswap",
+              pairAddress: "0xpairarkm",
+              priceUsd: "1.5",
+              liquidity: { usd: 1000000 },
+              volume: { h24: 120000 },
+              baseToken: {
+                address: "0x6E2a43be0B1d33b726f0CA3b8de60b3482b8b050",
+                name: "Arkham",
+                symbol: "ARKM",
+              },
+              quoteToken: {
+                address: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                name: "Tether USD",
+                symbol: "USDT",
+              },
+            },
+          ],
+        };
+      },
+    };
+  };
+
+  try {
+    const engine = createSearchEngine();
+    const res = await engine.search({
+      domain: "trade",
+      query: "ARKM",
+      network: "eth",
+      forceRemote: true,
+    });
+
+    assert.equal(res.ok, true);
+    assert.ok(res.items.length >= 1);
+    assert.equal(res.items[0].domain, "trade");
+    assert.equal(res.items[0].chain, "evm");
+    assert.equal(res.items[0].network, "eth");
+    assert.equal(res.items[0].address, "0xpairarkm");
+    assert.match(String(res.items[0].extra.routeSummary), /uniswap/i);
+  } finally {
+    globalThis.fetch = oldFetch;
+  }
+});

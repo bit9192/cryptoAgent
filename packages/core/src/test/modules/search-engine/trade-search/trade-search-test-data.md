@@ -12,6 +12,10 @@
 - 输入：provider 返回 route summary
 - 期望：输出在 extra.routeSummary
 
+3. evm 真实 provider 命中
+- 输入：domain=trade, query=ARKM, network=eth
+- 期望：默认 evm-trade provider 返回 pair 候选
+
 ## 2. edge-case
 
 1. 多 provider 去重
