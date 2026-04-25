@@ -204,9 +204,12 @@
 12. 已完成 ETS-4：provider 暴露 searchTokenBatch 接口。
 13. 已完成 ETS-4：批量 metadata 通过 multicall batch reader 补全。
 14. 已完成 ETS-4：batch 场景失败降级测试与回归通过。
+15. 已完成 ETS-3：contract 风险输入融合（contractChecker/input.contractRisk）。
+16. 已完成 ETS-3：sources 细化字段（name/status/level/score/flagsCount/reason/updatedAt）。
+17. ETS-3 + ETS-4 回归测试通过（18/18）。
 
 下一步：
 
-1. 完成 ETS-3：补齐 contract 风险输入融合与 sources 细化字段。
-2. 再进入 ETS-2：补充 token profile 字段结构与映射。
-3. 保持主 search 不变，仅在 EVM 侧迭代并扩展测试样本。
+1. 进入 ETS-2：补充 token profile 字段结构与映射。
+2. 保持主 search 不变，仅在 EVM 侧迭代并扩展测试样本。
+3. ETS-2 稳定后再评估 composition root 装配接入窗口。

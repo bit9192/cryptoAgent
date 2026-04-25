@@ -12,12 +12,39 @@ function toScore(level) {
   return null;
 }
 
-function pickRiskLevel(staticResult, marketResult) {
-  const levels = [staticResult?.level, marketResult?.level];
+function pickRiskLevel(staticResult, marketResult, contractResult) {
+  const levels = [staticResult?.level, marketResult?.level, contractResult?.level];
   if (levels.includes("high")) return "high";
   if (levels.includes("medium")) return "medium";
   if (levels.includes("low")) return "low";
   return "unknown";
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function normalizeResult(input, fallbackFlag) {
+  const level = String(input?.level ?? "unknown").trim().toLowerCase();
+  const scoreRaw = Number(input?.score);
+  const flags = Array.isArray(input?.flags) ? input.flags : [];
+  return {
+    level: ["high", "medium", "low"].includes(level) ? level : "unknown",
+    score: Number.isFinite(scoreRaw) ? scoreRaw : null,
+    flags: flags.length > 0 ? flags : [fallbackFlag],
+  };
+}
+
+function createSourceDetail(name, status, result, reason = null) {
+  return {
+    name,
+    status,
+    level: result?.level ?? "unknown",
+    score: result?.score ?? null,
+    flagsCount: Array.isArray(result?.flags) ? result.flags.length : 0,
+    reason,
+    updatedAt: nowIso(),
+  };
 }
 
 export async function tokenRiskCheck(input = {}, options = {}) {
@@ -34,39 +61,65 @@ export async function tokenRiskCheck(input = {}, options = {}) {
   const marketOptions = options.marketOptions && typeof options.marketOptions === "object"
     ? options.marketOptions
     : {};
+  const contractOptions = options.contractOptions && typeof options.contractOptions === "object"
+    ? options.contractOptions
+    : {};
+
+  const contractChecker = typeof options.contractChecker === "function"
+    ? options.contractChecker
+    : null;
 
   let staticResult = { level: "unknown", score: null, flags: ["static-unavailable"] };
   let marketResult = { level: "unknown", score: null, flags: ["market-unavailable"] };
+  let contractResult = normalizeResult(input.contractRisk, "contract-unavailable");
 
   const sources = [];
 
   try {
-    staticResult = await staticChecker(input, staticOptions);
-    sources.push({ name: "static", status: "ok" });
+    staticResult = normalizeResult(await staticChecker(input, staticOptions), "static-unavailable");
+    sources.push(createSourceDetail("static", "ok", staticResult));
   } catch {
-    sources.push({ name: "static", status: "error" });
+    staticResult = { level: "unknown", score: null, flags: ["static-unavailable"] };
+    sources.push(createSourceDetail("static", "error", staticResult, "checker-error"));
   }
 
   try {
-    marketResult = await marketChecker(input, marketOptions);
-    sources.push({ name: "market", status: "ok" });
+    marketResult = normalizeResult(await marketChecker(input, marketOptions), "market-unavailable");
+    sources.push(createSourceDetail("market", "ok", marketResult));
   } catch {
-    sources.push({ name: "market", status: "error" });
+    marketResult = { level: "unknown", score: null, flags: ["market-unavailable"] };
+    sources.push(createSourceDetail("market", "error", marketResult, "checker-error"));
   }
 
-  const riskLevel = pickRiskLevel(staticResult, marketResult);
+  if (contractChecker) {
+    try {
+      contractResult = normalizeResult(await contractChecker(input, contractOptions), "contract-unavailable");
+      sources.push(createSourceDetail("contract", "ok", contractResult));
+    } catch {
+      contractResult = { level: "unknown", score: null, flags: ["contract-unavailable"] };
+      sources.push(createSourceDetail("contract", "error", contractResult, "checker-error"));
+    }
+  } else if (input.contractRisk && typeof input.contractRisk === "object") {
+    sources.push(createSourceDetail("contract", "ok", contractResult, "input-contract-risk"));
+  } else {
+    sources.push(createSourceDetail("contract", "skipped", contractResult, "checker-not-configured"));
+  }
+
+  const riskLevel = pickRiskLevel(staticResult, marketResult, contractResult);
   const fallbackScore = toScore(riskLevel);
   const staticScore = Number(staticResult?.score);
   const marketScore = Number(marketResult?.score);
-  const scoreList = [staticScore, marketScore].filter((x) => Number.isFinite(x));
+  const contractScore = Number(contractResult?.score);
+  const scoreList = [staticScore, marketScore, contractScore].filter((x) => Number.isFinite(x));
   const riskScore = scoreList.length > 0
     ? Math.round(scoreList.reduce((sum, x) => sum + x, 0) / scoreList.length)
     : fallbackScore;
 
-  const riskFlags = [
+  const riskFlags = [...new Set([
     ...(Array.isArray(staticResult?.flags) ? staticResult.flags : []),
     ...(Array.isArray(marketResult?.flags) ? marketResult.flags : []),
-  ];
+    ...(Array.isArray(contractResult?.flags) ? contractResult.flags : []),
+  ])];
 
   return {
     riskLevel,
