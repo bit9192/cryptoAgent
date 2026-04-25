@@ -80,8 +80,9 @@
 4. 已完成 TS-2：注册式 provider 接口与统一 search 协议
 5. 已完成 TS-3：request-engine queryShared 去重缓存接入
 6. 已完成 TS-4：接入 trx provider 与多链排序优先级
+7. 已完成 TS-6（架构收口）：默认 provider 装配迁移至 composition root
 
 下一步：
 
-1. TS-5：trade/contract/address 三域按统一协议接入
-2. TS-6：search task 接入统一 SearchEngine 入口
+1. TS-7：search task 接入统一 SearchEngine 入口
+2. TS-8：token domain 逐链真实 provider 扩展（evm/btc/trx 统一注册）

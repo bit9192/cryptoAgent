@@ -65,6 +65,26 @@
 2. 旧 token-search 回归不破坏
 3. 样本覆盖 happy/edge/invalid/security
 
+### Slice S-6：composition root 外置默认 provider 装配
+
+本次只做：
+
+1. `createSearchEngine` 收口为纯引擎（不内置默认 provider）
+2. 新增 composition root（默认 provider 装配与注册函数）
+3. 保持 token-search 对外行为兼容（自定义 providers 默认不叠加）
+
+本次不做：
+
+1. 新链 provider 实现
+2. 搜索任务层与 CLI 接入
+3. 跨域策略配置化
+
+验收标准：
+
+1. `createSearchEngine` 默认 provider 数量为 0
+2. composition root 可恢复现有默认 provider 行为
+3. token-search 回归测试通过
+
 ## 4. 子模块映射
 
 1. token-search: symbol/name/tokenId 候选检索
@@ -80,8 +100,10 @@
 2. 已完成 token-search TS-1（最小闭环）
 3. 已补齐 token-search 样本与单测
 4. 已完成 token-search TS-2~TS-4（注册式、缓存、trx与排序）
+5. 已完成 S-5：trade/contract/address 协议接入（mock）
+6. 已完成 S-6：composition root 外置默认 provider 装配
 
 下一步：
 
-1. 进入 S-5：trade/contract/address 协议接入与 mock 验证
-2. 再进入各链真实 provider 替换切片
+1. 进入各链真实 provider 替换切片（先 EVM contract/address）
+2. 进入 tasks/search 接入统一 SearchEngine 入口

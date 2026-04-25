@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  createDefaultSearchEngine,
   createSearchEngine,
   createTokenSearchEngine,
 } from "../../../../modules/search-engine/index.mjs";
@@ -590,7 +591,7 @@ test("search-engine: 默认 evm-trade provider 可命中 DexScreener", async () 
   };
 
   try {
-    const engine = createSearchEngine();
+    const engine = createDefaultSearchEngine();
     const res = await engine.search({
       domain: "trade",
       query: "ARKM",
@@ -608,4 +609,15 @@ test("search-engine: 默认 evm-trade provider 可命中 DexScreener", async () 
   } finally {
     globalThis.fetch = oldFetch;
   }
+});
+
+test("search-engine: createSearchEngine 默认不自动注册 provider", async () => {
+  const engine = createSearchEngine();
+  const providers = engine.listProviders();
+  assert.equal(Array.isArray(providers), true);
+  assert.equal(providers.length, 0);
+
+  const res = await engine.search({ domain: "token", query: "usdt" });
+  assert.equal(res.ok, true);
+  assert.equal(res.items.length, 0);
 });

@@ -1,9 +1,8 @@
-import { resolveEvmToken } from "../../apps/evm/configs/tokens.js";
-import { resolveBtcToken } from "../../apps/btc/config/tokens.js";
-import { resolveTrxToken } from "../../apps/trx/config/tokens.js";
-import { normalizeTrxNetworkName } from "../../apps/trx/config/networks.js";
-import { createEvmDexScreenerTradeProvider } from "../../apps/evm/search/trade-provider.mjs";
 import { createRequestEngine } from "../request-engine/index.mjs";
+import {
+  createDefaultSearchProviders,
+  registerSearchProviders,
+} from "./composition-root.mjs";
 
 const SUPPORTED_DOMAINS = new Set(["token", "trade", "contract", "address"]);
 
@@ -203,95 +202,6 @@ function dedupeAndSortCandidates(candidates, query, input = {}, rankConfig = {})
   });
 
   return list;
-}
-
-function createDefaultProviders() {
-  return [
-    {
-      id: "btc-config",
-      chain: "btc",
-      networks: ["mainnet"],
-      capabilities: ["token"],
-      async searchToken(input) {
-        try {
-          const token = resolveBtcToken({
-            key: input.query,
-            network: "mainnet",
-          });
-          return [{
-            chain: "btc",
-            network: "mainnet",
-            tokenAddress: token.address,
-            symbol: token.symbol,
-            name: token.name,
-            decimals: token.decimals,
-            source: "config",
-            confidence: 0.95,
-          }];
-        } catch {
-          return [];
-        }
-      },
-    },
-    {
-      id: "evm-config",
-      chain: "evm",
-      networks: ["eth"],
-      capabilities: ["token"],
-      async searchToken(input) {
-        try {
-          const token = resolveEvmToken({
-            key: input.query,
-            network: "eth",
-          });
-          return [{
-            chain: "evm",
-            network: "eth",
-            tokenAddress: token.address,
-            symbol: token.symbol,
-            name: token.name,
-            decimals: token.decimals,
-            source: "config",
-            confidence: 0.9,
-          }];
-        } catch {
-          return [];
-        }
-      },
-    },
-    createEvmDexScreenerTradeProvider(),
-    {
-      id: "trx-config",
-      chain: "trx",
-      networks: ["mainnet", "nile", "shasta", "local"],
-      capabilities: ["token"],
-      async searchToken(input) {
-        try {
-          const requested = String(input.network ?? "").trim();
-          const network = requested
-            ? (requested === "trx" ? "mainnet" : normalizeTrxNetworkName(requested))
-            : "mainnet";
-
-          const token = resolveTrxToken({
-            key: input.query,
-            network,
-          });
-          return [{
-            chain: "trx",
-            network,
-            tokenAddress: token.address,
-            symbol: token.symbol,
-            name: token.name,
-            decimals: token.decimals,
-            source: "config",
-            confidence: 0.92,
-          }];
-        } catch {
-          return [];
-        }
-      },
-    },
-  ];
 }
 
 function assertValidProvider(provider, index) {
@@ -560,12 +470,8 @@ export function createSearchEngine(options = {}) {
     });
   }
 
-  const defaultProviders = Array.isArray(options.providers) && options.providers.length > 0
-    ? options.providers
-    : (options.withDefaultProviders === false ? [] : createDefaultProviders());
-  for (const provider of defaultProviders) {
-    registerProvider(provider);
-  }
+  const explicitProviders = Array.isArray(options.providers) ? options.providers : [];
+  registerSearchProviders({ registerProvider }, explicitProviders);
 
   return {
     registerProvider,
@@ -579,8 +485,24 @@ export function createSearchEngine(options = {}) {
   };
 }
 
+export function createDefaultSearchEngine(options = {}) {
+  const { providers, ...rest } = options;
+  const engine = createSearchEngine({
+    ...rest,
+    providers: [],
+  });
+
+  registerSearchProviders(engine, createDefaultSearchProviders());
+  if (Array.isArray(providers) && providers.length > 0) {
+    registerSearchProviders(engine, providers);
+  }
+
+  return engine;
+}
+
 export function createTokenSearchEngine(options = {}) {
-  const providers = Array.isArray(options.providers) && options.providers.length > 0
+  const hasCustomProviders = Array.isArray(options.providers) && options.providers.length > 0;
+  const providers = hasCustomProviders
     ? options.providers.map((provider) => ({
       ...provider,
       networks: normalizeProviderNetworks(provider),
@@ -588,12 +510,20 @@ export function createTokenSearchEngine(options = {}) {
     }))
     : undefined;
 
-  const engine = createSearchEngine({
-    providers,
-    withDefaultProviders: options.withDefaultProviders,
-    chainPriority: options.chainPriority,
-    networkPriority: options.networkPriority,
-  });
+  const shouldUseDefaultProviders = options.withDefaultProviders === true
+    || (!hasCustomProviders && options.withDefaultProviders !== false);
+
+  const engine = shouldUseDefaultProviders
+    ? createDefaultSearchEngine({
+      providers,
+      chainPriority: options.chainPriority,
+      networkPriority: options.networkPriority,
+    })
+    : createSearchEngine({
+      providers,
+      chainPriority: options.chainPriority,
+      networkPriority: options.networkPriority,
+    });
 
   async function search(input = {}) {
     return await engine.search({
@@ -616,5 +546,6 @@ export function createTokenSearchEngine(options = {}) {
 
 export default {
   createSearchEngine,
+  createDefaultSearchEngine,
   createTokenSearchEngine,
 };

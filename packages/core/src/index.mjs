@@ -87,5 +87,11 @@ export {
 } from "./modules/request-engine/index.mjs";
 export {
 	createSearchEngine,
+	createDefaultSearchEngine,
 	createTokenSearchEngine,
 } from "./modules/search-engine/index.mjs";
+export {
+	createDefaultSearchProviders,
+	registerDefaultSearchProviders,
+	registerSearchProviders,
+} from "./modules/search-engine/composition-root.mjs";
