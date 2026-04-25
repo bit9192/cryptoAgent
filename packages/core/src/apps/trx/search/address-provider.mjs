@@ -16,7 +16,7 @@ export function createTrxAddressSearchProvider(options = {}) {
   const resolver = options.resolver ?? createAddressResolver(options);
 
   async function searchAddress(input = {}) {
-    const address = normalizeAddress(input?.address);
+    const address = normalizeAddress(input?.address ?? input?.query);
     const network = normalizeNetwork(input?.network);
 
     try {

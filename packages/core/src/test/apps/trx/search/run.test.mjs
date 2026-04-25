@@ -12,7 +12,7 @@ const inputs = {
     limit: 5,
   },
   searchAddress: {
-    query: "TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9",
+    address: "TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9",
     network: "mainnet",
   },
   searchTrade: {
