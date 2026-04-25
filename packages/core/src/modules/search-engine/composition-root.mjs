@@ -1,12 +1,13 @@
 import { resolveEvmToken } from "../../apps/evm/configs/tokens.js";
 import { resolveBtcToken } from "../../apps/btc/config/tokens.js";
-import { resolveTrxToken } from "../../apps/trx/config/tokens.js";
-import { normalizeTrxNetworkName } from "../../apps/trx/config/networks.js";
 import { createEvmDexScreenerTradeProvider } from "../../apps/evm/search/trade-provider.mjs";
 import { createEvmAddressSearchProvider } from "../../apps/evm/search/address-provider.mjs";
 import { createBtcTokenSearchProvider } from "../../apps/btc/search/token-provider.mjs";
 import { createBtcAddressSearchProvider } from "../../apps/btc/search/address-provider.mjs";
 import { createBtcTradeSearchProvider } from "../../apps/btc/search/trade-provider.mjs";
+import { createTrxTokenSearchProvider } from "../../apps/trx/search/token-provider.mjs";
+import { createTrxAddressSearchProvider } from "../../apps/trx/search/address-provider.mjs";
+import { createTrxTradeSearchProvider } from "../../apps/trx/search/trade-provider.mjs";
 
 export function createDefaultSearchProviders() {
   return [
@@ -41,37 +42,9 @@ export function createDefaultSearchProviders() {
     },
     createEvmDexScreenerTradeProvider(),
     createEvmAddressSearchProvider(),
-    {
-      id: "trx-config",
-      chain: "trx",
-      networks: ["mainnet", "nile", "shasta", "local"],
-      capabilities: ["token"],
-      async searchToken(input) {
-        try {
-          const requested = String(input.network ?? "").trim();
-          const network = requested
-            ? (requested === "trx" ? "mainnet" : normalizeTrxNetworkName(requested))
-            : "mainnet";
-
-          const token = resolveTrxToken({
-            key: input.query,
-            network,
-          });
-          return [{
-            chain: "trx",
-            network,
-            tokenAddress: token.address,
-            symbol: token.symbol,
-            name: token.name,
-            decimals: token.decimals,
-            source: "config",
-            confidence: 0.92,
-          }];
-        } catch {
-          return [];
-        }
-      },
-    },
+    createTrxTokenSearchProvider(),
+    createTrxAddressSearchProvider(),
+    createTrxTradeSearchProvider(),
   ];
 }
 

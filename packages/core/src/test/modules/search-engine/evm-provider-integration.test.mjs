@@ -137,4 +137,65 @@ test("btc-provider-integration: BTC / EVM / TRX 三链 providers 在 SearchEngin
   const addressChains = new Set(addressProviders.map((p) => p.chain));
   assert.ok(addressChains.has("btc"), "address domain 应覆盖 BTC 链");
   assert.ok(addressChains.has("evm"), "address domain 应覆盖 EVM 链");
+  assert.ok(addressChains.has("trx"), "address domain 应覆盖 TRX 链");
+});
+
+test("trx-provider-integration: TRX token provider 通过 composition root 注册", () => {
+  const providers = createDefaultSearchProviders();
+  const trxTokenProvider = providers.find((p) => p.id === "trx-token");
+
+  assert.ok(trxTokenProvider, "TRX token provider 应该在默认 providers 中");
+  assert.equal(trxTokenProvider.chain, "trx");
+  assert.ok(trxTokenProvider.capabilities.includes("token"));
+  assert.equal(typeof trxTokenProvider.searchToken, "function");
+});
+
+test("trx-provider-integration: TRX address provider 通过 composition root 注册", () => {
+  const providers = createDefaultSearchProviders();
+  const trxAddressProvider = providers.find((p) => p.id === "trx-address");
+
+  assert.ok(trxAddressProvider, "TRX address provider 应该在默认 providers 中");
+  assert.equal(trxAddressProvider.chain, "trx");
+  assert.ok(trxAddressProvider.capabilities.includes("address"));
+  assert.equal(typeof trxAddressProvider.searchAddress, "function");
+});
+
+test("trx-provider-integration: TRX trade provider 通过 composition root 注册", () => {
+  const providers = createDefaultSearchProviders();
+  const trxTradeProvider = providers.find((p) => p.id === "trx-trade");
+
+  assert.ok(trxTradeProvider, "TRX trade provider 应该在默认 providers 中");
+  assert.equal(trxTradeProvider.chain, "trx");
+  assert.ok(trxTradeProvider.capabilities.includes("trade"));
+  assert.equal(typeof trxTradeProvider.searchTrade, "function");
+});
+
+test("trx-provider-integration: SearchEngine 可调度 TRX token provider", async () => {
+  const engine = createDefaultSearchEngine();
+
+  const result = await engine.search({
+    domain: "token",
+    query: "usdt",
+    network: "mainnet",
+    limit: 5,
+  });
+
+  assert.ok(result && Array.isArray(result.candidates));
+  assert.ok(result.candidates.length >= 1, "TRX token 查询应返回至少一条候选");
+  assert.equal(result.candidates[0].chain, "trx");
+  assert.equal(result.candidates[0].domain, "token");
+});
+
+test("trx-provider-integration: SearchEngine 调度 TRX trade provider 在 nile 降级为空", async () => {
+  const engine = createDefaultSearchEngine();
+
+  const result = await engine.search({
+    domain: "trade",
+    query: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+    network: "nile",
+    limit: 5,
+  });
+
+  assert.ok(result && Array.isArray(result.candidates));
+  assert.deepEqual(result.candidates, []);
 });
