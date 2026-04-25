@@ -46,16 +46,23 @@ function detectAddressKindSafe(value) {
   }
 }
 
-function inferExpectedChainFromNetwork(network) {
+function inferExpectedChainFromNetwork(network, networkRaw = null) {
+  const rawHint = normalizeLower(networkRaw);
+  if (["trx", "tron"].includes(rawHint)) return "trx";
+  if (["btc", "bitcoin"].includes(rawHint)) return "btc";
+  if (["eth", "ethereum", "evm", "bsc", "binance-smart-chain", "polygon", "arb", "arbitrum", "op", "optimism", "base", "avax", "linea", "scroll", "zksync"].includes(rawHint)) {
+    return "evm";
+  }
+
   const net = normalizeNetworkName(network);
   if (!net) return null;
   if (["eth", "bsc", "polygon", "arb", "arbitrum", "op", "optimism", "base", "avax", "linea", "scroll", "zksync"].includes(net)) {
     return "evm";
   }
-  if (["mainnet", "nile", "shasta"].includes(net)) {
+  if (["nile", "shasta"].includes(net)) {
     return "trx";
   }
-  if (["btc", "bitcoin", "testnet", "regtest"].includes(net)) {
+  if (["btc", "bitcoin", "testnet", "regtest", "signet"].includes(net)) {
     return "btc";
   }
   return null;
@@ -76,10 +83,14 @@ function isRemoteMatchForItem(item, normalized) {
     return true;
   }
 
-  const expectedChain = inferExpectedChainFromNetwork(item.network);
+  const expectedChain = inferExpectedChainFromNetwork(item.network, item.networkRaw);
   if (!expectedChain) return true;
   if (normalized?.chain && normalized.chain !== expectedChain) return false;
   if (tokenKind && tokenKind !== expectedChain) return false;
+  if (!tokenKind && tokenAddress && tokenAddress !== "native") {
+    if (expectedChain === "evm" && !/^0x[0-9a-fA-F]{40}$/.test(tokenAddress)) return false;
+    if (expectedChain === "trx" && !/^T[1-9A-HJ-NP-Za-km-z]{25,34}$/.test(tokenAddress)) return false;
+  }
   if (expectedNetwork && actualNetwork && expectedNetwork !== actualNetwork) return false;
   if (expectedNetwork && !actualNetwork) return false;
   if (!normalized?.chain && !tokenKind) return false;
@@ -112,7 +123,7 @@ function normalizeItems(input) {
       if (!query) {
         throw new Error("query 不能为空");
       }
-      return { query, network: null, kind: "auto" };
+      return { query, network: null, networkRaw: null, kind: "auto" };
     }
     if (!item || typeof item !== "object") {
       throw new Error("query item 必须是字符串或对象");
@@ -125,8 +136,9 @@ function normalizeItems(input) {
     if ((kind === "auto" || kind === "address") && looksLikeMalformedAddress(query)) {
       throw new Error(`非法地址: ${query}`);
     }
+    const networkRaw = normalizeLower(item.network);
     const network = normalizeNetworkName(item.network);
-    return { query, network, kind };
+    return { query, network, networkRaw, kind };
   });
 }
 
@@ -368,7 +380,10 @@ async function resolveFromCache(item, cacheApi, options = {}) {
     kind,
     maxAgeMs,
   });
-  return found ? { ...normalizeResolvedRow(found, found), source: "cache" } : null;
+  if (!found) return null;
+  const normalized = normalizeResolvedRow(found, found);
+  if (!isRemoteMatchForItem(item, normalized)) return null;
+  return { ...normalized, source: "cache" };
 }
 
 async function enrichResolvedMetadata(item, normalized, options = {}) {
@@ -626,8 +641,11 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
     }
 
     const configCandidates = resolveConfigCandidates(item);
-    if (configCandidates.length > 0) {
-      const chosen = configCandidates[0];
+    const matchedConfigCandidates = configCandidates
+      .map((row) => normalizeResolvedRow(row, row))
+      .filter((row) => isRemoteMatchForItem(item, row));
+    if (matchedConfigCandidates.length > 0) {
+      const chosen = matchedConfigCandidates[0];
       const output = {
         ok: true,
         query: item.query,

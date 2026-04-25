@@ -417,6 +417,74 @@ test("token meta: forceRemote symbol 在指定network时优先匹配对应链候
   }
 });
 
+test("token meta: symbol 查询应忽略与 network 不匹配的缓存候选", async () => {
+  const cache = createMemoryCache();
+  await cache.put({
+    chain: "evm",
+    network: "eth",
+    items: [{
+      tokenAddress: "so11111111111111111111111111111111111111112",
+      symbol: "AAVE",
+      name: "Aave (Solana)",
+      decimals: 0,
+      updatedAt: Date.now(),
+    }],
+  });
+
+  const res = await queryTokenMeta({
+    query: "aave",
+    network: "eth",
+    kind: "symbol",
+  }, {
+    cache,
+    forceRemote: true,
+    async remoteResolver(item) {
+      return {
+        chain: "evm",
+        network: item.network,
+        tokenAddress: "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9",
+        symbol: "AAVE",
+        name: "Aave",
+        decimals: 18,
+      };
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.chain, "evm");
+  assert.equal(res.network, "eth");
+  assert.equal(res.tokenAddress, "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9");
+  assert.equal(res.symbol, "AAVE");
+  assert.notEqual(res.name, "Aave (Solana)");
+});
+
+test("token meta: network=trx 的 symbol 查询不应漂移到 evm", async () => {
+  const cache = createMemoryCache();
+  await cache.put({
+    chain: "evm",
+    network: "mainnet",
+    items: [{
+      tokenAddress: "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      symbol: "USDT",
+      name: "Tether USD",
+      decimals: 6,
+      updatedAt: Date.now(),
+    }],
+  });
+
+  const res = await queryTokenMeta({
+    query: "usdt",
+    network: "trx",
+    kind: "symbol",
+  }, { cache });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.chain, "trx");
+  assert.equal(res.network, "mainnet");
+  assert.equal(res.symbol, "USDT");
+  assert.match(String(res.tokenAddress), /^T/);
+});
+
 test("token meta: forceRemote symbol 应优先精确匹配symbol避免相似币误命中", async () => {
   const oldFetch = globalThis.fetch;
   globalThis.fetch = async (url) => ({
@@ -664,7 +732,7 @@ test("token meta: network=trx 别名可规范到 mainnet 并命中配置", async
   });
 
   assert.equal(res.ok, true);
-  assert.ok(["config", "cache"].includes(res.source));
+  assert.ok(["config", "cache", "remote"].includes(res.source));
   assert.equal(res.chain, "trx");
   assert.equal(res.network, "mainnet");
   assert.equal(String(res.tokenAddress).toLowerCase(), "tssmhyev2ue9qyh95dqyocunczel1nvu3s");
