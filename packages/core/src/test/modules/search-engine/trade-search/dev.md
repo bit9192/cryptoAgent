@@ -36,6 +36,7 @@
 1. 已完成 TRS-1：trade-search 协议样本
 2. 已完成 TS-5：trade domain mock provider 协议回归测试
 3. 已完成 TRS-2：evm-trade 真实 provider（DexScreener）接入
+4. 已完成 TRS-2.5：DexScreener 集成下沉至 evm trade provider（SearchEngine 去 source 依赖）
 
 下一步：
 
