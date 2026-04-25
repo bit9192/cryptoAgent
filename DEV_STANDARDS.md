@@ -11,7 +11,8 @@
 3. [模块导出规范](#三模块导出规范)
 4. [测试文件规范](#四测试文件规范)
 5. [文档文件规范](#五文档文件规范)
-6. [快速参考](#六快速参考)
+6. [配置驱动开发规范](#六配置驱动开发规范)
+7. [快速参考](#七快速参考)
 
 ---
 
@@ -319,6 +320,55 @@ import { importAddress, getCachedImportedSignerAddresses } from "@ch/core";
 import * as fork from "@ch/core/fork";
 const signer = await fork.importAddress("0x...");
 
+---
+
+## 六、配置驱动开发规范
+
+目标：避免同一份业务配置在多个文件重复硬编码，降低改动漏改风险。
+
+### 6.1 单一配置源（Single Source of Truth）
+
+1. 网络列表、链 ID、RPC、主网标记等基础配置，必须以 `apps/*/config` 为唯一来源。
+2. 业务模块（provider、task、search、adapter）禁止重复手写同一份网络清单。
+3. 若模块需要网络列表，必须通过配置模块动态派生。
+
+示例：
+
+- ✅ 正确：从 `apps/evm/configs/networks.js` 派生 provider 的 `networks`。
+- ❌ 错误：在 provider 内写死 `networks: ["eth", "bsc"]`。
+
+### 6.2 禁止重复硬编码
+
+以下字段若已在配置中定义，业务代码不得再次硬编码：
+
+1. 网络名列表（如 eth/bsc/fork）。
+2. chainId 与主网/测试网标识。
+3. explorer URL、gas token、source policy。
+4. 同一 domain 的 capability 白名单。
+
+### 6.3 允许硬编码的例外
+
+仅以下场景允许短期硬编码，且必须写注释说明迁移计划：
+
+1. 启动兜底值（配置缺失时最小可运行 fallback）。
+2. 测试桩与 mock 数据（仅测试目录）。
+3. 历史兼容层（需标注删除条件）。
+
+### 6.4 开发与评审检查项
+
+每次涉及网络/链配置的开发，必须检查：
+
+1. 新增网络是否只在配置文件中增加一次。
+2. provider/task/search 是否通过配置派生，而非复制数组。
+3. 是否新增测试断言“模块配置与配置源一致”。
+4. 文档是否标注配置来源路径。
+
+### 6.5 AI 开发强制规则
+
+1. AI 修改网络相关逻辑前，先读取对应 `configs/*.js|ts`。
+2. 若发现业务层存在重复配置，优先重构为“配置派生”。
+3. 未确认配置源前，不得提交新的硬编码网络列表。
+
 // ❌ 避免过度嵌套
 import fork from "@ch/core";  // 不清楚 fork 是什么
 ```
@@ -417,7 +467,7 @@ test/
 
 ---
 
-## 六、快速参考
+## 七、快速参考
 
 ### 文件命名检查清单
 
