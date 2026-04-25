@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   createEvmTokenSearchProvider,
   searchToken,
+  searchTokenBatch,
 } from "../../../../../apps/evm/search/token-provider.mjs";
 import { evmNetworks } from "../../../../../apps/evm/configs/networks.js";
 
@@ -103,4 +104,61 @@ test("evm token-search: parser error does not leak sensitive text", async () => 
   });
 
   assert.deepEqual(items, []);
+});
+
+test("evm token-search: provider exposes batch search interface", async () => {
+  const provider = createEvmTokenSearchProvider({
+    metadataBatchReader: async () => ({ ok: true, items: [] }),
+  });
+
+  const batch = await provider.searchTokenBatch([
+    { query: "usdt", network: "eth" },
+    { query: "uni", network: "eth" },
+  ]);
+
+  assert.equal(Array.isArray(batch), true);
+  assert.equal(batch.length, 2);
+  assert.equal(Array.isArray(batch[0].items), true);
+  assert.equal(Array.isArray(batch[1].items), true);
+});
+
+test("evm token-search: batch metadata uses one multicall reader call per network", async () => {
+  let callCount = 0;
+  const provider = createEvmTokenSearchProvider({
+    metadataBatchReader: async (items) => {
+      callCount += 1;
+      return {
+        ok: true,
+        items: items.map((it) => ({
+          tokenAddress: String(it.token),
+          name: "Onchain Name",
+          symbol: "ONC",
+          decimals: 18,
+        })),
+      };
+    },
+  });
+
+  const batch = await provider.searchTokenBatch([
+    { query: "usdt", network: "eth" },
+    { query: "uni", network: "eth" },
+  ]);
+
+  assert.equal(callCount, 1);
+  assert.equal(batch[0].items.length > 0, true);
+  assert.equal(batch[0].items[0].extra.metadataSource, "multicall");
+  assert.equal(batch[0].items[0].symbol, "ONC");
+});
+
+test("evm token-search: batch degrades when one input is invalid", async () => {
+  const batch = await searchTokenBatch([
+    { query: "usdt", network: "eth" },
+    { query: "   ", network: "eth" },
+  ], {
+    metadataBatchReader: async () => ({ ok: true, items: [] }),
+  });
+
+  assert.equal(batch.length, 2);
+  assert.equal(batch[0].items.length > 0, true);
+  assert.deepEqual(batch[1].items, []);
 });

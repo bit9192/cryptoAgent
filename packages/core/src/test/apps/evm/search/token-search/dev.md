@@ -147,6 +147,25 @@
 2. 风险来源可追溯（sources 字段可见）。
 3. 安全样本通过，不泄露敏感上下文。
 
+### Slice ETS-4：token-search 批量接口与 multicall 元信息补全
+
+本次只做：
+
+1. provider 暴露 `searchTokenBatch` 批量接口。
+2. 批量场景使用 multicall 读取链上 metadata（name/symbol/decimals）补全结果。
+3. 保持单条 `searchToken` 行为兼容，不强制走 multicall。
+
+本次不做：
+
+1. 跨链批量并发策略。
+2. 远端资料源与 profile 字段融合。
+
+验收标准：
+
+1. 批量输入时可返回与输入同序的结果集合。
+2. 批量 metadata 补全走单次 batch reader（multicall 路径）。
+3. multicall 失败时可降级为配置数据，不抛异常。
+
 ## 5. 测试映射（先样本后测试）
 
 对应文件：
@@ -182,6 +201,9 @@
 9. ETS-1 切片测试已通过（10/10）。
 10. 已开始 ETS-3：market risk 接入 goplus（部分能力，支持注入与降级）。
 11. tokenRiskCheck 已支持 marketOptions/staticOptions 透传。
+12. 已完成 ETS-4：provider 暴露 searchTokenBatch 接口。
+13. 已完成 ETS-4：批量 metadata 通过 multicall batch reader 补全。
+14. 已完成 ETS-4：batch 场景失败降级测试与回归通过。
 
 下一步：
 

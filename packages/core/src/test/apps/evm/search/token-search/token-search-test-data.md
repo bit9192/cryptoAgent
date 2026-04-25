@@ -40,6 +40,32 @@ expected:
 - 返回 usdt 对应候选
 - source 标记为 config 或 provider
 
+### searchToken-h4: batch 查询命中并返回分组结果
+
+input:
+- items:
+  - query: usdt
+    network: eth
+  - query: uni
+    network: eth
+
+expected:
+- 返回 batch 结果数组，长度与输入一致
+- 每个子结果含 items/sourceStats
+
+### searchToken-h5: batch metadata 通过 multicall 补全
+
+input:
+- items:
+  - query: usdt
+    network: eth
+  - query: uni
+    network: eth
+
+expected:
+- 批量 metadata reader 被调用一次
+- 返回候选中 decimals/name/symbol 可被链上数据覆盖
+
 ### tokenRiskCheck-h1: 风险摘要正常返回
 
 input:
@@ -86,6 +112,20 @@ input:
 expected:
 - 不崩溃
 - 若有返回，network 字段稳定
+
+### searchToken-e4: batch 中单项失败不影响其它项
+
+input:
+- items:
+  - query: usdt
+    network: eth
+  - query: "   "
+    network: eth
+
+expected:
+- 第 1 项正常返回
+- 第 2 项降级为空结果
+- 不抛出批量级异常
 
 ### tokenRiskCheck-e1: 市场风险源缺失
 
