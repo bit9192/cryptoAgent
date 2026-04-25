@@ -5,6 +5,23 @@ import {
   createEvmTokenSearchProvider,
   searchToken,
 } from "../../../../../apps/evm/search/token-provider.mjs";
+import { evmNetworks } from "../../../../../apps/evm/configs/networks.js";
+
+function expectedMainnetNetworks() {
+  return Object.entries(evmNetworks)
+    .filter(([, cfg]) => cfg && cfg.isMainnet === true)
+    .map(([name]) => String(name).trim())
+    .filter(Boolean)
+    .sort();
+}
+
+test("evm token-search: provider networks are derived from networks config", async () => {
+  const provider = createEvmTokenSearchProvider();
+  const actual = [...provider.networks].sort();
+  const expected = expectedMainnetNetworks();
+
+  assert.deepEqual(actual, expected);
+});
 
 test("evm token-search: symbol query returns token candidate", async () => {
   const provider = createEvmTokenSearchProvider();

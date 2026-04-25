@@ -2,6 +2,20 @@ import { parseTokenSearchInput } from "./token-query-parser.mjs";
 import { resolveEvmTokenCandidates } from "./token-resolver.mjs";
 import { normalizeEvmTokenSearchItems } from "./token-normalizer.mjs";
 import { tokenRiskCheck } from "./token-risk-check.mjs";
+import { evmNetworks } from "../configs/networks.js";
+
+function resolveEvmSearchNetworks() {
+  const all = Object.entries(evmNetworks)
+    .filter(([, cfg]) => cfg && cfg.isMainnet === true)
+    .map(([name]) => String(name).trim())
+    .filter(Boolean);
+
+  if (all.length > 0) {
+    return all;
+  }
+
+  return ["eth", "bsc"];
+}
 
 export function createEvmTokenSearchProvider(options = {}) {
   const parseInput = options.parseInput ?? parseTokenSearchInput;
@@ -11,7 +25,7 @@ export function createEvmTokenSearchProvider(options = {}) {
   return {
     id: "evm-token-config",
     chain: "evm",
-    networks: ["eth", "bsc"],
+    networks: resolveEvmSearchNetworks(),
     capabilities: ["token"],
     async searchToken(input = {}) {
       try {

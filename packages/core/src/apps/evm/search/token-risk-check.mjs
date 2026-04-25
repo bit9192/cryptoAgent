@@ -28,6 +28,12 @@ export async function tokenRiskCheck(input = {}, options = {}) {
 
   const staticChecker = options.staticChecker ?? checkTokenRiskStatic;
   const marketChecker = options.marketChecker ?? checkTokenRiskMarket;
+  const staticOptions = options.staticOptions && typeof options.staticOptions === "object"
+    ? options.staticOptions
+    : {};
+  const marketOptions = options.marketOptions && typeof options.marketOptions === "object"
+    ? options.marketOptions
+    : {};
 
   let staticResult = { level: "unknown", score: null, flags: ["static-unavailable"] };
   let marketResult = { level: "unknown", score: null, flags: ["market-unavailable"] };
@@ -35,14 +41,14 @@ export async function tokenRiskCheck(input = {}, options = {}) {
   const sources = [];
 
   try {
-    staticResult = await staticChecker(input);
+    staticResult = await staticChecker(input, staticOptions);
     sources.push({ name: "static", status: "ok" });
   } catch {
     sources.push({ name: "static", status: "error" });
   }
 
   try {
-    marketResult = await marketChecker(input);
+    marketResult = await marketChecker(input, marketOptions);
     sources.push({ name: "market", status: "ok" });
   } catch {
     sources.push({ name: "market", status: "error" });

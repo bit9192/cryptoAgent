@@ -180,9 +180,11 @@
 7. 已完成 ETS-1 模块化实现：token-provider/query-parser/resolver/normalizer。
 8. 已完成 tokenRiskCheck 最小聚合实现与降级策略（无真实远端风险源）。
 9. ETS-1 切片测试已通过（10/10）。
+10. 已开始 ETS-3：market risk 接入 goplus（部分能力，支持注入与降级）。
+11. tokenRiskCheck 已支持 marketOptions/staticOptions 透传。
 
 下一步：
 
-1. 进入 ETS-2：补充 token profile 字段结构与映射。
-2. 保持主 search 不变，仅在 EVM 侧迭代并扩展测试样本。
-3. ETS-2 稳定后再考虑 composition root 装配接入。
+1. 完成 ETS-3：补齐 contract 风险输入融合与 sources 细化字段。
+2. 再进入 ETS-2：补充 token profile 字段结构与映射。
+3. 保持主 search 不变，仅在 EVM 侧迭代并扩展测试样本。
