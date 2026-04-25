@@ -50,6 +50,34 @@ function normalizeMetaItems(items = []) {
   });
 }
 
+function normalizeLiteQueryItems(items = []) {
+  return (Array.isArray(items) ? items : []).map((item) => {
+    const query = normalizeString(item?.query ?? item?.symbol ?? item?.name);
+    const network = normalizeNetworkName(item?.network);
+    const chain = normalizeLower(item?.chain) || inferChainFromNetwork(network);
+    return {
+      query,
+      network,
+      chain,
+    };
+  });
+}
+
+function inferChainFromNetwork(network) {
+  const net = normalizeNetworkName(network);
+  if (!net) return null;
+  if (["eth", "bsc", "polygon", "arb", "arbitrum", "op", "optimism", "base", "avax", "linea", "scroll", "zksync"].includes(net)) {
+    return "evm";
+  }
+  if (["mainnet", "nile", "shasta"].includes(net)) {
+    return "trx";
+  }
+  if (["btc", "bitcoin", "testnet", "regtest", "signet"].includes(net)) {
+    return "btc";
+  }
+  return null;
+}
+
 function buildCacheApi(options = {}) {
   const custom = options.cache ?? {};
   return {
@@ -499,7 +527,104 @@ export async function queryTokenPriceByMeta(metaItem, options = {}) {
   return res.items[0] ?? null;
 }
 
+export async function queryTokenPriceLiteBatchByQuery(items = [], options = {}) {
+  const rows = normalizeLiteQueryItems(Array.isArray(items) ? items : [items]);
+  const results = [];
+
+  const groups = new Map();
+  for (const row of rows) {
+    const query = normalizeLower(row?.query);
+    const network = normalizeNetworkName(row?.network);
+    const chain = normalizeLower(row?.chain) || inferChainFromNetwork(network);
+    if (!query || !network) {
+      results.push({
+        ok: false,
+        query: row?.query ?? null,
+        chain: chain || null,
+        network: network || null,
+        tokenAddress: null,
+        symbol: normalizeString(row?.query).toUpperCase() || null,
+        priceUsd: null,
+        source: "unresolved",
+        error: !query ? "query 不能为空" : "network 不能为空",
+      });
+      continue;
+    }
+
+    const key = `${chain || "unknown"}:${network}`;
+    const group = groups.get(key) ?? { chain, network, requests: [], rows: [] };
+    group.requests.push({
+      key: `${query}:${network}`,
+      queryToken: query,
+      meta: {
+        chain,
+        network,
+        symbol: normalizeString(row?.query).toUpperCase() || null,
+      },
+    });
+    group.rows.push({ ...row, query, chain, network });
+    groups.set(key, group);
+  }
+
+  const resolvedMap = new Map();
+  for (const group of groups.values()) {
+    const remoteResolved = await resolveRemotePriceMap(group.requests, options, {
+      chain: group.chain,
+      network: group.network,
+    });
+    const remoteMap = remoteResolved?.map instanceof Map ? remoteResolved.map : new Map();
+    for (const row of group.rows) {
+      const dedupKey = `${row.query}:${row.network}`;
+      const priceUsd = Number(remoteMap.get(dedupKey));
+      if (Number.isFinite(priceUsd)) {
+        resolvedMap.set(dedupKey, {
+          ok: true,
+          query: row.query,
+          chain: row.chain || null,
+          network: row.network,
+          tokenAddress: null,
+          symbol: normalizeString(row.query).toUpperCase() || null,
+          priceUsd,
+          source: "remote",
+        });
+      } else {
+        resolvedMap.set(dedupKey, {
+          ok: false,
+          query: row.query,
+          chain: row.chain || null,
+          network: row.network,
+          tokenAddress: null,
+          symbol: normalizeString(row.query).toUpperCase() || null,
+          priceUsd: null,
+          source: "unresolved",
+          error: `未解析价格: ${row.query}`,
+        });
+      }
+    }
+  }
+
+  for (const row of rows) {
+    const query = normalizeLower(row?.query);
+    const network = normalizeNetworkName(row?.network);
+    if (!query || !network) continue;
+    const dedupKey = `${query}:${network}`;
+    results.push(resolvedMap.get(dedupKey));
+  }
+
+  return {
+    ok: true,
+    items: results,
+  };
+}
+
+export async function queryTokenPriceLiteByQuery(item, options = {}) {
+  const res = await queryTokenPriceLiteBatchByQuery([item], options);
+  return res.items[0] ?? null;
+}
+
 export default {
   queryTokenPriceBatchByMeta,
   queryTokenPriceByMeta,
+  queryTokenPriceLiteBatchByQuery,
+  queryTokenPriceLiteByQuery,
 };

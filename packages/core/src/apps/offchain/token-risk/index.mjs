@@ -209,7 +209,8 @@ export async function getTokenRiskReport(networkInput, tokenAddressInput, option
 
     const goplusResult = useGoPlus
       ? await goplusTokenSecurityOne(network, tokenAddress, {
-        fetchFromApi: Boolean(options.fetchFromApi ?? false),
+        remote: Boolean(options.remote ?? options.fetchFromApi ?? false),
+        fetchFromApi: Boolean(options.remote ?? options.fetchFromApi ?? false),
       })
       : {
         ok: true,

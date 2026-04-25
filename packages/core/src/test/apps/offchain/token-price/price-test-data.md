@@ -49,7 +49,6 @@
 - ETH (eth) -> 价格应可解析（`priceUsd > 0`）
 - USDT (bsc) -> 价格应可解析（`priceUsd > 0`）
 - ORDI (btc) -> 价格应可解析（`priceUsd > 0`）
-- XPS (bsc) -> 0x8E9b87caD37610D60120A1f48AA1036e24a3831a
 - SUN (trx) -> 价格应可解析（`priceUsd > 0`）
 
 ### edge-case
@@ -90,5 +89,12 @@
 
 - 主流币（BTC/ETH/BNB）优先命中 Binance 批量报价
 - Binance 未命中时自动回退 CoinGecko / DexScreener
+
+### lite-price-case
+
+- `queryTokenPriceLite` 的 `network` 为必填，缺失时返回可预测错误
+- 已解析 token（如 USDT:bsc）可返回精简字段价格结果
+- 未解析 symbol（例如交易所可直接报价的 symbol）可通过 symbol 直取价兜底
+- 轻接口输出不返回复杂调试结构（`sourceStats/candidates/debugStats`）
 
 

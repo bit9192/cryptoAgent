@@ -358,6 +358,30 @@
 2. 默认价格源顺序调整为 Binance -> CoinGecko -> DexScreener
 3. 与现有 fallback/diagnostics 兼容，不改 task 输入
 
+## 14. 当前切片计划（进行中）
+
+### Slice B-5：queryTokenPriceLite 轻接口（前端展示）
+
+本次只做：
+
+1. 新增 `queryTokenPriceLite(input, options?)` 轻接口（放在 `apps/offchain/token-price/index.mjs`）。
+2. `network` 设为必填；输入支持 `name/symbol` 查询。
+3. 轻接口默认返回最小字段：`ok/query/chain/network/tokenAddress/symbol/priceUsd/source/error`。
+4. 先走现有 `queryTokenPrice` 主链路；若因 token 未解析而失败，则走“symbol 直取价”兜底路径（不强依赖 address）。
+
+本次不做：
+
+1. 多网络聚合返回（同 query 多 network 一次返回多条）。
+2. 复杂冲突策略（同 symbol 多 token 歧义裁决）。
+3. 新增 task / cli 对外命令。
+
+验收标准：
+
+1. `network` 缺失时，轻接口返回可预测错误（`ok=false` 且 `error` 可读）。
+2. 已能解析 address 的 token，轻接口可复用主链路成功返回价格。
+3. 无法解析 address 的 symbol，轻接口可通过 symbol 直取价兜底返回 `priceUsd`。
+4. 轻接口输出不包含复杂调试结构（如 sourceStats/candidates/debugStats）。
+
 本次不做：
 
 1. 历史 K 线与波动率
@@ -479,3 +503,27 @@
 1. `ORDI + network=btc + forceRemote=true` 可返回价格
 2. CoinGecko 已能直接命中的现有 EVM / BTC native 行为不回归
 3. 旧测试不回归
+
+## 18. 当前切片计划（进行中）
+
+### Slice B-6：token-price lite EVM 地址查询 trade summary 降级桥
+
+本次只做：
+
+1. `queryTokenPriceLite` 中当 query 为 EVM 地址且主链路（所有 API 源）返回 `ok=false` 时，调用 options 注入的 `tradeSummaryResolver(tokenAddress, network)` 函数兜底。
+2. 若 resolver 返回 `priceUsd` 有效数值，则包装成 lite 格式返回 `ok=true`。
+3. 若 resolver 失败或返回无效，保持原有 `ok=false` 降级行为不变。
+4. 非地址 query（symbol 等）不走此路径（保持原有行为）。
+
+本次不做：
+
+1. 默认注入 `getTokenTradeSummary`（避免循环依赖，由调用方自行注入）。
+2. 将 trade search 结果写入 price 缓存。
+3. 修改 `queryTokenPrice`（full 接口）行为。
+
+验收标准：
+
+1. EVM 地址 query、API 全部失败时，resolver 被调用且返回 priceUsd → ok=true。
+2. resolver 失败 → ok=false，不抛异常。
+3. symbol query → resolver 不被调用（保持原有行为）。
+4. 旧测试不回归。

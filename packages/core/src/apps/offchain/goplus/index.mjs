@@ -186,7 +186,10 @@ function normalizeSecurityItem(address, payload = {}) {
   const cannotSellAll = toBoolFlag(payload?.cannot_sell_all);
   const hiddenOwner = toBoolFlag(payload?.hidden_owner);
   const isOpenSource = toBoolFlag(payload?.is_open_source);
-  const isHighRisk = !isOpenSource || isHoneypot || isBlacklisted || cannotSellAll;
+  const isProxy = toBoolFlag(payload?.is_proxy);
+  // Temporary policy: treat upgradeable/proxy contracts as high risk.
+  // Future policy can downgrade when ownership has been renounced and controls are constrained.
+  const isHighRisk = !isOpenSource || isHoneypot || isBlacklisted || cannotSellAll || isProxy;
 
   return {
     address,
@@ -197,7 +200,7 @@ function normalizeSecurityItem(address, payload = {}) {
     cannotSellAll,
     hiddenOwner,
     isOpenSource,
-    isProxy: toBoolFlag(payload?.is_proxy),
+    isProxy,
     isMintable: toBoolFlag(payload?.is_mintable),
     buyTax: Number(payload?.buy_tax ?? payload?.buy_tax_rate ?? 0) || 0,
     sellTax: Number(payload?.sell_tax ?? payload?.sell_tax_rate ?? 0) || 0,
@@ -308,7 +311,7 @@ async function queryGoPlusTokenSecurityApi(chainId, addresses, options = {}) {
 export async function goplusTokenSecurity(networkInput, contractAddressesInput, options = {}) {
   const chainId = resolveGoPlusChainId(networkInput);
   const addresses = normalizeAddressList(contractAddressesInput);
-  const forceApi = Boolean(options.fetchFromApi ?? options.refreshFromApi ?? options.fromApi ?? false);
+  const forceApi = Boolean(options.remote ?? options.fetchFromApi ?? options.refreshFromApi ?? options.fromApi ?? false);
   const cache = loadSecurityCache();
 
   const cachedMap = {};

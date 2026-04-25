@@ -126,6 +126,7 @@ address search
 分为 上下部分，上面 显示结果，下面负责输入，显示面板 可以在一些情况下提供输入，比如配置私钥时
 
 
-
+### network 自动配置
+根据 net name 自动 配置 各种地址 在 evm的config 里，包括 dex stable coin ，multi 等
 
  task assets:query assets.token-price --query 0xb45e6dd851df10961d1aad912baf220168fcaa25 --network bsc --forceRemote true --debugStats true

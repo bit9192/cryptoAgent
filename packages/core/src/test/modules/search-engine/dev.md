@@ -107,3 +107,43 @@
 
 1. 进入各链真实 provider 替换切片（先 EVM contract/address）
 2. 进入 tasks/search 接入统一 SearchEngine 入口
+
+### Slice S-7：EVM search provider 注册注入到中心 SearchEngine
+
+本次只做：
+
+1. 在 composition root 增加 EVM search provider 装配入口（token/trade/address）。
+2. SearchEngine 通过 registerProvider 注入 EVM provider，不在核心引擎硬编码链逻辑。
+3. 新增模块级回归测试，验证 domain=token/trade/address 能命中 EVM provider。
+4. 默认 provider 与自定义 provider 共存策略明确（可覆盖、可追加）。
+
+本次不做：
+
+1. contract-search 真实 provider 接入。
+2. BTC search 真实实现。
+3. CLI/task 层最终接线。
+
+验收标准：
+
+1. createDefaultSearchEngine 下 EVM 三类 search 可用。
+2. SearchEngine 仍保持注册式架构（无链特化分支）。
+3. token-search 既有测试无回归。
+
+### Slice S-8：以 EVM 接口为模板定义 BTC search 接口骨架
+
+本次只做：
+
+1. 建立 BTC search 接口设计文档（token/address/trade 最小对齐面）。
+2. 明确 BTC provider 注册字段（id/chain/networks/capabilities/searchXxx）。
+3. 准备 BTC search 的 test-data 与 dev 切片，不进入业务实现。
+
+本次不做：
+
+1. BTC provider 具体逻辑开发。
+2. 第三方源接入（mempool/blockbook）。
+3. 排序与风险策略实现。
+
+验收标准：
+
+1. BTC search 开发门禁文档齐备（dev.md + test-data）。
+2. 接口签名与输出字段可直接指导后续切片实现。

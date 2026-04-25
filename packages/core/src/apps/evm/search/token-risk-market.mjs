@@ -72,9 +72,11 @@ export async function checkTokenRiskMarket(input = {}, options = {}) {
       flags: ["market-risk-source-not-installed"],
     };
   }
+  const forceRemote = Boolean(options.remote ?? options.fetchFromApi ?? options.refreshFromApi ?? options.fromApi ?? false);
   const goplusOptions = {
     ...(options.goplusOptions && typeof options.goplusOptions === "object" ? options.goplusOptions : {}),
-    fetchFromApi: options.fetchFromApi === true,
+    remote: forceRemote,
+    fetchFromApi: forceRemote,
   };
 
   try {

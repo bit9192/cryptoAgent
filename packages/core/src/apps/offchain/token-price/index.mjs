@@ -14,6 +14,7 @@ import {
 import {
   queryTokenPriceBatchByMeta,
   queryTokenPriceByMeta,
+  queryTokenPriceLiteByQuery,
 } from "./query-token-price.mjs";
 
 function normalizeString(value) {
@@ -761,9 +762,116 @@ export async function queryTokenPrice(input, options = {}) {
   return await queryTokenPriceByMeta(meta, options);
 }
 
+function shapeLitePriceRow(row = {}, fallback = {}) {
+  return {
+    ok: Boolean(row?.ok),
+    query: normalizeString(row?.query ?? fallback.query) || null,
+    chain: row?.chain ?? fallback.chain ?? null,
+    network: normalizeNetworkName(row?.network ?? fallback.network) ?? null,
+    tokenAddress: normalizeString(row?.tokenAddress) || null,
+    symbol: normalizeString(row?.symbol) || (normalizeString(fallback.query).toUpperCase() || null),
+    priceUsd: Number.isFinite(Number(row?.priceUsd)) ? Number(row.priceUsd) : null,
+    source: normalizeString(row?.source) || (row?.ok ? "remote" : "unresolved"),
+    error: row?.ok ? null : (normalizeString(row?.error) || "未解析价格"),
+  };
+}
+
+export async function queryTokenPriceLite(input, options = {}) {
+  const query = normalizeString(input?.query ?? input?.symbol ?? input?.name ?? input);
+  const network = normalizeNetworkName(input?.network);
+
+  if (!query) {
+    return shapeLitePriceRow({
+      ok: false,
+      source: "unresolved",
+      error: "query 不能为空",
+    }, {
+      query,
+      network,
+      chain: inferExpectedChainFromNetwork(network, network),
+    });
+  }
+
+  if (!network) {
+    return shapeLitePriceRow({
+      ok: false,
+      source: "unresolved",
+      error: "network 不能为空",
+    }, {
+      query,
+      network,
+      chain: inferExpectedChainFromNetwork(network, network),
+    });
+  }
+
+  const chain = inferExpectedChainFromNetwork(network, network);
+  const primary = await queryTokenPrice({
+    query,
+    network,
+    kind: normalizeQueryKind(input?.kind),
+  }, options);
+
+  if (primary?.ok) {
+    return shapeLitePriceRow(primary, {
+      query,
+      network,
+      chain,
+    });
+  }
+
+  // If token metadata cannot be resolved, fallback to direct symbol pricing for display usage.
+  const isAddressQuery = Boolean(detectAddressKindSafe(query));
+  if (!isAddressQuery) {
+    const fallback = await queryTokenPriceLiteByQuery({ query, network, chain }, options);
+    if (fallback?.ok) {
+      return shapeLitePriceRow(fallback, {
+        query,
+        network,
+        chain,
+      });
+    }
+  }
+
+  // B-6: EVM address query fallback to trade summary resolver.
+  const tradeSummaryResolver = typeof options.tradeSummaryResolver === "function"
+    ? options.tradeSummaryResolver
+    : null;
+  if (isAddressQuery && tradeSummaryResolver) {
+    try {
+      const summary = await tradeSummaryResolver(query, network);
+      const priceUsd = Number.isFinite(Number(summary?.priceUsd)) ? Number(summary.priceUsd) : null;
+      if (priceUsd != null) {
+        return shapeLitePriceRow({
+          ok: true,
+          query,
+          chain,
+          network,
+          tokenAddress: query,
+          symbol: null,
+          priceUsd,
+          source: "trade-summary",
+        }, {
+          query,
+          network,
+          chain,
+        });
+      }
+    } catch {
+      // trade summary resolver failure is downgraded; fall through to unresolved
+    }
+  }
+
+  return shapeLitePriceRow(primary, {
+    query,
+    network,
+    chain,
+  });
+}
+
 export default {
   queryTokenMeta,
   queryTokenMetaBatch,
   queryTokenPrice,
   queryTokenPriceBatch,
+  queryTokenPriceLite,
 };

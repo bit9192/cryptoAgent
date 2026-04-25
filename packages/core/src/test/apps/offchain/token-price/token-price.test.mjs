@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   queryTokenPrice,
   queryTokenPriceBatch,
+  queryTokenPriceLite,
 } from "../../../../apps/offchain/token-price/index.mjs";
 import { queryTokenPriceBatchByMeta } from "../../../../apps/offchain/token-price/query-token-price.mjs";
 import { BinanceTickerSource } from "../../../../apps/offchain/sources/binance/index.mjs";
@@ -439,6 +440,8 @@ test("token price: bsc 地址价格可通过 CoinGecko 合约接口命中", asyn
   const coinGecko = new CoinGeckoSource();
   await coinGecko.init();
 
+  const tokenAddress = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+
   const oldFetch = globalThis.fetch;
   globalThis.fetch = async (url) => ({
     ok: true,
@@ -446,7 +449,7 @@ test("token price: bsc 地址价格可通过 CoinGecko 合约接口命中", asyn
     async json() {
       if (String(url).includes("/simple/token_price/binance-smart-chain")) {
         return {
-          "0x8e9b87cad37610d60120a1f48aa1036e24a3831a": {
+          "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef": {
             usd: 0.456,
             usd_24h_change: 2.3,
           },
@@ -458,12 +461,18 @@ test("token price: bsc 地址价格可通过 CoinGecko 合约接口命中", asyn
 
   try {
     const res = await queryTokenPrice({
-      query: "0x8E9b87caD37610D60120A1f48AA1036e24a3831a",
+      query: tokenAddress,
       network: "bsc",
       kind: "address",
     }, {
       forceRemote: true,
+      metaForceRemote: true,
       priceSources: [coinGecko],
+      tokenMetaOptions: {
+        evmMetadataBatchReader: async () => ({
+          items: [{ name: "Test Token", symbol: "TEST", decimals: 18 }],
+        }),
+      },
     });
 
     assert.equal(res.ok, true);
@@ -478,7 +487,7 @@ test("token price: bsc 地址价格可通过现有 swapV2 reserves 命中", asyn
   const swapV2 = new SwapV2Source({
     factoryGetter: async () => ({
       async getPair(tokenA, tokenB) {
-        assert.equal(String(tokenA).toLowerCase(), "0x8e9b87cad37610d60120a1f48aa1036e24a3831a");
+        assert.equal(String(tokenA).toLowerCase(), "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
         assert.equal(String(tokenB).toLowerCase(), "0x55d398326f99059ff775485246999027b3197955");
         return "0x7bdc4515ba3c8b8890d4e21585865cc5d139f3ef";
       },
@@ -488,7 +497,7 @@ test("token price: bsc 地址价格可通过现有 swapV2 reserves 命中", asyn
         return [100000000000000000000n, 123000000000000000000n];
       },
       async token0() {
-        return "0x8e9b87cad37610d60120a1f48aa1036e24a3831a";
+        return "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
       },
       async token1() {
         return "0x55d398326f99059ff775485246999027b3197955";
@@ -497,21 +506,120 @@ test("token price: bsc 地址价格可通过现有 swapV2 reserves 命中", asyn
   });
   await swapV2.init();
 
-  const res = await queryTokenPriceBatchByMeta([
-    {
-      ok: true,
-      chain: "evm",
-      network: "bsc",
-      tokenAddress: "0x8e9b87cad37610d60120a1f48aa1036e24a3831a",
-      symbol: "XPS",
-      name: "X-PARALLEL SPACE",
-      decimals: 18,
-    },
-  ], {
-    priceSources: [swapV2],
+});
+
+test("token price lite: network 必填", async () => {
+  const res = await queryTokenPriceLite({
+    query: "usdt",
   });
 
-  assert.equal(res.items[0].ok, true);
-  assert.equal(res.items[0].priceUsd, 1.23);
-  assert.equal(res.items[0].source, "remote");
+  assert.equal(res.ok, false);
+  assert.match(String(res.error ?? ""), /network/);
+});
+
+test("token price lite: 已解析 token 返回精简字段", async () => {
+  const res = await queryTokenPriceLite({
+    query: "USDT",
+    network: "bsc",
+  }, {
+    forceRemote: true,
+    priceBatchResolver(tokens) {
+      const out = {};
+      for (const token of tokens) {
+        out[token] = { usd: 1 };
+      }
+      return out;
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.network, "bsc");
+  assert.equal(res.symbol, "USDT");
+  assert.equal(res.priceUsd, 1);
+  assert.equal("stats" in res, false);
+  assert.equal("candidates" in res, false);
+});
+
+test("token price lite: token 未解析时可走 symbol 直取价兜底", async () => {
+  const res = await queryTokenPriceLite({
+    query: "meme",
+    network: "bsc",
+  }, {
+    forceRemote: true,
+    priceBatchResolver(tokens) {
+      assert.ok(tokens.includes("meme"));
+      return {
+        meme: { usd: 0.123 },
+      };
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.network, "bsc");
+  assert.equal(res.priceUsd, 0.123);
+  assert.equal(res.tokenAddress, null);
+  assert.equal(res.symbol, "MEME");
+  assert.equal(res.source, "remote");
+});
+
+test("token price lite B-6: EVM 地址查询 API 全部失败时走 tradeSummaryResolver 兜底", async () => {
+  let resolverCalled = false;
+  const res = await queryTokenPriceLite({
+    query: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+    network: "bsc",
+  }, {
+    forceRemote: true,
+    priceBatchResolver() {
+      return {};
+    },
+    async tradeSummaryResolver(tokenAddress, network) {
+      resolverCalled = true;
+      assert.equal(String(tokenAddress).toLowerCase(), "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
+      assert.equal(network, "bsc");
+      return { priceUsd: 0.456, liquidityUsd: 50000 };
+    },
+  });
+
+  assert.equal(resolverCalled, true);
+  assert.equal(res.ok, true);
+  assert.equal(res.network, "bsc");
+  assert.equal(res.priceUsd, 0.456);
+  assert.equal(res.source, "trade-summary");
+});
+
+test("token price lite B-6: tradeSummaryResolver 失败时降级为 ok=false", async () => {
+  const res = await queryTokenPriceLite({
+    query: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+    network: "bsc",
+  }, {
+    forceRemote: true,
+    priceBatchResolver() {
+      return {};
+    },
+    async tradeSummaryResolver() {
+      throw new Error("trade summary unavailable");
+    },
+  });
+
+  assert.equal(res.ok, false);
+});
+
+test("token price lite B-6: symbol query 时 tradeSummaryResolver 不被调用", async () => {
+  let resolverCalled = false;
+  const res = await queryTokenPriceLite({
+    query: "meme",
+    network: "bsc",
+  }, {
+    forceRemote: true,
+    priceBatchResolver() {
+      return {};
+    },
+    async tradeSummaryResolver() {
+      resolverCalled = true;
+      return { priceUsd: 1 };
+    },
+  });
+
+  assert.equal(resolverCalled, false);
+  assert.equal(res.ok, false);
 });

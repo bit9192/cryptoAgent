@@ -6,15 +6,7 @@ function isEvmAddress(value) {
   return /^0x[0-9a-fA-F]{40}$/.test(String(value ?? "").trim());
 }
 
-export function detectTokenQueryKind(query, kind = "auto") {
-  const normalizedKind = normalizeLower(kind || "auto") || "auto";
-  if (!["auto", "symbol", "name", "address"].includes(normalizedKind)) {
-    throw new TypeError(`不支持的 token query kind: ${String(kind ?? "")}`);
-  }
-
-  if (normalizedKind !== "auto") {
-    return normalizedKind;
-  }
+export function detectTokenQueryKind(query, _kind = "auto") {
 
   const raw = String(query ?? "").trim();
   if (isEvmAddress(raw)) return "address";
@@ -28,9 +20,9 @@ export function parseTokenSearchInput(input = {}) {
     throw new TypeError("query 必须是非空字符串");
   }
 
-  const queryKind = detectTokenQueryKind(query, input.kind);
+  const queryKind = detectTokenQueryKind(query);
   const network = String(input.network ?? "eth").trim() || "eth";
-  const rawLimit = Number(input.limit ?? 20);
+  const rawLimit = Number(input.limit ?? input.count ?? 20);
   const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : 20;
 
   return {

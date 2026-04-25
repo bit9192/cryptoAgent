@@ -45,3 +45,9 @@ export {
 	queryEvmTokenBalance,
 	queryEvmTokenBalanceBatch,
 } from "./assets/balance-batch.mjs";
+export {
+	queryAddressCheck,
+	queryAddressCheckBatch,
+	queryAddressBalanceByNetwork,
+	queryAddressBalance,
+} from "./search/address-search.mjs";

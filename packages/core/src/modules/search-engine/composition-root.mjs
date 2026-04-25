@@ -3,35 +3,16 @@ import { resolveBtcToken } from "../../apps/btc/config/tokens.js";
 import { resolveTrxToken } from "../../apps/trx/config/tokens.js";
 import { normalizeTrxNetworkName } from "../../apps/trx/config/networks.js";
 import { createEvmDexScreenerTradeProvider } from "../../apps/evm/search/trade-provider.mjs";
+import { createEvmAddressSearchProvider } from "../../apps/evm/search/address-provider.mjs";
+import { createBtcTokenSearchProvider } from "../../apps/btc/search/token-provider.mjs";
+import { createBtcAddressSearchProvider } from "../../apps/btc/search/address-provider.mjs";
+import { createBtcTradeSearchProvider } from "../../apps/btc/search/trade-provider.mjs";
 
 export function createDefaultSearchProviders() {
   return [
-    {
-      id: "btc-config",
-      chain: "btc",
-      networks: ["mainnet"],
-      capabilities: ["token"],
-      async searchToken(input) {
-        try {
-          const token = resolveBtcToken({
-            key: input.query,
-            network: "mainnet",
-          });
-          return [{
-            chain: "btc",
-            network: "mainnet",
-            tokenAddress: token.address,
-            symbol: token.symbol,
-            name: token.name,
-            decimals: token.decimals,
-            source: "config",
-            confidence: 0.95,
-          }];
-        } catch {
-          return [];
-        }
-      },
-    },
+    createBtcTokenSearchProvider(),
+    createBtcAddressSearchProvider(),
+    createBtcTradeSearchProvider(),
     {
       id: "evm-config",
       chain: "evm",
@@ -59,6 +40,7 @@ export function createDefaultSearchProviders() {
       },
     },
     createEvmDexScreenerTradeProvider(),
+    createEvmAddressSearchProvider(),
     {
       id: "trx-config",
       chain: "trx",
