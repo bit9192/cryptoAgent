@@ -85,3 +85,6 @@ export {
 export {
 	createRequestEngine,
 } from "./modules/request-engine/index.mjs";
+export {
+	createTokenSearchEngine,
+} from "./modules/search-engine/index.mjs";

@@ -34,9 +34,11 @@
 
 当前进度：
 
-1. 仅完成切片计划
+1. 已完成 TS-1：token-search 最小闭环实现
+2. 已补充 token-search 四类测试样本
+3. 已新增并通过 TS-1 单测（聚合/去重/limit/安全）
 
 下一步：
 
-1. 先补 token-search 测试样本
-2. 再进入实现
+1. TS-2：接入 request-engine 做 queryShared 去重缓存
+2. TS-3：扩展到 trx provider 并补多链排序策略

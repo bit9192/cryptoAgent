@@ -56,9 +56,11 @@
 
 当前进度：
 
-1. 仅完成 search 模块计划拆分
+1. 已完成 search 模块计划拆分
+2. 已完成 token-search TS-1（最小闭环）
+3. 已补齐 token-search 样本与单测
 
 下一步：
 
-1. 进入 request-engine 的 S-1（去重与缓存扇出）
-2. 进入 token-search 的 S-2（最小闭环）
+1. 进入 token-search TS-2：接入 request-engine queryShared
+2. 进入 trade-search TRS-1：协议与样本
