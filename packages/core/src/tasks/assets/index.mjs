@@ -96,6 +96,7 @@ function unique(items = []) {
 
 function stableStringify(value) {
   if (value === null || value === undefined) return String(value);
+  if (typeof value === "bigint") return `"${value.toString()}n"`;
   if (typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map((x) => stableStringify(x)).join(",")}]`;
   const keys = Object.keys(value).sort();
@@ -126,6 +127,37 @@ function buildBatchRequestKey(action, items = [], options = {}) {
     },
   };
   return `${action}:${stableStringify(shape)}`;
+}
+
+function normalizeAssetQueryItemForKey(item = {}) {
+  return {
+    address: String(item.address ?? "").trim().toLowerCase(),
+    token: String(item.token ?? "").trim().toLowerCase(),
+    network: String(item.network ?? "").trim().toLowerCase(),
+    chain: String(item.chain ?? "").trim().toLowerCase(),
+  };
+}
+
+function buildAssetSnapshotRequestKey(chain, items = [], sharedInput = {}) {
+  const normalizedItems = items
+    .map((item) => normalizeAssetQueryItemForKey(item))
+    .sort((a, b) => {
+      const ak = `${a.address}|${a.token}|${a.network}|${a.chain}`;
+      const bk = `${b.address}|${b.token}|${b.network}|${b.chain}`;
+      return ak.localeCompare(bk);
+    });
+
+  const shape = {
+    action: "assets.query.snapshot",
+    chain,
+    items: normalizedItems,
+    sharedInput: {
+      prices: Array.isArray(sharedInput.prices) ? sharedInput.prices : [],
+      risks: Array.isArray(sharedInput.risks) ? sharedInput.risks : [],
+    },
+  };
+
+  return `assets.query:${stableStringify(shape)}`;
 }
 
 function resolveDataQueryGateway(ctx = {}) {
@@ -766,10 +798,23 @@ async function runAssetsQuery(ctx, input = {}) {
   const trxItems = items.filter((i) => i.chain === "trx");
 
   const sharedInput = { prices: input.prices, risks: input.risks };
+
+  const dataQueryGateway = resolveDataQueryGateway(ctx);
+
+  async function resolveChainSnapshot(chain, chainItems, fetcher) {
+    if (chainItems.length === 0) return { rows: [], warnings: [] };
+    if (!dataQueryGateway) return await fetcher();
+    return await dataQueryGateway.queryShared({
+      requestKey: buildAssetSnapshotRequestKey(chain, chainItems, sharedInput),
+      fetcher,
+      ttlPolicy: ctx?.dataQueryTtlPolicy,
+    });
+  }
+
   const results = await Promise.all([
-    evmItems.length > 0 ? queryEvmSnapshot(evmItems, adapters, sharedInput) : Promise.resolve({ rows: [], warnings: [] }),
-    btcItems.length > 0 ? queryBtcSnapshot(btcItems, adapters, sharedInput) : Promise.resolve({ rows: [], warnings: [] }),
-    trxItems.length > 0 ? queryTrxSnapshot(trxItems, adapters, sharedInput) : Promise.resolve({ rows: [], warnings: [] }),
+    resolveChainSnapshot("evm", evmItems, async () => await queryEvmSnapshot(evmItems, adapters, sharedInput)),
+    resolveChainSnapshot("btc", btcItems, async () => await queryBtcSnapshot(btcItems, adapters, sharedInput)),
+    resolveChainSnapshot("trx", trxItems, async () => await queryTrxSnapshot(trxItems, adapters, sharedInput)),
   ]);
 
   const allRows     = results.flatMap((r) => r.rows);

@@ -40,8 +40,10 @@
 3. 已新增并通过 DQ-1 相关单测
 4. 已完成 DQ-2：assets.token-meta / assets.token-price 入口接入 queryShared
 5. 已新增任务层接入回归测试并通过
+6. 已完成 DQ-3：assets.query（多链余额聚合）入口接入 queryShared
+7. 任务层回归测试已覆盖 assets.query 缓存复用
 
 下一步：
 
-1. 规划 DQ-3：assets.query（多链余额聚合）入口接入 queryChain
-2. 设计 queryKey 规范（task 维度统一）
+1. 修复功能测试暴露的跨链解析偏移（symbol->network 约束）
+2. 规划 DQ-4：queryChain fanout 在 search/data 聚合中的标准接入
