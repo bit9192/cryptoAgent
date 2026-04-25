@@ -309,3 +309,95 @@ test("search-engine: unregisterProvider 后 provider 不再参与搜索", async 
   const after = await engine.search({ domain: "token", query: "tmp", network: "eth" });
   assert.equal(after.items.length, 0);
 });
+
+test("search-engine: 重复相同查询命中 request 缓存", async () => {
+  const engine = createSearchEngine({ withDefaultProviders: false });
+  let called = 0;
+  engine.registerProvider({
+    id: "cached-provider",
+    chain: "evm",
+    networks: ["eth"],
+    capabilities: ["token"],
+    async searchToken() {
+      called += 1;
+      return [{
+        chain: "evm",
+        network: "eth",
+        tokenAddress: "0x1234567890123456789012345678901234567890",
+        symbol: "CACHE",
+        name: "Cache Token",
+        confidence: 0.9,
+      }];
+    },
+  });
+
+  const first = await engine.search({ domain: "token", query: "cache", network: "eth" });
+  const second = await engine.search({ domain: "token", query: "cache", network: "eth" });
+
+  assert.equal(first.ok, true);
+  assert.equal(second.ok, true);
+  assert.equal(called, 1);
+  const stats = engine.getSearchStats();
+  assert.ok(stats.requestCacheHitCount >= 1);
+});
+
+test("search-engine: 并发相同查询触发 in-flight 合并", async () => {
+  const engine = createSearchEngine({ withDefaultProviders: false });
+  let called = 0;
+  engine.registerProvider({
+    id: "inflight-provider",
+    chain: "evm",
+    networks: ["eth"],
+    capabilities: ["token"],
+    async searchToken() {
+      called += 1;
+      await Promise.resolve();
+      return [{
+        chain: "evm",
+        network: "eth",
+        tokenAddress: "0x1234567890123456789012345678901234567890",
+        symbol: "SYNC",
+        name: "Sync Token",
+        confidence: 0.9,
+      }];
+    },
+  });
+
+  const output = await Promise.all([
+    engine.search({ domain: "token", query: "sync", network: "eth" }),
+    engine.search({ domain: "token", query: "sync", network: "eth" }),
+    engine.search({ domain: "token", query: "sync", network: "eth" }),
+  ]);
+
+  assert.equal(output.length, 3);
+  assert.equal(called, 1);
+  const stats = engine.getSearchStats();
+  assert.ok(stats.inFlightJoinCount >= 2);
+});
+
+test("search-engine: forceRemote=true 跳过缓存", async () => {
+  const engine = createSearchEngine({ withDefaultProviders: false });
+  let called = 0;
+  engine.registerProvider({
+    id: "force-provider",
+    chain: "evm",
+    networks: ["eth"],
+    capabilities: ["token"],
+    async searchToken() {
+      called += 1;
+      return [{
+        chain: "evm",
+        network: "eth",
+        tokenAddress: "0x1234567890123456789012345678901234567890",
+        symbol: "FORCE",
+        name: "Force Token",
+        confidence: 0.9,
+      }];
+    },
+  });
+
+  await engine.search({ domain: "token", query: "force", network: "eth" });
+  await engine.search({ domain: "token", query: "force", network: "eth", forceRemote: true });
+
+  assert.equal(called, 2);
+});

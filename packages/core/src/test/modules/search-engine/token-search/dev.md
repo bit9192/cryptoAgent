@@ -50,6 +50,26 @@
 2. 可按 domain/chain/network 列举 provider
 3. 原 TS-1 测试全部通过
 
+### Slice TS-3：接入 request-engine 做 queryShared 去重缓存
+
+本次只做：
+
+1. search 查询通过 request-engine.fetchShared 复用缓存
+2. 同 requestKey 并发查询只触发一次 provider 执行
+3. 暴露 invalidateSearchCache/getSearchStats 便于调试和回归
+
+本次不做：
+
+1. chain fanout 缓存
+2. 分布式缓存或持久化缓存
+3. 跨 domain 共享缓存策略
+
+验收标准：
+
+1. 重复相同查询命中 request 缓存，不重复调用 provider
+2. 并发相同查询触发 in-flight 合并
+3. forceRemote=true 可跳过缓存
+
 ## 3. 当前进度 / 下一步
 
 当前进度：
@@ -58,8 +78,9 @@
 2. 已补充 token-search 四类测试样本
 3. 已新增并通过 TS-1 单测（聚合/去重/limit/安全）
 4. 已完成 TS-2：注册式 provider 接口与统一 search 协议
+5. 已完成 TS-3：request-engine queryShared 去重缓存接入
 
 下一步：
 
-1. TS-3：接入 request-engine 做 queryShared 去重缓存
-2. TS-4：扩展到 trx provider 并补多链排序策略
+1. TS-4：扩展到 trx provider 并补多链排序策略
+2. TS-5：trade/contract/address 三域按统一协议接入

@@ -1,4 +1,4 @@
-# token-search TS-1 测试样本清单
+# token-search TS-1/TS-2/TS-3 测试样本清单
 
 目标：覆盖 token-search 最小闭环与注册式 provider（TS-2）的 happy / edge / invalid / security 四类样本。
 
@@ -16,6 +16,10 @@
 - 输入：createSearchEngine 后 register 新 provider
 - 期望：search 可命中新 provider
 
+4. queryShared 缓存复用
+- 输入：同 query 连续调用 2 次
+- 期望：provider 仅执行 1 次
+
 ## 2. edge-case
 
 1. 重复候选去重
@@ -30,6 +34,10 @@
 - 输入：listProviders(domain/chain/network)
 - 期望：返回匹配 provider 子集
 
+4. 并发同请求合并
+- 输入：同 query 并发调用 3 次
+- 期望：provider 仅执行 1 次
+
 ## 3. invalid-case
 
 1. query 为空
@@ -43,6 +51,10 @@
 3. 重复注册 provider id
 - 输入：register 同 id
 - 期望：抛 `TypeError`
+
+4. forceRemote 跳过缓存
+- 输入：同 query 第二次 forceRemote=true
+- 期望：provider 再执行一次
 
 ## 4. security-case
 

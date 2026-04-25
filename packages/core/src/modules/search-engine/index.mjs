@@ -1,5 +1,6 @@
 import { resolveEvmToken } from "../../apps/evm/configs/tokens.js";
 import { resolveBtcToken } from "../../apps/btc/config/tokens.js";
+import { createRequestEngine } from "../request-engine/index.mjs";
 
 const SUPPORTED_DOMAINS = new Set(["token", "trade", "contract", "address"]);
 
@@ -19,6 +20,43 @@ function normalizeDomain(domain) {
     throw new TypeError(`不支持的 search domain: ${String(domain ?? "")}`);
   }
   return value;
+}
+
+function stableStringify(value) {
+  if (value == null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+  const keys = Object.keys(value).sort();
+  const entries = keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`);
+  return `{${entries.join(",")}}`;
+}
+
+function buildSearchRequestKey(input = {}) {
+  const {
+    cacheNamespace,
+    domain,
+    query,
+    queryKind,
+    chain,
+    network,
+    limit,
+    cursor,
+    providerIds,
+  } = input;
+  const payload = {
+    domain,
+    query: normalizeLower(query),
+    queryKind,
+    chain: normalizeLower(chain || "*"),
+    network: normalizeLower(network || "*"),
+    limit,
+    cursor: normalizeLower(cursor || ""),
+    providerIds: Array.isArray(providerIds) ? [...providerIds].sort() : [],
+  };
+  return `${cacheNamespace}:${stableStringify(payload)}`;
 }
 
 function detectQueryKind(input = {}) {
@@ -240,6 +278,24 @@ function toCandidateNetwork(row, provider, input) {
 
 export function createSearchEngine(options = {}) {
   const providerMap = new Map();
+  const cacheNamespace = String(options.cacheNamespace ?? "search-engine").trim() || "search-engine";
+  const requestEngine = options.requestEngine ?? createRequestEngine({
+    defaultTtlMs: Number.isFinite(Number(options.defaultCacheTtlMs))
+      ? Number(options.defaultCacheTtlMs)
+      : 30_000,
+  });
+  const cacheEnabled = options.cacheEnabled !== false;
+
+  function getSearchStats() {
+    return typeof requestEngine.getStats === "function"
+      ? requestEngine.getStats()
+      : null;
+  }
+
+  function invalidateSearchCache(input = {}) {
+    if (typeof requestEngine.invalidate !== "function") return null;
+    return requestEngine.invalidate(input);
+  }
 
   function registerProvider(provider) {
     assertValidProvider(provider, 0);
@@ -285,79 +341,103 @@ export function createSearchEngine(options = {}) {
       domain,
     });
 
-    const sourceStats = {
-      total: providers.length,
-      success: 0,
-      failed: 0,
-      hit: 0,
-      empty: 0,
-      timeout: 0,
-    };
+    const executeSearch = async () => {
+      const sourceStats = {
+        total: providers.length,
+        success: 0,
+        failed: 0,
+        hit: 0,
+        empty: 0,
+        timeout: 0,
+      };
 
-    const allCandidates = [];
+      const allCandidates = [];
 
-    await Promise.all(providers.map(async (provider) => {
-      const method = pickProviderMethod(provider, domain);
-      if (!method) {
-        sourceStats.empty += 1;
-        return;
-      }
-
-      try {
-        const rows = await method({
-          domain,
-          query: String(input.query).trim(),
-          kind: queryKind,
-          chain: input.chain ?? null,
-          network: input.network ?? null,
-          limit,
-          cursor: input.cursor ?? null,
-          timeoutMs: input.timeoutMs ?? null,
-          forceRemote: input.forceRemote === true,
-          metadata: input.metadata ?? null,
-        }, {
-          providerId: provider.id,
-          providerChain: provider.chain,
-          providerNetworks: provider.networks,
-        });
-
-        sourceStats.success += 1;
-
-        const normalizedRows = (Array.isArray(rows) ? rows : [])
-          .map((row) => normalizeCandidate(row, {
-            chain: provider.chain,
-            network: toCandidateNetwork(row, provider, input),
-            source: "provider",
-            providerId: provider.id,
-          }))
-          .filter(Boolean);
-
-        if (normalizedRows.length === 0) {
+      await Promise.all(providers.map(async (provider) => {
+        const method = pickProviderMethod(provider, domain);
+        if (!method) {
           sourceStats.empty += 1;
           return;
         }
 
-        sourceStats.hit += 1;
-        allCandidates.push(...normalizedRows);
-      } catch (error) {
-        if (String(error?.name ?? "") === "AbortError") {
-          sourceStats.timeout += 1;
+        try {
+          const rows = await method({
+            domain,
+            query: String(input.query).trim(),
+            kind: queryKind,
+            chain: input.chain ?? null,
+            network: input.network ?? null,
+            limit,
+            cursor: input.cursor ?? null,
+            timeoutMs: input.timeoutMs ?? null,
+            forceRemote: input.forceRemote === true,
+            metadata: input.metadata ?? null,
+          }, {
+            providerId: provider.id,
+            providerChain: provider.chain,
+            providerNetworks: provider.networks,
+          });
+
+          sourceStats.success += 1;
+
+          const normalizedRows = (Array.isArray(rows) ? rows : [])
+            .map((row) => normalizeCandidate(row, {
+              chain: provider.chain,
+              network: toCandidateNetwork(row, provider, input),
+              source: "provider",
+              providerId: provider.id,
+            }))
+            .filter(Boolean);
+
+          if (normalizedRows.length === 0) {
+            sourceStats.empty += 1;
+            return;
+          }
+
+          sourceStats.hit += 1;
+          allCandidates.push(...normalizedRows);
+        } catch (error) {
+          if (String(error?.name ?? "") === "AbortError") {
+            sourceStats.timeout += 1;
+          }
+          sourceStats.failed += 1;
         }
-        sourceStats.failed += 1;
-      }
-    }));
+      }));
 
-    const items = dedupeAndSortCandidates(allCandidates, input.query).slice(0, limit);
+      const items = dedupeAndSortCandidates(allCandidates, input.query).slice(0, limit);
 
-    return {
-      ok: true,
-      domain,
-      query: String(input.query).trim(),
-      queryKind,
-      items,
-      candidates: items,
-      sourceStats,
+      return {
+        ok: true,
+        domain,
+        query: String(input.query).trim(),
+        queryKind,
+        items,
+        candidates: items,
+        sourceStats,
+      };
     };
+
+    if (!cacheEnabled || input.forceRemote === true || providers.length === 0) {
+      return await executeSearch();
+    }
+
+    const requestKey = buildSearchRequestKey({
+      cacheNamespace,
+      domain,
+      query: input.query,
+      queryKind,
+      chain: input.chain,
+      network: input.network,
+      limit,
+      cursor: input.cursor,
+      providerIds: providers.map((provider) => provider.id),
+    });
+
+    return await requestEngine.fetchShared({
+      requestKey,
+      fetcher: executeSearch,
+      ttlMs: Number.isFinite(Number(input.cacheTtlMs)) ? Number(input.cacheTtlMs) : undefined,
+    });
   }
 
   const defaultProviders = Array.isArray(options.providers) && options.providers.length > 0
@@ -373,6 +453,8 @@ export function createSearchEngine(options = {}) {
     hasProvider,
     listProviders,
     clearProviders,
+    getSearchStats,
+    invalidateSearchCache,
     search,
   };
 }
@@ -404,6 +486,8 @@ export function createTokenSearchEngine(options = {}) {
     hasProvider: engine.hasProvider,
     listProviders: engine.listProviders,
     clearProviders: engine.clearProviders,
+    getSearchStats: engine.getSearchStats,
+    invalidateSearchCache: engine.invalidateSearchCache,
     search,
   };
 }
