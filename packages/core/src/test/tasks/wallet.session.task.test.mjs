@@ -217,3 +217,145 @@ test("wallet:session wallet.tree builds minimal tree from cached session", async
   assert.equal(treeRes.counts.addresses, 3);
   assert.equal(Array.isArray(treeRes.tree), true);
 });
+
+test("wallet:session wallet.inputs.set/show/clear works with scope data", async () => {
+  await task.run(createCtx({ action: "wallet.inputs.clear" }, {}));
+
+  const setRes = await task.run(createCtx({
+    action: "wallet.inputs.set",
+    scope: "wallet",
+    data: {
+      keyId: "k1",
+      chain: "evm",
+      address: "0xabc",
+    },
+  }, {}));
+
+  assert.equal(setRes.ok, true);
+  assert.equal(setRes.action, "wallet.inputs.set");
+  assert.equal(setRes.item.scope, "wallet");
+
+  const showRes = await task.run(createCtx({ action: "wallet.inputs.show", scope: "wallet" }, {}));
+  assert.equal(showRes.ok, true);
+  assert.equal(showRes.action, "wallet.inputs.show");
+  assert.equal(showRes.count, 1);
+  assert.equal(showRes.items[0].data.keyId, "k1");
+
+  const clearRes = await task.run(createCtx({ action: "wallet.inputs.clear", scope: "wallet" }, {}));
+  assert.equal(clearRes.ok, true);
+  assert.equal(clearRes.action, "wallet.inputs.clear");
+  assert.equal(clearRes.removed, 1);
+
+  const after = await task.run(createCtx({ action: "wallet.inputs.show", scope: "wallet" }, {}));
+  assert.equal(after.count, 0);
+});
+
+test("wallet:session wallet.inputs.set validates required args", async () => {
+  await assert.rejects(
+    () => task.run(createCtx({ action: "wallet.inputs.set", data: { keyId: "k1" } }, {})),
+    /参数缺失: scope/,
+  );
+});
+
+test("wallet:session wallet.inputs.patch updates partial fields", async () => {
+  await task.run(createCtx({ action: "wallet.inputs.clear" }, {}));
+  await task.run(createCtx({
+    action: "wallet.inputs.set",
+    scope: "wallet",
+    data: {
+      keyId: "k1",
+      chain: "evm",
+      amount: "1",
+    },
+  }, {}));
+
+  const patchRes = await task.run(createCtx({
+    action: "wallet.inputs.patch",
+    scope: "wallet",
+    data: {
+      amount: "2",
+    },
+  }, {}));
+
+  assert.equal(patchRes.ok, true);
+  assert.equal(patchRes.action, "wallet.inputs.patch");
+  assert.equal(patchRes.item.data.amount, "2");
+  assert.equal(patchRes.item.data.keyId, "k1");
+});
+
+test("wallet:session wallet.inputs.resolve merges defaults/inputs/args", async () => {
+  await task.run(createCtx({ action: "wallet.inputs.clear" }, {}));
+  await task.run(createCtx({
+    action: "wallet.inputs.set",
+    scope: "wallet",
+    data: {
+      chain: "evm",
+      address: "0xabc",
+      amount: "1",
+    },
+  }, {}));
+
+  const resolveRes = await task.run(createCtx({
+    action: "wallet.inputs.resolve",
+    scope: "wallet",
+    defaults: {
+      chain: "btc",
+      symbol: "USDT",
+      amount: "0",
+    },
+    args: {
+      amount: "3",
+    },
+  }, {}));
+
+  assert.equal(resolveRes.ok, true);
+  assert.equal(resolveRes.action, "wallet.inputs.resolve");
+  assert.equal(resolveRes.resolvedArgs.chain, "evm");
+  assert.equal(resolveRes.resolvedArgs.symbol, "USDT");
+  assert.equal(resolveRes.resolvedArgs.amount, "3");
+});
+
+test("wallet:session wallet.status supports resolver-based filtering with useInputs", async () => {
+  await task.run(createCtx({ action: "wallet.clear" }, {}));
+
+  const wallet = {
+    async listKeys() {
+      return {
+        items: [
+          { keyId: "k1", name: "alpha", source: "file", sourceFile: "storage/key/a.enc.json", status: "unlocked" },
+          { keyId: "k2", name: "beta", source: "file", sourceFile: "storage/key/b.enc.json", status: "unlocked" },
+        ],
+      };
+    },
+    async deriveConfiguredAddresses() {
+      return {
+        items: [
+          { keyId: "k1", chain: "evm", address: "0xabc", name: "e1", path: "m/44'/60'/0'/0/0", addressType: null },
+          { keyId: "k2", chain: "btc", address: "bc1qabc", name: "b1", path: "m/84'/0'/0'/0/0", addressType: "p2wpkh" },
+        ],
+        warnings: [],
+      };
+    },
+  };
+
+  await task.run(createCtx({ action: "wallet.deriveConfigured" }, wallet));
+
+  const plain = await task.run(createCtx({ action: "wallet.status" }, wallet));
+  assert.equal(plain.counts.keys, 2);
+  assert.equal(plain.counts.addresses, 2);
+
+  await task.run(createCtx({
+    action: "wallet.inputs.set",
+    scope: "wallet",
+    data: {
+      chain: "evm",
+    },
+  }, wallet));
+
+  const filtered = await task.run(createCtx({ action: "wallet.status", useInputs: true }, wallet));
+  assert.equal(filtered.counts.keys, 1);
+  assert.equal(filtered.counts.addresses, 1);
+  assert.equal(filtered.addresses[0].chain, "evm");
+  assert.equal(filtered.inputScope, "wallet");
+  assert.equal(filtered.inputResolved.chain, "evm");
+});

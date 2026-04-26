@@ -517,6 +517,364 @@ function normalizeTaskArgs(rawArgs = {}) {
   return out;
 }
 
+function parseJsonObjectArg(value, label) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value;
+  }
+  const text = String(value ?? "").trim();
+  if (!text) {
+    throw new Error(`${label} 不能为空`);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(`${label} 必须是合法 JSON 对象`);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${label} 必须是 JSON 对象`);
+  }
+  return parsed;
+}
+
+function normalizeSearchText(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function buildWalletTargetCandidates(treeData = {}) {
+  const tree = Array.isArray(treeData?.tree) ? treeData.tree : [];
+  const candidates = [];
+
+  for (const account of tree) {
+    const keyId = String(account?.keyId ?? "").trim();
+    const keyName = String(account?.keyName ?? "").trim() || keyId;
+    const chains = Array.isArray(account?.chains) ? account.chains : [];
+
+    for (const chainNode of chains) {
+      const chain = String(chainNode?.chain ?? "").trim().toLowerCase();
+      const addresses = Array.isArray(chainNode?.addresses) ? chainNode.addresses : [];
+
+      for (const addrNode of addresses) {
+        const address = String(addrNode?.address ?? "").trim();
+        if (!keyId || !chain || !address) continue;
+
+        const name = String(addrNode?.name ?? "").trim() || null;
+        const path = String(addrNode?.path ?? "").trim() || null;
+        const addressType = String(addrNode?.addressType ?? "").trim() || null;
+        const title = `${keyName} | ${keyId} | ${chain} | ${address}${name ? ` | ${name}` : ""}`;
+        const searchText = normalizeSearchText([keyId, keyName, chain, address, name, path].filter(Boolean).join(" "));
+
+        candidates.push({
+          id: `${keyId}:${chain}:${address}:${name ?? "-"}`,
+          title,
+          searchText,
+          target: {
+            keyId,
+            keyName,
+            chain,
+            address,
+            name,
+            path,
+            addressType,
+          },
+        });
+      }
+    }
+  }
+
+  return candidates;
+}
+
+function buildKeyOnlyCandidates(keyItems = []) {
+  return keyItems
+    .map((item) => {
+      const keyId = String(item?.keyId ?? "").trim();
+      if (!keyId) return null;
+      const keyName = String(item?.keyName ?? item?.name ?? "").trim() || keyId;
+      const source = String(item?.source ?? "").trim() || "unknown";
+      const status = String(item?.status ?? "").trim() || "unknown";
+      const title = `${keyName} | ${keyId} | ${source} | ${status}`;
+      const searchText = normalizeSearchText([keyId, keyName, source, status].join(" "));
+      return {
+        id: `key:${keyId}`,
+        title,
+        searchText,
+        target: {
+          keyId,
+          keyName,
+        },
+      };
+    })
+    .filter(Boolean);
+}
+
+async function readWalletTreeForInputs(session) {
+  if (!session.registry || !session.wallet) return null;
+
+  const result = await execute(
+    {
+      task: "wallet:session",
+      args: { action: "wallet.tree" },
+      source: "cli",
+      network: session.network,
+    },
+    {
+      registry: session.registry,
+      wallet: session.wallet,
+      confirm: async () => true,
+      interact: async () => null,
+      checkpointStore: session.checkpointStore,
+    },
+  );
+
+  if (!result?.ok) return null;
+  return result.data ?? null;
+}
+
+async function readWalletKeysForInputs(session) {
+  if (!session.wallet || typeof session.wallet.listKeys !== "function") return [];
+  try {
+    const listed = await session.wallet.listKeys({ enabled: true });
+    return Array.isArray(listed?.items) ? listed.items : [];
+  } catch {
+    return [];
+  }
+}
+
+function buildInputsDataFromTargets(selected = []) {
+  if (selected.length === 0) return null;
+  const primary = selected[0];
+  const base = {
+    targets: selected,
+    keyIds: Array.from(new Set(selected.map((item) => item.keyId).filter(Boolean))),
+    keyId: primary.keyId,
+    keyName: primary.keyName,
+  };
+
+  if (primary.chain) base.chain = primary.chain;
+  if (primary.address) base.address = primary.address;
+  if (primary.name) base.name = primary.name;
+  if (primary.path) base.path = primary.path;
+  if (primary.addressType) base.addressType = primary.addressType;
+
+  return base;
+}
+
+async function pickTargetsFromChoices(choicesPool = [], promptLabel = "选择钱包地址加入 inputs") {
+  const selected = [];
+  const selectedIds = new Set();
+
+  while (true) {
+    const choices = choicesPool
+      .filter((item) => !selectedIds.has(item.id))
+      .map((item) => ({
+        title: item.title,
+        value: item.id,
+      }));
+
+    if (choices.length === 0) break;
+
+    choices.unshift({ title: "完成选择", value: "__done__" });
+    const pickedId = await askSelect(promptLabel, choices, { initial: 0 });
+    if (pickedId === "__done__") break;
+
+    const hit = choicesPool.find((item) => item.id === pickedId);
+    if (!hit) continue;
+    selected.push(hit.target);
+    selectedIds.add(hit.id);
+
+    const cont = await askConfirm("继续添加下一个地址吗？", { initial: false });
+    if (!cont) break;
+  }
+
+  return selected;
+}
+
+async function pickTargetsWithMode(candidates = [], listPrompt = "从列表选择", fuzzyPrompt = "从匹配结果中选择") {
+  if (candidates.length === 0) return null;
+
+  const mode = await askSelect("wallet inputs.set 选择方式", [
+    { title: listPrompt, value: "list" },
+    { title: "输入名称/ID 模糊匹配", value: "fuzzy" },
+    { title: "手动输入 JSON", value: "manual" },
+  ], { initial: 0 });
+
+  if (mode === "manual") return null;
+
+  if (mode === "list") {
+    const selected = await pickTargetsFromChoices(candidates, listPrompt);
+    return buildInputsDataFromTargets(selected);
+  }
+
+  const keyword = await askText("输入名称/ID/address 关键词", { required: true });
+  const needle = normalizeSearchText(keyword);
+  const filtered = candidates.filter((item) => item.searchText.includes(needle));
+  if (filtered.length === 0) {
+    console.log("  [wallet.inputs] 未匹配到候选项，改为手动输入 JSON");
+    return null;
+  }
+
+  const fuzzyMode = await askSelect("模糊匹配结果处理", [
+    { title: `全部加入（${filtered.length} 项）`, value: "all" },
+    { title: "从匹配结果中选择", value: "pick" },
+  ], { initial: 0 });
+
+  if (fuzzyMode === "all") {
+    return buildInputsDataFromTargets(filtered.map((item) => item.target));
+  }
+
+  const selected = await pickTargetsFromChoices(filtered, fuzzyPrompt);
+  return buildInputsDataFromTargets(selected);
+}
+
+async function matchWalletTargetsByNameOrId(session, nameFilter = "", idFilter = "") {
+  // 收集所有候选项（tree + keys）
+  const treeData = await readWalletTreeForInputs(session);
+  const treeCandidates = buildWalletTargetCandidates(treeData);
+  
+  const keyItems = await readWalletKeysForInputs(session);
+  const keyCandidates = buildKeyOnlyCandidates(keyItems);
+  
+  const allCandidates = [...treeCandidates, ...keyCandidates];
+  if (allCandidates.length === 0) {
+    return [];
+  }
+  
+  const normalizedName = normalizeSearchText(nameFilter);
+  const normalizedId = normalizeSearchText(idFilter);
+  
+  return allCandidates.filter((item) => {
+    // id 过滤：精确匹配 keyId（大小写忽略）
+    if (normalizedId) {
+      const itemKeyId = normalizeSearchText(item.target.keyId || "");
+      if (itemKeyId !== normalizedId) {
+        return false;
+      }
+    }
+    
+    // name 过滤：模糊匹配 searchText
+    if (normalizedName) {
+      if (!item.searchText.includes(normalizedName)) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+}
+
+async function pickWalletTargetsFromTree(session) {
+  const treeData = await readWalletTreeForInputs(session);
+  const candidates = buildWalletTargetCandidates(treeData);
+  if (candidates.length > 0) {
+    return await pickTargetsWithMode(
+      candidates,
+      "从 wallet tree 列表选择",
+      "从匹配结果中选择地址",
+    );
+  }
+
+  const keyItems = await readWalletKeysForInputs(session);
+  const keyCandidates = buildKeyOnlyCandidates(keyItems);
+  if (keyCandidates.length > 0) {
+    console.log("  [wallet.inputs] 当前 wallet tree 暂无地址，切换为 key 列表选择模式");
+    return await pickTargetsWithMode(
+      keyCandidates,
+      "从 key 列表选择",
+      "从匹配结果中选择 key",
+    );
+  }
+
+  console.log("  [wallet.inputs] 当前无可选钱包，请先执行 wallet unlock 或 wallet derive");
+  return null;
+}
+
+async function prepareWalletInputsArgs(session, action, rawArgs = {}) {
+  const args = normalizeTaskArgs(rawArgs);
+  delete args._;
+  const isInteractiveTty = Boolean(process.stdin.isTTY);
+
+  if (action === "wallet.inputs.set" || action === "wallet.inputs.patch") {
+    let scope = String(args.scope ?? "").trim();
+    if (!scope) {
+      if (!isInteractiveTty) {
+        throw new Error(`${action} 缺少参数: scope`);
+      }
+      scope = action === "wallet.inputs.set"
+        ? "wallet"
+        : await askText("inputs scope", { required: true, initial: "wallet" });
+      scope = String(scope ?? "").trim();
+    }
+
+    let data = args.data;
+    if (data == null && action === "wallet.inputs.set") {
+      // 先检查 name/id 参数做自动匹配
+      const nameFilter = String(args.name ?? "").trim();
+      const idFilter = String(args.id ?? "").trim();
+      
+      if (nameFilter || idFilter) {
+        // 基于 name/id 做参数匹配
+        const matched = await matchWalletTargetsByNameOrId(session, nameFilter, idFilter);
+        if (matched.length === 0) {
+          throw new Error(`inputs: 未匹配到候选项 (name=${nameFilter}, id=${idFilter})`);
+        }
+        
+        const targets = matched.map((item) => item.target);
+        data = buildInputsDataFromTargets(targets);
+      }
+    }
+    
+    if (data == null) {
+      if (!isInteractiveTty) {
+        throw new Error(`${action} 缺少参数: data (或提供 --name/--id 做参数匹配)`);
+      }
+      // 未来可以加交互，现在只支持参数模式
+      throw new Error(`${action} 需要提供 --data 或 --name/--id 参数`);
+    }
+
+    const taskArgs = {
+      scope,
+      data: parseJsonObjectArg(data, "data"),
+    };
+
+    if (args.ttlMs !== undefined) {
+      taskArgs.ttlMs = args.ttlMs;
+    }
+    return taskArgs;
+  }
+
+  if (action === "wallet.inputs.resolve") {
+    let scope = String(args.scope ?? "").trim();
+    if (!scope) {
+      if (!isInteractiveTty) {
+        throw new Error(`${action} 缺少参数: scope`);
+      }
+      scope = await askText("inputs scope", { required: true, initial: "wallet" });
+      scope = String(scope ?? "").trim();
+    }
+
+    const taskArgs = { scope };
+    if (args.args !== undefined) taskArgs.args = parseJsonObjectArg(args.args, "args");
+    if (args.defaults !== undefined) taskArgs.defaults = parseJsonObjectArg(args.defaults, "defaults");
+    if (args.allowFields !== undefined) {
+      taskArgs.allowFields = Array.isArray(args.allowFields)
+        ? args.allowFields
+        : String(args.allowFields)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+    }
+    return taskArgs;
+  }
+
+  if (action === "wallet.inputs.show" || action === "wallet.inputs.clear") {
+    const scope = String(args.scope ?? "").trim();
+    return scope ? { scope } : {};
+  }
+
+  return args;
+}
+
 // ─── 命令分发 ─────────────────────────────────────────────────
 
 async function dispatchCommand(line, session) {
@@ -547,9 +905,20 @@ async function dispatchCommand(line, session) {
         action: spec.action,
       };
 
-      const optionKeys = Object.keys(args).filter((k) => k !== "_");
-      if (optionKeys.length > 0) {
-        console.log(`  [wallet] ${spec.sub} 不接收参数，已忽略: ${optionKeys.join(", ")}`);
+      const rawWalletArgs = { ...args };
+      delete rawWalletArgs._;
+      if (spec.action.startsWith("wallet.inputs.")) {
+        const prepared = await prepareWalletInputsArgs(session, spec.action, rawWalletArgs);
+        if (prepared === null) {
+          // 取消操作，返回 true 继续 REPL
+          return true;
+        }
+        Object.assign(taskArgs, prepared);
+      } else {
+        const optionKeys = Object.keys(rawWalletArgs);
+        if (optionKeys.length > 0) {
+          console.log(`  [wallet] ${spec.sub} 不接收参数，已忽略: ${optionKeys.join(", ")}`);
+        }
       }
 
       await runTask(session, spec.taskId, taskArgs, null);

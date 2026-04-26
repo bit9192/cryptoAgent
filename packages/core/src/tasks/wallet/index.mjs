@@ -16,6 +16,13 @@ import {
   upsertKey,
 } from "./session-cache.mjs";
 import { buildWalletTree } from "../../modules/wallet-tree/index.mjs";
+import {
+  clearInputs,
+  patchInputs,
+  resolveInputs,
+  setInputs,
+  showInputs,
+} from "../../modules/inputs/index.mjs";
 
 const WALLET_SESSION_TASK_ID = "wallet:session";
 
@@ -310,6 +317,93 @@ async function buildTreeFromSession() {
   };
 }
 
+function applyStatusFiltersFromResolvedInput(snap, resolved = {}) {
+  const keyId = String(resolved?.keyId ?? "").trim();
+  const chain = String(resolved?.chain ?? "").trim().toLowerCase();
+  const address = String(resolved?.address ?? "").trim();
+  const name = String(resolved?.name ?? "").trim().toLowerCase();
+
+  const addresses = snap.addresses.filter((item) => {
+    if (keyId && item.keyId !== keyId) return false;
+    if (chain && item.chain !== chain) return false;
+    if (address && item.address !== address) return false;
+    if (name && String(item.name ?? "").toLowerCase() !== name) return false;
+    return true;
+  });
+
+  const allowedKeyIds = new Set(addresses.map((item) => item.keyId));
+  const keys = keyId
+    ? snap.keys.filter((k) => k.keyId === keyId)
+    : snap.keys.filter((k) => allowedKeyIds.has(k.keyId));
+
+  return {
+    ...snap,
+    keys,
+    addresses,
+    counts: {
+      keys: keys.length,
+      addresses: addresses.length,
+    },
+  };
+}
+
+async function inputsSet(_ctx, input = {}) {
+  const result = setInputs("default", {
+    scope: input?.scope,
+    data: input?.data,
+    ttlMs: input?.ttlMs,
+  });
+  return {
+    ...result,
+    action: "wallet.inputs.set",
+  };
+}
+
+async function inputsShow(_ctx, input = {}) {
+  const result = showInputs("default", {
+    scope: input?.scope,
+  });
+  return {
+    ...result,
+    action: "wallet.inputs.show",
+  };
+}
+
+async function inputsPatch(_ctx, input = {}) {
+  const result = patchInputs("default", {
+    scope: input?.scope,
+    data: input?.data,
+    ttlMs: input?.ttlMs,
+  });
+  return {
+    ...result,
+    action: "wallet.inputs.patch",
+  };
+}
+
+async function inputsResolve(_ctx, input = {}) {
+  const result = resolveInputs("default", {
+    scope: input?.scope,
+    args: input?.args,
+    defaults: input?.defaults,
+    allowFields: input?.allowFields,
+  });
+  return {
+    ...result,
+    action: "wallet.inputs.resolve",
+  };
+}
+
+async function inputsClear(_ctx, input = {}) {
+  const result = clearInputs("default", {
+    scope: input?.scope,
+  });
+  return {
+    ...result,
+    action: "wallet.inputs.clear",
+  };
+}
+
 export const walletSessionActionObject = Object.freeze({
   "wallet.unlock": {
     taskId: WALLET_SESSION_TASK_ID,
@@ -351,21 +445,55 @@ export const walletSessionActionObject = Object.freeze({
     description: "查看当前缓存中的 key 名称与地址列表",
     argsSchema: {
       required: [],
-      properties: {},
+      properties: {
+        useInputs: { type: "boolean" },
+        scope: { type: "string" },
+      },
     },
-    handler: async () => {
+    handler: async (_ctx, input) => {
       const session = getDefaultSession();
       const snap = snapshotSession(session);
+      const useInputs = Boolean(input?.useInputs);
+
+      if (!useInputs) {
+        return {
+          ok: true,
+          action: "wallet.status",
+          keys: snap.keys.map((k) => ({
+            keyId: k.keyId,
+            keyName: k.keyName,
+            source: k.source,
+            status: k.status,
+          })),
+          addresses: snap.addresses.map((a) => ({
+            keyId: a.keyId,
+            chain: a.chain,
+            address: a.address,
+            name: a.name,
+            addressType: a.addressType,
+            path: a.path,
+          })),
+          counts: snap.counts,
+        };
+      }
+
+      const scope = String(input?.scope ?? "").trim() || "wallet";
+      const resolved = resolveInputs("default", {
+        scope,
+        allowFields: ["keyId", "chain", "address", "name"],
+      });
+      const filtered = applyStatusFiltersFromResolvedInput(snap, resolved.resolvedArgs);
+
       return {
         ok: true,
         action: "wallet.status",
-        keys: snap.keys.map((k) => ({
+        keys: filtered.keys.map((k) => ({
           keyId: k.keyId,
           keyName: k.keyName,
           source: k.source,
           status: k.status,
         })),
-        addresses: snap.addresses.map((a) => ({
+        addresses: filtered.addresses.map((a) => ({
           keyId: a.keyId,
           chain: a.chain,
           address: a.address,
@@ -373,7 +501,9 @@ export const walletSessionActionObject = Object.freeze({
           addressType: a.addressType,
           path: a.path,
         })),
-        counts: snap.counts,
+        counts: filtered.counts,
+        inputScope: scope,
+        inputResolved: resolved.resolvedArgs,
       };
     },
   },
@@ -387,6 +517,78 @@ export const walletSessionActionObject = Object.freeze({
       properties: {},
     },
     handler: async () => await buildTreeFromSession(),
+  },
+  "wallet.inputs.set": {
+    taskId: WALLET_SESSION_TASK_ID,
+    sub: "inputs.set",
+    usage: "wallet inputs.set",
+    description: "设置会话 inputs 上下文（整块覆盖）",
+    argsSchema: {
+      required: ["scope", "data"],
+      properties: {
+        scope: { type: "string" },
+        data: { type: "object" },
+        ttlMs: { type: "number|integer" },
+      },
+    },
+    handler: async (ctx, input) => await inputsSet(ctx, input),
+  },
+  "wallet.inputs.show": {
+    taskId: WALLET_SESSION_TASK_ID,
+    sub: "inputs.show",
+    usage: "wallet inputs.show",
+    description: "查看会话 inputs 上下文",
+    argsSchema: {
+      required: [],
+      properties: {
+        scope: { type: "string" },
+      },
+    },
+    handler: async (ctx, input) => await inputsShow(ctx, input),
+  },
+  "wallet.inputs.patch": {
+    taskId: WALLET_SESSION_TASK_ID,
+    sub: "inputs.patch",
+    usage: "wallet inputs.patch",
+    description: "局部更新会话 inputs 上下文",
+    argsSchema: {
+      required: ["scope", "data"],
+      properties: {
+        scope: { type: "string" },
+        data: { type: "object" },
+        ttlMs: { type: "number|integer" },
+      },
+    },
+    handler: async (ctx, input) => await inputsPatch(ctx, input),
+  },
+  "wallet.inputs.resolve": {
+    taskId: WALLET_SESSION_TASK_ID,
+    sub: "inputs.resolve",
+    usage: "wallet inputs.resolve",
+    description: "按优先级合并 inputs/defaults/args 并输出解析结果",
+    argsSchema: {
+      required: ["scope"],
+      properties: {
+        scope: { type: "string" },
+        args: { type: "object" },
+        defaults: { type: "object" },
+        allowFields: { type: "array" },
+      },
+    },
+    handler: async (ctx, input) => await inputsResolve(ctx, input),
+  },
+  "wallet.inputs.clear": {
+    taskId: WALLET_SESSION_TASK_ID,
+    sub: "inputs.clear",
+    usage: "wallet inputs.clear",
+    description: "清空会话 inputs 上下文（可按 scope）",
+    argsSchema: {
+      required: [],
+      properties: {
+        scope: { type: "string" },
+      },
+    },
+    handler: async (ctx, input) => await inputsClear(ctx, input),
   },
 });
 

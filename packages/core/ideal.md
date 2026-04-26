@@ -113,7 +113,10 @@ asset 和 wallet 组合
 类似前端 的 数据绑定 ui 的思路，以 tree 为 核心维护
 wallet 应当是一个 树形结构，hd 可以衍生出 key ，特别是有key 里配置的情况
 
-
+实现 可以 根据 Wallet tree 上的 数据，通过 名称 获取地址 用来查询余额 或后面的 send  swap 等 操作，应当怎么设计？
+用命令 嵌套？比如 tree name=aa | assets ？
+或者 一个命令，可以作为 inputs 的挂载，先 wallet inputs ，然后 选择要用的 key ，挂载到 inputs 上，再执行 其他命令，其他命令 可以 用 inputs作为输入？
+还有其他方法，你推荐啥？
 
 
 ## cli 界面修改
