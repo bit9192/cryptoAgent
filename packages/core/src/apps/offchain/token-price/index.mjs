@@ -338,6 +338,7 @@ async function resolveConfigCandidates(item) {
     }
   };
 
+  let proofNetworks = null;
   if (kind === "address") {
     const detected = detectAddressKindSafe(query);
     if (detected === "evm") {
@@ -345,6 +346,7 @@ async function resolveConfigCandidates(item) {
         maybeResolve("evm", resolveEvmToken, { network, address: query });
       } else {
         const matchedNetworks = await resolveEvmAddressNetworksByMetadata(query);
+        proofNetworks = matchedNetworks;
         for (const matchedNetwork of matchedNetworks) {
           maybeResolve("evm", resolveEvmToken, { network: matchedNetwork, address: query });
         }
@@ -352,7 +354,7 @@ async function resolveConfigCandidates(item) {
     }
     if (detected === "btc") maybeResolve("btc", resolveBtcToken, { network, address: query });
     if (detected === "trx") maybeResolve("trx", resolveTrxToken, { network, address: query });
-    return candidates;
+    return { candidates, proofNetworks };
   }
 
   const nativeCandidate = resolveNativeTokenCandidate(query, network);
@@ -366,7 +368,7 @@ async function resolveConfigCandidates(item) {
   maybeResolve("evm", resolveEvmToken, { network, key: query });
   maybeResolve("btc", resolveBtcToken, { network, key: query });
   maybeResolve("trx", resolveTrxToken, { network, key: query });
-  return candidates;
+  return { candidates, proofNetworks };
 }
 
 function buildCacheApi(options = {}) {
@@ -673,8 +675,8 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
       }
     }
 
-    const configCandidates = await resolveConfigCandidates(item);
-    const matchedConfigCandidates = configCandidates
+    const { candidates: resolvedCandidates, proofNetworks } = await resolveConfigCandidates(item);
+    const matchedConfigCandidates = resolvedCandidates
       .map((row) => normalizeResolvedRow(row, row))
       .filter((row) => isRemoteMatchForItem(item, row));
     if (matchedConfigCandidates.length > 0) {
@@ -686,6 +688,7 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
         ...chosen,
         source: "config",
       };
+      if (proofNetworks !== null) output.debugStats = { ...(output.debugStats ?? {}), proofNetworks };
       if (stats) stats.configHits += 1;
       dedupResultMap.set(dedupKey, output);
       results.push(output);

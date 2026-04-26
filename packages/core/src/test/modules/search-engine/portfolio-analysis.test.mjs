@@ -284,6 +284,11 @@ class PerformanceMonitor {
   constructor() {
     this.requests = [];
     this.startTime = Date.now();
+    this.proofNetworkHits = {};
+  }
+
+  recordProofNetworkHit(network) {
+    this.proofNetworkHits[network] = (this.proofNetworkHits[network] ?? 0) + 1;
   }
 
   recordRequest(domain, query, network, duration, resultCount, error = null) {
@@ -344,6 +349,11 @@ class PerformanceMonitor {
     console.log(`  按 domain 统计:`);
     for (const [domain, info] of Object.entries(stats.byDomain)) {
       console.log(`    ${domain}: ${info.count} 请求, ${info.errors} 错误`);
+    }
+    const proofEntries = Object.entries(this.proofNetworkHits);
+    if (proofEntries.length > 0) {
+      const distribution = proofEntries.map(([net, count]) => `${net}=${count}`).join(", ");
+      console.log(`  EVM 地址预验证命中网络分布: ${distribution}`);
     }
     console.log(`  总耗时: ${stats.totalTime}ms`);
   }
@@ -737,6 +747,7 @@ async function preloadTokenPrices(engine, monitor, tokens) {
     const matched = evmMatchedNetworks.get(address);
     if (!matched || matched.size === 0) continue;
     for (const network of matched) {
+      monitor.recordProofNetworkHit(network);
       directQueries.push({ query: address, network: resolvePriceNetwork("evm", network), chain: "evm" });
     }
   }

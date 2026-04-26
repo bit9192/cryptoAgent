@@ -110,9 +110,11 @@
 
 下一步：
 
-1. 进入 S-12：EVM tokenAddress 先做网络归属验证（仅非 fork 网络）再查价
-2. 进入各链真实 provider 替换切片（先 EVM contract/address）
-3. 进入 tasks/search 接入统一 SearchEngine 入口
+1. ~~进入 S-12：EVM tokenAddress 先做网络归属验证（仅非 fork 网络）再查价~~ ✅
+2. ~~S-13：公共层预验证下沉~~ ✅
+3. ~~S-14：预验证命中统计注入 debugStats + 监测报告~~ ✅
+4. 进入各链真实 provider 替换切片（先 EVM contract/address）
+5. 进入 tasks/search 接入统一 SearchEngine 入口
 
 ### Slice S-7：EVM search provider 注册注入到中心 SearchEngine
 
@@ -307,3 +309,24 @@
 1. EVM address 无 network 时，config 解析优先使用预验证命中的网络。
 2. 未命中任何网络时不产生错误的 config 候选。
 3. 现有脚本 `portfolio-analysis.test.mjs` 回归通过。
+
+### Slice S-14：预验证结果注入 debugStats，并更新进度记录
+
+本次只做：
+
+1. 在 `resolveConfigCandidates` 中记录 EVM 预验证命中的网络列表，通过函数返回值附带 `_proofNetworks`（可选字段）。
+2. 在 `queryTokenMetaBatch` 中，当存在 `_proofNetworks` 时将其注入结果项的 `debugStats.proofNetworks` 字段。
+3. 在 `portfolio-analysis.test.mjs` 的监测报告里增加一行：统计所有地址 token 预验证命中的网络分布（eth/bsc 各命中几次）。
+4. 更新 dev.md 进度（标记 S-14 完成）。
+
+本次不做：
+
+1. 修改价格源策略或远程接口。
+2. 在 root search / task 层添加新 API。
+3. 扩展到 polygon/base 等新网络。
+
+验收标准：
+
+1. `queryTokenMetaBatch` 返回结果中，EVM address 型 token 的 result.debugStats.proofNetworks 有值。
+2. `portfolio-analysis.test.mjs` 输出能显示"证明命中网络分布"统计行。
+3. 回归测试通过（总请求数与错误率不回退）。
