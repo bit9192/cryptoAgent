@@ -218,3 +218,66 @@ test("trx-address-search: S2-2 结果不包含私钥字段", async () => {
   assert.ok(!payload.includes("mnemonic"));
   assert.ok(!payload.includes("seed"));
 });
+
+test("trx-address-search: 远程持仓命中时不受 tokenBook 限制", async () => {
+  const provider = createTrxAddressSearchProvider({
+    tokenBookReader: () => ({ tokens: {} }),
+    tokenHoldingsGetter: async () => ([
+      {
+        contractAddress: "TMacq4TDUw5q8NFBwmbY4RLXvzvG5JTkvi",
+        rawBalance: 1200000n,
+      },
+    ]),
+    tokenMetadataBatchReader: async () => ({
+      ok: true,
+      items: [
+        {
+          ok: true,
+          tokenAddress: "TMacq4TDUw5q8NFBwmbY4RLXvzvG5JTkvi",
+          symbol: "TST",
+          name: "Test TRC20",
+          decimals: 6,
+        },
+      ],
+    }),
+  });
+
+  const items = await provider.searchAddress({ address: MAIN_ADDRESS, network: "mainnet" });
+  const trc20 = items.find((i) => i.extra?.protocol === "trc20");
+
+  assert.ok(trc20);
+  assert.equal(trc20.symbol, "TST");
+  assert.equal(trc20.extra.contractAddress, "TMacq4TDUw5q8NFBwmbY4RLXvzvG5JTkvi");
+  assert.equal(trc20.extra.balance, "1.2");
+});
+
+test("trx-address-search: 远程持仓失败时回退 tokenBook 扫描", async () => {
+  const provider = createTrxAddressSearchProvider({
+    tokenHoldingsGetter: async () => {
+      throw new Error("remote unavailable");
+    },
+    tokenBookReader: () => ({
+      tokens: {
+        usdt: {
+          key: "usdt",
+          name: "Tether USD",
+          symbol: "USDT",
+          decimals: 6,
+          address: MAIN_USDT,
+        },
+      },
+    }),
+    tokenBalanceGetter: async () => ({
+      ok: true,
+      balance: "2500000",
+    }),
+  });
+
+  const items = await provider.searchAddress({ address: MAIN_ADDRESS, network: "mainnet" });
+  const trc20 = items.find((i) => i.extra?.protocol === "trc20");
+
+  assert.ok(trc20);
+  assert.equal(trc20.symbol, "USDT");
+  assert.equal(trc20.extra.contractAddress, MAIN_USDT);
+  assert.equal(trc20.extra.balance, "2.5");
+});
