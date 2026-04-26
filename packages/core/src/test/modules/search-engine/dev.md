@@ -418,3 +418,32 @@ token-price 层在中心表基础上扩展：
 2. `token-price/chain-adapters.mjs` 中链身份字段来自 `chain-registry.mjs`，不再重复硬编码。
 3. `CHAIN_ADAPTERS` 对外接口字段不变，`token-price/index.mjs` 零修改。
 4. `portfolio-analysis.test.mjs` 回归通过。
+
+### Slice S-17：tasks/search 接入统一 SearchEngine 入口
+
+**目标：**
+新建 `src/tasks/search/` 任务模块，作为所有上层（CLI/API/页面）调用 SearchEngine 的统一入口，屏蔽 provider 装配、参数校验、错误处理细节。
+
+**本次只做：**
+
+1. 新建 `src/tasks/search/index.mjs`，导出 `searchTask(input, context)` 函数：
+   - 参数校验：domain（token/trade/address）、query、network（address domain 可选）
+   - 内部通过 `createDefaultSearchEngine()` + `registerDefaultSearchProviders()` 装配引擎（单例，首次调用后缓存）
+   - 调用 `engine.search()` 并返回标准化结果 `{ ok, domain, query, candidates, error }`
+2. 新建 `src/test/tasks/search/search.test.mjs`，覆盖：
+   - happy path：token/address 各一个样本
+   - invalid：domain 非法、query 为空
+3. 不新增任何 provider 实现，复用现有 composition-root
+
+**本次不做：**
+
+1. CLI 层接线（ui.mjs / lon.mjs）
+2. 分页、排序配置化
+3. 多 domain 并发聚合
+
+**验收标准：**
+
+1. `node --test src/test/tasks/search/search.test.mjs` 通过。
+2. `searchTask({ domain: "token", query: "USDT", network: "eth" })` 返回 `{ ok: true, candidates: [...] }`。
+3. 非法 domain 返回 `{ ok: false, error: "..." }`，不抛异常。
+4. engine 实例在进程内复用（不重复装配）。
