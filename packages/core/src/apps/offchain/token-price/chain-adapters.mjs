@@ -1,22 +1,23 @@
 /**
- * Chain Token Adapter 注册机制
+ * token-price 层 ChainTokenAdapter 注册表
  *
- * 每条链实现 ChainTokenAdapter 接口并在本文件末尾注册。
- * token-price 公共层通过此注册表驱动所有链特化逻辑，增加新链只需追加一个适配器对象。
+ * 从中心链身份表（chain-registry.mjs）import 基础定义，
+ * 在此追加 token-price 专有方法后导出 CHAIN_ADAPTERS。
  *
- * @typedef {Object} ChainTokenAdapter
- * @property {string}   chain           - 链标识符，e.g. "evm" | "btc" | "trx"
- * @property {string[]} networkNames    - 该链归属的 network 名称列表（用于 inferExpectedChainFromNetwork）
- * @property {string[]} networkAliases  - 额外的别名（如 "ethereum" → evm），用于原始网络名匹配
- * @property {string[]} proofNetworks   - 支持地址归属预验证的网络列表（空数组表示不支持）
- * @property {string}   addressTokenFormat - token address 正则（字符串形式），用于 isRemoteMatchForItem 校验
- * @property {Function} resolveToken    - (input: {network?, address?, key?}) => config | null
- * @property {Function} [resolveNativeToken] - (network: string) => config | null
- * @property {Function} [proofAddressNetworks] - async (tokenAddress: string) => string[]
- * @property {Function} [resolveMetadata] - async (item, options) => resolvedMeta | null
- * @property {Function} [enrichMetadata] - async (item, normalized, options) => normalized
+ * 增加新链：
+ *   1. 先在 src/apps/chain-registry.mjs 注册链身份
+ *   2. 在本文件末尾追加对应的业务方法扩展，加入 CHAIN_ADAPTERS
+ *
+ * @typedef {import("../../chain-registry.mjs").ChainMeta & {
+ *   resolveToken:          (input: {network?, address?, key?}) => object | null,
+ *   resolveNativeToken?:   (network: string) => object | null,
+ *   proofAddressNetworks?: (tokenAddress: string) => Promise<string[]>,
+ *   resolveMetadata?:      (item: object, options: object) => Promise<object | null>,
+ *   enrichMetadata?:       (item: object, normalized: object, options: object) => Promise<object>,
+ * }} ChainTokenAdapter
  */
 
+import { getChainMeta } from "../../chain-registry.mjs";
 import { resolveEvmToken } from "../../evm/configs/tokens.js";
 import { resolveBtcToken } from "../../btc/config/tokens.js";
 import { resolveTrxToken } from "../../trx/config/tokens.js";
@@ -27,11 +28,7 @@ import { queryTrxTokenMetadata } from "../../trx/assets/token-metadata.mjs";
 
 /** @type {ChainTokenAdapter} */
 const evmAdapter = {
-  chain: "evm",
-  networkNames: ["eth", "bsc", "polygon", "arb", "arbitrum", "op", "optimism", "base", "avax", "linea", "scroll", "zksync"],
-  networkAliases: ["ethereum", "evm", "binance-smart-chain"],
-  proofNetworks: ["eth", "bsc"],
-  addressTokenFormat: "^0x[0-9a-fA-F]{40}$",
+  ...getChainMeta("evm"),
 
   resolveToken(input) {
     return resolveEvmToken(input);
@@ -126,11 +123,7 @@ const evmAdapter = {
 
 /** @type {ChainTokenAdapter} */
 const btcAdapter = {
-  chain: "btc",
-  networkNames: ["btc", "bitcoin", "testnet", "regtest", "signet"],
-  networkAliases: [],
-  proofNetworks: [],
-  addressTokenFormat: null,
+  ...getChainMeta("btc"),
 
   resolveToken(input) {
     return resolveBtcToken(input);
@@ -145,11 +138,7 @@ const btcAdapter = {
 
 /** @type {ChainTokenAdapter} */
 const trxAdapter = {
-  chain: "trx",
-  networkNames: ["mainnet", "nile", "shasta"],
-  networkAliases: ["tron", "trx"],
-  proofNetworks: [],
-  addressTokenFormat: "^T[1-9A-HJ-NP-Za-km-z]{25,34}$",
+  ...getChainMeta("trx"),
 
   resolveToken(input) {
     return resolveTrxToken(input);
@@ -210,7 +199,9 @@ const trxAdapter = {
 };
 
 // ─── Registry ─────────────────────────────────────────────────────────────────
-// 增加新链：在此追加一个适配器对象即可，其余文件无需修改。
+// 增加新链：
+//   1. 先在 src/apps/chain-registry.mjs 注册链身份
+//   2. 在此追加业务方法扩展并加入 CHAIN_ADAPTERS
 
 /** @type {ChainTokenAdapter[]} */
 export const CHAIN_ADAPTERS = [evmAdapter, btcAdapter, trxAdapter];

@@ -374,3 +374,47 @@
 3. `inferExpectedChainFromNetwork` 的 network 名称列表从各适配器 `networkNames` 中聚合而来。
 4. `portfolio-analysis.test.mjs` 回归通过（请求数/错误率不回退）。
 5. 理论上添加新链只需在 `chain-adapters.mjs` 末尾追加一个对象。
+
+### Slice S-16：上移 chain-adapters 到 apps/ 中心层，token-price 层只做模块扩展
+
+**背景：**
+`chain-adapters.mjs` 目前在 `token-price/` 下，包含链身份（networkNames/networkAliases/addressTokenFormat/proofNetworks）与 token-price 专有方法（resolveToken/resolveMetadata/enrichMetadata）的混合定义。随着 search-engine、assets-engine 等模块也需要链路由，若各模块自行维护一份，新增链时容易遗漏。
+
+**目标架构：**
+
+```
+src/apps/
+  chain-registry.mjs          ← 中心链身份注册表（纯数据，无业务方法）
+  offchain/
+    token-price/
+      chain-adapters.mjs      ← 从中心表 import，追加 token-price 专有方法后导出
+```
+
+中心表只定义：
+```js
+{ chain, networkNames, networkAliases, addressTokenFormat, proofNetworks }
+```
+
+token-price 层在中心表基础上扩展：
+```js
+{ ...base, resolveToken, resolveNativeToken, proofAddressNetworks, resolveMetadata, enrichMetadata }
+```
+
+**本次只做：**
+
+1. 新建 `src/apps/chain-registry.mjs`，从现有 `chain-adapters.mjs` 中提取纯链身份字段（chain/networkNames/networkAliases/proofNetworks/addressTokenFormat）注册为 `CHAIN_REGISTRY`。
+2. 改写 `token-price/chain-adapters.mjs`：从 `chain-registry.mjs` import 基础定义，仅在此补充 token-price 专有方法，`CHAIN_ADAPTERS` 导出行为不变。
+3. `token-price/index.mjs` 的 import 路径不变（只 import `chain-adapters.mjs`），无需改动。
+
+**本次不做：**
+
+1. 让 search-engine 或其他模块接入中心表。
+2. 改变 token-price 任何对外 API。
+3. 改变 CHAIN_ADAPTERS 的接口字段。
+
+**验收标准：**
+
+1. `src/apps/chain-registry.mjs` 存在，导出 `CHAIN_REGISTRY`（数组）和 `getChainMeta(chain)`。
+2. `token-price/chain-adapters.mjs` 中链身份字段来自 `chain-registry.mjs`，不再重复硬编码。
+3. `CHAIN_ADAPTERS` 对外接口字段不变，`token-price/index.mjs` 零修改。
+4. `portfolio-analysis.test.mjs` 回归通过。
