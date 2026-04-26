@@ -42,6 +42,12 @@ function shortAddr(addr) {
   return s.length > 14 ? `${s.slice(0, 8)}…${s.slice(-6)}` : s;
 }
 
+function trimTrailingZeros(value) {
+  const text = String(value ?? "0").trim();
+  if (!text.includes(".")) return text;
+  return text.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+}
+
 function fmt(r) {
   if (!r.ok) return `FAIL  "${r.error}"`;
   const t = r.candidates[0];
@@ -63,14 +69,34 @@ function pickBalance(asset = {}) {
   return 0;
 }
 
+function pickAssetLabel(asset = {}, chain = "") {
+  const extra = asset?.extra && typeof asset.extra === "object" ? asset.extra : {};
+  const nestedAsset = extra.asset && typeof extra.asset === "object" ? extra.asset : {};
+  const tokenAddress = String(asset.tokenAddress || nestedAsset.address || "").trim();
+
+  if (extra.assetType === "native" || extra.protocol === "native") {
+    if (chain === "btc") return "BTC";
+    if (chain === "trx") return "TRX";
+    if (chain === "evm") return String(asset?.network ?? "").toLowerCase() === "bsc" ? "BNB" : "ETH";
+  }
+
+  if (asset.symbol) return String(asset.symbol);
+  if (nestedAsset.symbol) return String(nestedAsset.symbol);
+  if (extra.ticker) return String(extra.ticker);
+  if (tokenAddress) return `${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)}`;
+  return String(asset.title ?? "ASSET");
+}
+
 // ─── 主流程 ─────────────────────────────────────────────────────────────────
 
 async function main() {
+  console.log("🚀 === Search Task 全链路测试（analysis 对齐输出）===\n");
+
   const raw = readFileSync(new URL("./test.data.md", import.meta.url), "utf8");
   const d = parseTestData(raw);
 
   // ── 1. Token 名称（EVM 视为 ETH 主网，特殊链单独归类）──────────────────
-  console.log("\n=== 1. Token 名称搜索（ETH 主网）===");
+  console.log("🔎 === 步骤 A: Token 名称搜索 ===");
   const BTC_SYMBOLS  = new Set(["ordi","sats","rats","btc"]);
   const TRX_SYMBOLS  = new Set(["sun","trx"]);
   for (const token of d.tokens) {
@@ -82,25 +108,25 @@ async function main() {
   }
 
   // ── 2. BSC 合约地址 ────────────────────────────────────────────────────
-  console.log("\n=== 2. BSC 合约地址搜索 ===");
+  console.log("\n🧩 === 步骤 B: BSC 合约地址搜索 ===");
   for (const addr of d.bsc) {
     await run(shortAddr(addr), { domain: "token", query: addr, network: "bsc" });
   }
 
   // ── 3. ETH 合约地址 ────────────────────────────────────────────────────
-  console.log("\n=== 3. ETH 合约地址搜索 ===");
+  console.log("\n🧩 === 步骤 C: ETH 合约地址搜索 ===");
   for (const addr of d.eth) {
     await run(shortAddr(addr), { domain: "token", query: addr, network: "eth" });
   }
 
   // ── 4. TRC20 合约地址 ──────────────────────────────────────────────────
-  console.log("\n=== 4. TRC20 合约地址搜索（TRX mainnet）===");
+  console.log("\n🧩 === 步骤 D: TRC20 合约地址搜索（TRX mainnet）===");
   for (const addr of d.trc20) {
     await run(shortAddr(addr), { domain: "token", query: addr, network: "mainnet" });
   }
 
   // ── 5. 钱包地址 ────────────────────────────────────────────────────────
-  console.log("\n=== 5. 钱包地址搜索 ===");
+  console.log("\n👛 === 步骤 E: 钱包地址搜索 ===");
   for (const addr of d.addresses) {
     const isTrx = /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(addr);
     const isBtc = /^(bc1|1|3)[a-zA-HJ-NP-Z0-9]{6,}/.test(addr) || /^04[0-9a-fA-F]{128}$/.test(addr);
@@ -109,13 +135,13 @@ async function main() {
   }
 
   // ── 6. 地址资产估值（仅 search 任务层接口）────────────────────────────
-  console.log("\n=== 6. 地址资产估值（searchAddressAssetsTask）===");
+  console.log("\n📊 === 步骤 F: 地址资产估值（searchAddressAssetsTask）===");
   for (const addr of d.addresses) {
     const isTrx = /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(addr);
     const isBtc = /^(bc1|1|3)[a-zA-HJ-NP-Z0-9]{6,}/.test(addr) || /^04[0-9a-fA-F]{128}$/.test(addr);
     const network = isTrx ? "mainnet" : isBtc ? "btc" : "eth";
 
-    process.stdout.write(`  ${shortAddr(addr).padEnd(52)}`);
+    process.stdout.write(`  地址: ${addr}\n`);
     const result = await searchAddressAssetsTask({
       query: addr,
       network,
@@ -124,22 +150,24 @@ async function main() {
     });
 
     if (!result.ok) {
-      console.log(`FAIL  \"${result.error}\"`);
+      console.log(`    ✗ 查询失败: ${result.error}`);
       continue;
     }
 
-    console.log(`ok  assets=${result.assets.length}  totalValueUsd=${result.totalValueUsd}`);
+    console.log(`    ✓ assets=${result.assets.length} total=${trimTrailingZeros(result.totalValueUsd)}`);
     for (const asset of result.assets.slice(0, 3)) {
       const valuation = asset?.extra?.valuation ?? {};
       const quantity = pickBalance(asset);
+      const chain = String(asset?.chain ?? "").toLowerCase();
+      const label = pickAssetLabel(asset, chain);
       console.log(
-        `      - ${asset.symbol ?? asset.title ?? "ASSET"}: qty=${quantity} priceUsd=${valuation.priceUsd ?? 0} valueUsd=${valuation.valueUsd ?? 0}`,
+        `    - ${label}: qty=${trimTrailingZeros(quantity)} price=${trimTrailingZeros(valuation.priceUsd ?? 0)} value=${trimTrailingZeros(valuation.valueUsd ?? 0)}`,
       );
     }
   }
 
   // ── 7. 地址组合汇总（仅 search 任务层接口）────────────────────────────
-  console.log("\n=== 7. 地址组合汇总（searchPortfolioTask）===");
+  console.log("\n💰 === 投资组合总结（searchPortfolioTask）===");
   const portfolio = await searchPortfolioTask({
     addresses: d.addresses,
     withPrice: true,
@@ -149,13 +177,20 @@ async function main() {
   if (!portfolio.ok) {
     console.log(`FAIL  \"${portfolio.error}\"`);
   } else {
-    console.log(`ok  addresses=${portfolio.addresses.length}  totalValueUsd=${portfolio.totalValueUsd}`);
+    console.log(`  total=${trimTrailingZeros(portfolio.totalValueUsd)} addresses=${portfolio.addresses.length}`);
     for (const [chain, row] of Object.entries(portfolio.byChain || {})) {
       console.log(
-        `      - ${chain.toUpperCase()}: addresses=${(row?.addresses || []).length} assets=${(row?.assets || []).length} totalValueUsd=${row?.totalValueUsd ?? 0}`,
+        `  ${chain.toUpperCase()}: total=${trimTrailingZeros(row?.totalValueUsd ?? 0)} assets=${(row?.assets || []).length} addresses=${(row?.addresses || []).length}`,
       );
     }
-    console.log(`      - riskFlags=${Array.isArray(portfolio.riskFlags) ? portfolio.riskFlags.length : 0}`);
+    if (Array.isArray(portfolio.riskFlags) && portfolio.riskFlags.length > 0) {
+      console.log("\n⚠️ === 风险标记 ===");
+      for (const item of portfolio.riskFlags) {
+        console.log(`  - ${item.chain}/${item.network} ${item.address} ${item.asset}: ${item.reason}`);
+      }
+    } else {
+      console.log("  风险标记: 0");
+    }
   }
 
   console.log("\n✅ 完成\n");

@@ -506,3 +506,27 @@ token-price 层在中心表基础上扩展：
 2. BTC native 资产估值行为保持不变。
 3. `src/test/tasks/search/search.test.mjs` 全部通过。
 4. `run.test.mjs` 可运行且组合总值不出现异常数量级。
+
+### Slice S-21：run.test 与 analysis 输出格式对齐（便于人工核对）
+
+**目标：**
+将 `run.test.mjs` 的展示模板对齐 `portfolio-analysis.test.mjs`，统一标题、资产行、组合汇总与风险输出格式，降低人工比对成本。
+
+**本次只做：**
+
+1. 统一标题风格（步骤标题/总结标题）。
+2. 统一资产行格式：`- {label}: qty=... price=... value=...`。
+3. 统一组合汇总格式：`{CHAIN}: total=... assets=...`。
+4. 风险输出从仅计数改为明细列表（若存在）。
+
+**本次不做：**
+
+1. 修改分析脚本核心业务逻辑。
+2. 引入新的数据源或查询链路。
+3. 变更任务层返回结构。
+
+**验收标准：**
+
+1. `run.test.mjs` 输出可与 `portfolio-analysis.test.mjs` 逐段对照。
+2. `run.test.mjs` 可运行并完成全部段落。
+3. `search.test.mjs` 回归不受影响。
