@@ -76,3 +76,27 @@ bc1ps793rn2savj7u7stawzly7uua62nuay7pzq027ck8hfrdzffdnnqf3gegf
 
 
 
+## address assets test
+
+SUN USDT TRX
+TPsMJ3BE9ixSQ7guFbVLZ4eou6SATBSqHH
+TLaGjwhvA8XQYSxFAcAXy7Dvuue9eGYitv
+
+ORDI SATS BTC
+bc1ps793rn2savj7u7stawzly7uua62nuay7pzq027ck8hfrdzffdnnqf3gegf
+bc1p8w6zr5e2q60s0r8al4tvmsfer77c0eqc8j55gk8r7hzv39zhs2lqa8p0k6
+1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+
+usdt bnb eth 
+0x6Fb8aa6fc6f27e591423009194529aE126660027
+0x436693FF266F9E495dbD1DCa2f48B65B03Dc0198
+
+## token price
+
+btc: ordi sats rats btc
+trx: trx usdt sun
+eth: dog cusd armk crv
+bsc: usdt bnb folk cake
+
+## fuzzy
+fxs, cvx, aave

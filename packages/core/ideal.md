@@ -106,48 +106,21 @@ asset 和 wallet 组合
 
 # 开发计划
 ## search 板块
-token search 
-trade search
-contract search
-address search
-
-## search 架构
-和 provider 一样，基于每条链独立开发一个 searchprovider，在用一个 action 集成
-比如 搜索 ordi ，action -> btc chain token search + evm ... -> 汇总到 action -> 处理输出
+还差 contract search ，其他已完成，但是 价格获取 token 查询还是有限制，后期可以优化
 
 ## 数据结构讨论
-
 数据数 + 数据操作，在缓存中维护一颗 wallet tree ，每个 钱包的 name 地址 余额 交易记录 等 放到 tree 里，再提供一系列操作接口修改 tree
-
 类似前端 的 数据绑定 ui 的思路，以 tree 为 核心维护
+wallet 应当是一个 树形结构，hd 可以衍生出 key ，特别是有key 里配置的情况
+
+
+
 
 ## cli 界面修改
-
 分为 上下部分，上面 显示结果，下面负责输入，显示面板 可以在一些情况下提供输入，比如配置私钥时
 
 
 ## 开发计划
-
-- 测试 优化 search ，完成 root search 集成
-现在 `portfolio-analysis.test.mjs` 已经有 一个 比较全的地址 token 查询的示例，接下来的目标是把这个流程 封装到 root search 下
-提供如下接口：
-
-### token 查询
-- 价格查询：输入 [name, address, ....] 输入会混合 name 和 address，返回 token 的 基本信息 risk 和 价格
-
-### asset 查询
-- 需要两种模式
-  1. 全量查询，只给 一批地址 [address, address], 系统把各地址所有的资产余额返回
-  2. 定量查询，输入的地址都指定好要查的 token [address1:token1, address1::token2, address2:token1 ...] ，然后返回结果
-注意用批量模式保证效率
-  3. 根据 1 2 的返回结果 查询 涉及的 token 的价格，然后 返回 每个地址的各资产的 数量 价格 价值，已经 地址的 总价值
-
-上面这些功能的实现都要考虑到批量请求优化，有几个问题需要讨论：
-- asset 中，传入的 address 本身的格式就可以用来做一道判断，给出 chain 得配置，是否有必要 在 root search 加一个接口 做 地址 整理，输入批量地址，返回 每个地址对应的 chain，netwrok，但是要考虑如果如果后续增加其他链如何维护，是否在注册里可以配置，配置以后自动添加，或者是每个 链的 address search 提供一个 address check ，返回判断，这样注册进去以后，root search 调用 整理
-- 执行流程是否可以设计成： 输入 -> 地址整理 按 chain network 分类 -> 分别调用 各链 search -> 数据汇总 返回
-- 现在是否已经对各接口的数据做了缓存，token risk inform 这些常量信息不用每次都走远程
-
-还有什么补充？ 
 
 ## 数据结构开发
 - 构建 wallet tree，实现钱包余额查询

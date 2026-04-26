@@ -3,6 +3,7 @@ import { queryTrxTokenBalance } from "../../trc20.mjs";
 import { queryTrxTokenMetadataBatch } from "../../assets/token-metadata.mjs";
 import { resolveTrxNetProvider } from "../../netprovider.mjs";
 import { toTrxHexAddress } from "../../address-codec.mjs";
+import { createTronscanAccountTokensSource } from "../sources/tronscan-account-tokens-source.mjs";
 
 function toBigIntSafe(value) {
   try {
@@ -61,7 +62,52 @@ function normalizeTrc20Holdings(raw = {}) {
   return rows;
 }
 
-async function queryTrxAccountTrc20Holdings(input = {}) {
+async function queryTrxAccountTrc20HoldingsV1(input = {}) {
+  const address = normalizeAddress(input?.address);
+  const network = normalizeNetwork(input?.network);
+  if (!address) {
+    return [];
+  }
+
+  const provider = resolveTrxNetProvider(network);
+  const baseUrl = String(provider?.rpcUrl ?? "").trim().replace(/\/+$/, "");
+  if (!baseUrl) {
+    return [];
+  }
+
+  const url = `${baseUrl}/v1/accounts/${encodeURIComponent(address)}`;
+  const headerVariants = [];
+  if (provider?.apiKey) {
+    headerVariants.push({ accept: "application/json", "TRON-PRO-API-KEY": provider.apiKey });
+  }
+  headerVariants.push({ accept: "application/json" });
+
+  for (const headers of headerVariants) {
+    const maxRetries = 2;
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      const response = await fetch(url, { method: "GET", headers });
+      if (response.ok) {
+        const json = await response.json();
+        const account = Array.isArray(json?.data) ? json.data[0] : null;
+        return normalizeTrc20Holdings(account ?? {});
+      }
+
+      if (response.status !== 429 || attempt >= maxRetries) {
+        break;
+      }
+
+      const retryAfter = Number(response.headers.get("retry-after") ?? 0);
+      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+        ? retryAfter * 1000
+        : 400 * (attempt + 1);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
+
+  return [];
+}
+
+async function queryTrxAccountTrc20HoldingsWallet(input = {}) {
   const address = normalizeAddress(input?.address);
   const network = normalizeNetwork(input?.network);
   if (!address) {
@@ -70,8 +116,59 @@ async function queryTrxAccountTrc20Holdings(input = {}) {
 
   const provider = resolveTrxNetProvider(network);
   const hexAddress = toTrxHexAddress(address);
-  const raw = await provider.walletCall("getaccount", { address: hexAddress });
-  return normalizeTrc20Holdings(raw);
+  try {
+    const raw = await provider.walletCall("getaccount", { address: hexAddress });
+    const fromWallet = normalizeTrc20Holdings(raw);
+    if (fromWallet.length > 0) {
+      return fromWallet;
+    }
+  } catch {
+    // wallet/getaccount 失败时，继续尝试 v1/accounts 回退。
+  }
+
+  return [];
+}
+
+async function queryTrxAccountTrc20Holdings(input = {}, options = {}) {
+  const address = normalizeAddress(input?.address);
+  const network = normalizeNetwork(input?.network);
+  if (!address) {
+    return [];
+  }
+
+  const v1HoldingsGetter = options.v1HoldingsGetter ?? queryTrxAccountTrc20HoldingsV1;
+  const tronscanHoldingsGetter = options.tronscanHoldingsGetter
+    ?? createTronscanAccountTokensSource(options).fetch;
+  const walletHoldingsGetter = options.walletHoldingsGetter ?? queryTrxAccountTrc20HoldingsWallet;
+
+  try {
+    const fromTronscan = await tronscanHoldingsGetter(address, { address, network });
+    if (Array.isArray(fromTronscan) && fromTronscan.length > 0) {
+      return fromTronscan;
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const fromV1 = await v1HoldingsGetter({ address, network });
+    if (Array.isArray(fromV1) && fromV1.length > 0) {
+      return fromV1;
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const fromWallet = await walletHoldingsGetter({ address, network });
+    if (Array.isArray(fromWallet) && fromWallet.length > 0) {
+      return fromWallet;
+    }
+  } catch {
+    // ignore
+  }
+
+  return [];
 }
 
 function createTrc20Item(address, network, token, rawBalance) {
@@ -95,48 +192,97 @@ function createTrc20Item(address, network, token, rawBalance) {
       contractAddress,
       balance: formatUnits(rawBalance, decimals),
       decimals,
+      sourceMeta: String(token?.sourceMeta ?? "").trim() || "metadata/fallback",
     },
   };
+}
+
+function normalizeHoldingToken(holding, metadata, bookToken, contractAddress) {
+  const holdingToken = holding?.token ?? {};
+  const symbol = String(
+    holdingToken?.symbol
+      ?? metadata?.symbol
+      ?? bookToken?.symbol
+      ?? contractAddress,
+  ).trim();
+  const name = String(
+    holdingToken?.name
+      ?? metadata?.name
+      ?? metadata?.symbol
+      ?? bookToken?.name
+      ?? symbol
+      ?? contractAddress,
+  ).trim();
+  const decimalsCandidate = holdingToken?.decimals ?? metadata?.decimals ?? bookToken?.decimals;
+  const decimals = Number.isFinite(Number(decimalsCandidate)) ? Number(decimalsCandidate) : 0;
+
+  return {
+    symbol,
+    name,
+    decimals,
+    address: contractAddress,
+    sourceMeta: hasDirectTokenMeta(holding) ? "accountv2/direct" : "metadata/fallback",
+  };
+}
+
+function hasDirectTokenMeta(holding) {
+  const token = holding?.token;
+  if (!token || typeof token !== "object") {
+    return false;
+  }
+  const hasNameLike = String(token.name ?? token.symbol ?? "").trim() !== "";
+  const hasDecimals = Number.isFinite(Number(token.decimals));
+  return hasNameLike && hasDecimals;
 }
 
 export function createTrc20BalanceResolver(options = {}) {
   const tokenBookReader = options.tokenBookReader ?? getTrxTokenBook;
   const tokenBalanceGetter = options.tokenBalanceGetter ?? queryTrxTokenBalance;
   const tokenMetadataBatchReader = options.tokenMetadataBatchReader ?? queryTrxTokenMetadataBatch;
-  const tokenHoldingsGetter = options.tokenHoldingsGetter ?? queryTrxAccountTrc20Holdings;
+  const tokenHoldingsGetter = options.tokenHoldingsGetter
+    ?? ((input) => queryTrxAccountTrc20Holdings(input, options));
 
   async function resolve(input = {}) {
     const address = normalizeAddress(input?.address);
     const network = normalizeNetwork(input?.network);
+    const { tokens } = tokenBookReader({ network });
+    const tokenBookMap = new Map(
+      Object.values(tokens ?? {})
+        .filter((token) => token?.address)
+        .map((token) => [String(token.address).toLowerCase(), token]),
+    );
 
     // 优先走远程账户持仓，避免仅受 tokenBook 范围约束。
     try {
       const holdings = await tokenHoldingsGetter({ address, network });
       if (Array.isArray(holdings) && holdings.length > 0) {
-        const metadataResult = await tokenMetadataBatchReader(
-          holdings.map((item) => item.contractAddress),
-          {
-            network,
-            callerAddress: address,
-          },
-        );
+        const missingMetaAddresses = holdings
+          .filter((item) => !hasDirectTokenMeta(item))
+          .map((item) => String(item?.contractAddress ?? "").trim())
+          .filter(Boolean);
 
-        const metadataItems = Array.isArray(metadataResult?.items) ? metadataResult.items : [];
-        const metadataMap = new Map(
-          metadataItems
-            .filter((item) => item?.ok && item?.tokenAddress)
-            .map((item) => [String(item.tokenAddress).toLowerCase(), item]),
-        );
+        const metadataMap = new Map();
+        if (missingMetaAddresses.length > 0) {
+          const metadataResult = await tokenMetadataBatchReader(
+            missingMetaAddresses,
+            {
+              network,
+              callerAddress: address,
+            },
+          );
+
+          const metadataItems = Array.isArray(metadataResult?.items) ? metadataResult.items : [];
+          for (const item of metadataItems) {
+            if (!item?.ok || !item?.tokenAddress) continue;
+            metadataMap.set(String(item.tokenAddress).toLowerCase(), item);
+          }
+        }
 
         const rows = holdings.map((item) => {
           const contractAddress = String(item.contractAddress).trim();
           const meta = metadataMap.get(contractAddress.toLowerCase());
-          const token = {
-            symbol: String(meta?.symbol ?? contractAddress).trim(),
-            name: String(meta?.name ?? meta?.symbol ?? contractAddress).trim(),
-            decimals: Number(meta?.decimals ?? 0),
-            address: contractAddress,
-          };
+          const bookToken = tokenBookMap.get(contractAddress.toLowerCase());
+          const token = normalizeHoldingToken(item, meta, bookToken, contractAddress);
           return createTrc20Item(address, network, token, toBigIntSafe(item.rawBalance));
         });
 
@@ -146,7 +292,6 @@ export function createTrc20BalanceResolver(options = {}) {
       // 远程持仓失败时降级到 tokenBook 扫描路径。
     }
 
-    const { tokens } = tokenBookReader({ network });
     const list = Object.values(tokens ?? {});
     if (list.length === 0) {
       return [];
@@ -163,7 +308,10 @@ export function createTrc20BalanceResolver(options = {}) {
         if (rawBalance <= 0n) {
           return null;
         }
-        return createTrc20Item(address, network, token, rawBalance);
+        return createTrc20Item(address, network, {
+          ...token,
+          sourceMeta: "tokenBook/scan",
+        }, rawBalance);
       } catch {
         return null;
       }

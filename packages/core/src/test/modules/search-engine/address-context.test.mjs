@@ -16,6 +16,9 @@ test("address-context: BTC 地址返回 chain/type/network/provider 信息", asy
   assert.equal(result.items[0].addressType, "p2pkh");
   assert.equal(result.items[0].detectedNetwork, "mainnet");
   assert.equal(result.items[0].providerIds.includes("btc-address"), true);
+  assert.equal(result.items[0].networks.includes("mainnet"), true);
+  assert.equal(result.items[0].mainnetNetworks.includes("mainnet"), true);
+  assert.equal(result.items[0].mainnetNetworks.includes("testnet"), false);
   assert.equal(result.items[0].availableNetworks.includes("mainnet"), true);
   assert.equal(result.items[0].availableNetworks.includes("testnet"), true);
 });
@@ -33,6 +36,9 @@ test("address-context: TRX 地址返回 trx 上下文且不混入 BTC", async ()
   assert.equal(result.items[0].addressType, "base58");
   assert.equal(result.items[0].providerIds.includes("trx-address"), true);
   assert.equal(result.items[0].providerIds.includes("btc-address"), false);
+  assert.equal(result.items[0].networks.includes("mainnet"), true);
+  assert.equal(result.items[0].mainnetNetworks.includes("mainnet"), true);
+  assert.equal(result.items[0].mainnetNetworks.includes("nile"), false);
   assert.equal(result.items[0].availableNetworks.includes("mainnet"), true);
   assert.equal(result.items[0].availableNetworks.includes("nile"), true);
 });
@@ -50,6 +56,10 @@ test("address-context: EVM 地址返回 evm 上下文与配置网络", async () 
   assert.equal(result.items[0].addressType, "hex");
   assert.equal(result.items[0].normalizedAddress, "0x63320F728777d332a1F1031019481A94144779fB");
   assert.equal(result.items[0].providerIds.includes("evm-address"), true);
+  assert.equal(result.items[0].networks.includes("eth"), true);
+  assert.equal(result.items[0].networks.includes("fork"), true);
+  assert.equal(result.items[0].mainnetNetworks.includes("eth"), true);
+  assert.equal(result.items[0].mainnetNetworks.includes("fork"), false);
   assert.equal(result.items[0].availableNetworks.includes("eth"), true);
   assert.equal(result.items[0].availableNetworks.includes("bsc"), true);
 });

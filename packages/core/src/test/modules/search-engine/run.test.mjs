@@ -6,7 +6,13 @@
  */
 
 import { readFileSync } from "node:fs";
-import { searchTask, searchAddressAssetsTask, searchPortfolioTask } from "../../../tasks/search/index.mjs";
+import {
+  searchTask,
+  searchAddressAssetsTask,
+  searchAddressValuationTask,
+  searchPortfolioTask,
+  searchPortfolioValuationTask,
+} from "../../../tasks/search/index.mjs";
 
 // ─── 解析 test.data.md ──────────────────────────────────────────────────────
 
@@ -63,8 +69,6 @@ async function run(label, params) {
 
 function pickBalance(asset = {}) {
   const extra = asset?.extra && typeof asset.extra === "object" ? asset.extra : {};
-  const valuation = extra?.valuation && typeof extra.valuation === "object" ? extra.valuation : {};
-  if (typeof valuation.quantity === "number") return valuation.quantity;
   if (typeof extra.balance === "string" || typeof extra.balance === "number") return Number(extra.balance);
   return 0;
 }
@@ -134,8 +138,8 @@ async function main() {
     await run(shortAddr(addr), { domain: "address", query: addr, network, timeoutMs: 15000 });
   }
 
-  // ── 6. 地址资产估值（仅 search 任务层接口）────────────────────────────
-  console.log("\n📊 === 步骤 F: 地址资产估值（searchAddressAssetsTask）===");
+  // ── 6. 地址资产列表（仅余额，不包含价格）─────────────────────────────
+  console.log("\n📊 === 步骤 F: 地址资产列表（searchAddressAssetsTask，仅余额）===");
   for (const addr of d.addresses) {
     const isTrx = /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(addr);
     const isBtc = /^(bc1|1|3)[a-zA-HJ-NP-Z0-9]{6,}/.test(addr) || /^04[0-9a-fA-F]{128}$/.test(addr);
@@ -145,7 +149,6 @@ async function main() {
     const result = await searchAddressAssetsTask({
       query: addr,
       network,
-      withPrice: true,
       timeoutMs: 15000,
     });
 
@@ -154,33 +157,31 @@ async function main() {
       continue;
     }
 
-    console.log(`    ✓ assets=${result.assets.length} total=${trimTrailingZeros(result.totalValueUsd)}`);
+    console.log(`    ✓ assets=${result.assets.length}`);
     for (const asset of result.assets.slice(0, 3)) {
-      const valuation = asset?.extra?.valuation ?? {};
       const quantity = pickBalance(asset);
       const chain = String(asset?.chain ?? "").toLowerCase();
       const label = pickAssetLabel(asset, chain);
       console.log(
-        `    - ${label}: qty=${trimTrailingZeros(quantity)} price=${trimTrailingZeros(valuation.priceUsd ?? 0)} value=${trimTrailingZeros(valuation.valueUsd ?? 0)}`,
+        `    - ${label}: qty=${trimTrailingZeros(quantity)}`,
       );
     }
   }
 
-  // ── 7. 地址组合汇总（仅 search 任务层接口）────────────────────────────
-  console.log("\n💰 === 投资组合总结（searchPortfolioTask）===");
+  // ── 7. 地址组合汇总（仅余额，不包含价格）─────────────────────────────
+  console.log("\n💰 === 地址组合汇总（searchPortfolioTask，仅余额）===");
   const portfolio = await searchPortfolioTask({
     addresses: d.addresses,
-    withPrice: true,
     timeoutMs: 15000,
   });
 
   if (!portfolio.ok) {
     console.log(`FAIL  \"${portfolio.error}\"`);
   } else {
-    console.log(`  total=${trimTrailingZeros(portfolio.totalValueUsd)} addresses=${portfolio.addresses.length}`);
+    console.log(`  addresses=${portfolio.addresses.length}`);
     for (const [chain, row] of Object.entries(portfolio.byChain || {})) {
       console.log(
-        `  ${chain.toUpperCase()}: total=${trimTrailingZeros(row?.totalValueUsd ?? 0)} assets=${(row?.assets || []).length} addresses=${(row?.addresses || []).length}`,
+        `  ${chain.toUpperCase()}: assets=${(row?.assets || []).length} addresses=${(row?.addresses || []).length}`,
       );
     }
     if (Array.isArray(portfolio.riskFlags) && portfolio.riskFlags.length > 0) {
@@ -191,6 +192,35 @@ async function main() {
     } else {
       console.log("  风险标记: 0");
     }
+  }
+
+  // ── 8. 独立估值接口（与资产列表分离）──────────────────────────────────
+  console.log("\n💹 === 独立估值接口（searchAddressValuationTask / searchPortfolioValuationTask）===");
+  const sampleAddress = d.addresses[0];
+  if (sampleAddress) {
+    const isTrx = /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(sampleAddress);
+    const isBtc = /^(bc1|1|3)[a-zA-HJ-NP-Z0-9]{6,}/.test(sampleAddress) || /^04[0-9a-fA-F]{128}$/.test(sampleAddress);
+    const network = isTrx ? "mainnet" : isBtc ? "btc" : "eth";
+    const singleValuation = await searchAddressValuationTask({
+      query: sampleAddress,
+      network,
+      timeoutMs: 15000,
+    });
+    if (!singleValuation.ok) {
+      console.log(`  地址估值失败: ${singleValuation.error}`);
+    } else {
+      console.log(`  地址估值: assets=${singleValuation.assets.length} total=${trimTrailingZeros(singleValuation.totalValueUsd)}`);
+    }
+  }
+
+  const portfolioValuation = await searchPortfolioValuationTask({
+    addresses: d.addresses,
+    timeoutMs: 15000,
+  });
+  if (!portfolioValuation.ok) {
+    console.log(`  组合估值失败: ${portfolioValuation.error}`);
+  } else {
+    console.log(`  组合估值: total=${trimTrailingZeros(portfolioValuation.totalValueUsd)} addresses=${portfolioValuation.addresses.length}`);
   }
 
   console.log("\n✅ 完成\n");

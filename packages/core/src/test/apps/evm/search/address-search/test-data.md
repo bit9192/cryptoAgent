@@ -6,6 +6,9 @@
 2. H2: 单网络批量余额查询：2 个地址 x 2 个资产（含 native）一次返回。
 3. H3: 混合网络批量余额查询：eth+bsc 按 network 分组并发返回，且顺序与输入一致。
 4. H4: 未传 `assetListResolver` 时，`queryAddressCheck` 可通过 Alchemy 返回 network 对应 token 资产列表。
+5. H5: 未传 `network` 时，`queryAddressCheck` 会按配置网络列表调用 Alchemy。
+6. H6: 余额阶段 metadata 缺失时，按本地/Multicall/token-search 顺序补全 decimals 等字段。
+7. H7: 当资产已带预置余额（如 Alchemy tokenBalance）时，余额阶段跳过对应 token 的 batch balance 查询。
 
 ## Edge
 
@@ -13,6 +16,7 @@
 2. E2: 资产列表缺失时，可由 `includeNative=true` 自动补 native。
 3. E3: `queryAddressCheck` 在地址类型探测失败时降级 `unknown`，不抛异常。
 4. E4: Alchemy 返回无效 token 地址时会被过滤，不影响其它资产。
+5. E5: 未传 `network` 的地址查询会按资产 `extra.network` 分组后再查余额并合并。
 
 ## Invalid
 

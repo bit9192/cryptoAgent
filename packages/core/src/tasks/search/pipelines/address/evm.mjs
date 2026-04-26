@@ -48,6 +48,7 @@ function buildCandidateNetworks(input = {}, contextItem = {}, config = {}) {
 export async function runEvmAddressPipeline(input = {}) {
   const engine = input?.engine;
   const query = String(input?.query ?? "").trim();
+  const requestedNetwork = String(input?.network ?? "").trim().toLowerCase();
   const limit = Number.isFinite(Number(input?.limit)) ? Number(input.limit) : 10;
   const timeoutMs = Number.isFinite(Number(input?.timeoutMs)) ? Number(input.timeoutMs) : 10000;
   const contextItem = input?.contextItem ?? null;
@@ -55,6 +56,23 @@ export async function runEvmAddressPipeline(input = {}) {
 
   if (!engine || typeof engine.search !== "function" || !query) {
     return null;
+  }
+
+  if (!requestedNetwork) {
+    const result = await engine.search({
+      domain: "address",
+      query,
+      limit,
+      timeoutMs,
+    });
+    const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
+    const inferredNetworkSet = new Set(candidates.map((item) => normalizeLower(item?.network)).filter(Boolean));
+    return {
+      ok: true,
+      network: inferredNetworkSet.size === 1 ? [...inferredNetworkSet][0] : null,
+      attempts: [{ network: "*", count: candidates.length }],
+      candidates,
+    };
   }
 
   const networks = buildCandidateNetworks(input, contextItem, config);

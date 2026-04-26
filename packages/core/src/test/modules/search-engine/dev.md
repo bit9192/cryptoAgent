@@ -319,6 +319,314 @@
 3. 在 `portfolio-analysis.test.mjs` 的监测报告里增加一行：统计所有地址 token 预验证命中的网络分布（eth/bsc 各命中几次）。
 4. 更新 dev.md 进度（标记 S-14 完成）。
 
+### Slice S-15：地址余额查询与价格估值接口解耦
+
+本次只做：
+
+1. `searchAddressAssetsTask` 默认只返回余额资产，不触发价格查询。
+2. 新增 `searchAddressValuationTask` 专用估值入口（显式执行价格查询）。
+3. `searchPortfolioTask` 改为两段流程：先批量查地址资产余额，再集中归集 token 批量估值。
+4. 新增 `searchPortfolioValuationTask` 专用估值入口。
+5. 增加任务层测试，验证“默认不估值”与“集中估值单次批量查询”。
+
+本次不做：
+
+1. 修改 offchain 价格源优先级与策略。
+2. 修改各链资产发现 provider 逻辑。
+3. 引入新的缓存键或持久化模型。
+
+验收标准：
+
+1. `searchAddressAssetsTaskWithEngine` 默认不会调用价格查询函数。
+2. `searchAddressValuationTask*` 和 `searchPortfolioValuationTask*` 可返回估值结果。
+3. `searchPortfolioTaskWithEngine(withPrice=true)` 在多地址场景下只触发一次价格批量查询。
+
+### Slice S-22：地址批量资产列表查询专用脚本（run.asset）
+
+本次只做：
+
+1. 新增 `run.asset.mjs` 手工脚本，专门排查地址资产查询接口。
+2. 脚本只读取 `test.data.md` 中 `## address assets test` 段落地址。
+3. 逐地址调用 `searchAddressAssetsTask`，批量输出资产列表与总价值。
+4. 输出保持对账友好：地址、链路网络、资产条目、qty/price/value。
+
+本次不做：
+
+1. 修改 search/task/provider 业务逻辑。
+2. 改动 `run.test.mjs`、`portfolio-analysis.test.mjs`。
+3. 接入 CI 强断言。
+
+验收标准：
+
+1. `node src/test/modules/search-engine/run.asset.mjs` 可执行。
+2. 只使用 `## address assets test` 地址样本，不混用 `# addresses` 段。
+3. 每个地址输出资产列表（最多前 N 条）与 totalValueUsd。
+
+### Slice S-23：地址资产排查阶段临时跳过 EVM 样本
+
+本次只做：
+
+1. 在 `run.asset` 专用脚本中临时跳过 EVM 地址样本。
+2. 仅执行 TRX / BTC 地址资产查询，聚焦排查资产缺失问题。
+3. 输出中明确展示跳过地址列表，避免误判为查询失败。
+
+本次不做：
+
+1. 修改 EVM provider / search / valuation 逻辑。
+2. 修改 `test.data.md` 地址样本内容。
+3. 对 TRX/BTC 资产缺失问题做根因修复（下一切片）。
+
+验收标准：
+
+1. `run.asset` 执行时不再请求 EVM 地址。
+2. TRX/BTC 地址照常输出资产结果。
+3. 日志包含 EVM 跳过统计与地址列表。
+
+### Slice S-24：BTC 地址查询网络别名归一（btc -> mainnet）
+
+本次只做：
+
+1. 在 `tasks/search` 的 BTC 地址 pipeline 中增加网络别名归一：`btc/bitcoin/main -> mainnet`。
+2. 在 `run.asset` 脚本中将 BTC 地址网络显式传 `mainnet`。
+3. 复跑 BTC 地址样本，确认不再因 network 参数导致 provider 失配。
+
+本次不做：
+
+1. 修改 BTC provider 的资产聚合策略。
+2. 改动 TRX/EVM 链路。
+3. 调整估值规则。
+
+验收标准：
+
+1. BTC 地址查询不再因 `network=btc` 返回空结果。
+2. `run.asset` 中 BTC 地址可得到真实资产列表（若链上确有余额）。
+
+### Slice S-25：TRX 地址资产多源对账（run.asset --debug）
+
+本次只做：
+
+1. 为 `run.asset` 增加 `--debug` 参数。
+2. `--debug` 模式下，对 TRX 地址输出：
+   - `getaccount.trc20` 原始条目数与非零合约数量
+   - tokenBook 扫描命中数量
+3. 输出每个来源的样本合约（截断显示），用于人工对账。
+
+本次不做：
+
+1. 修改 TRX resolver 业务逻辑。
+2. 修改 tokenBook 数据。
+3. 修改任务层返回结构。
+
+验收标准：
+
+1. `node src/test/modules/search-engine/run.asset.test.mjs --debug` 可执行。
+2. TRX 地址出现 debug 对账信息。
+3. 不影响默认（无 `--debug`）输出。
+
+### Slice S-26：TRX 持仓发现补充 v1/accounts 远程回退
+
+本次只做：
+
+1. 在 TRX `trc20-balance-resolver` 中，当 `wallet/getaccount` 未返回持仓时，增加 `v1/accounts/{address}` 回退。
+2. 统一复用现有持仓归一化逻辑，确保输出契约地址与 rawBalance 一致。
+3. 保持旧行为兼容：有 `getaccount` 持仓时优先使用原路径。
+
+本次不做：
+
+1. 修改 token 估值规则。
+2. 修改 EVM/BTC 资产链路。
+3. 修改 `searchAddressAssetsTask` 对外协议。
+
+验收标准：
+
+1. TRX 地址（如 TLa...）在 run.asset 中返回明显多于 tokenBook 的资产数量。
+2. `run.asset --debug` 显示 remote nonZeroContracts > 0。
+3. 回归测试无新增失败。
+
+### Slice S-27：BTC 地址资产查询失败托底（stale-cache + API_ERROR 可见化）
+
+本次只做：
+
+1. 在 BTC `brc20-balance-resolver` 增加进程内短期缓存（按 address+network，默认 TTL 120s）。
+2. 当 BRC20 上游接口失败且本次无可用 BRC20 结果时，返回最近一次成功快照（标记 `stale=true`）。
+3. 保留并输出接口错误项（`assetType=error`），确保用户可见失败原因，不再“静默丢资产”。
+4. 在 `run.asset` 输出层对 stale 资产打标（`[STALE]`）。
+
+本次不做：
+
+1. 改动 TRX/EVM 资产查询逻辑。
+2. 引入新的全局缓存存储（如 Redis / 文件缓存）。
+3. 修改 search/task 对外返回结构字段命名。
+
+验收标准：
+
+1. 接口正常时，BTC 地址资产输出与现状一致。
+2. 接口失败时，输出中可见 `API_ERROR`，且若存在近期成功快照可返回 stale 资产。
+3. `run.asset` 输出中 stale 资产有 `[STALE]` 标记。
+
+### Slice S-28：UniSat 请求重试与无 Key 回退（降低 403/429 抖动）
+
+本次只做：
+
+1. 在 `apps/btc/brc20.mjs` 的 `unisatRequest` 增加重试（最多 2 次）与指数退避。
+2. 对可重试状态码（403/429/5xx 等）自动重试，降低短时波动导致的全量失败。
+3. 当配置了 API key 且请求仍失败时，尝试一次无 key 回退（可通过参数关闭）。
+4. 保持上层 resolver 协议不变，仅提升请求成功率。
+
+本次不做：
+
+1. 修改 `searchTask` / `searchAddressAssetsTask` 返回结构。
+2. 接入新的第三方 BRC20 地址持仓数据源。
+3. 调整 token 估值策略。
+
+验收标准：
+
+1. `run.asset` 对同一地址多次调用时，BRC20 报错概率下降。
+2. 接口失败时仍可见 `API_ERROR`，不回退到静默失败。
+3. `src/test/tasks/search/search.test.mjs` 回归通过。
+
+### Slice S-29：BTC BRC20 异源托底（BestInSlot wallet_balances）
+
+本次只做：
+
+1. 新增 BestInSlot 地址 BRC20 持仓 source：`GET /v3/brc20/wallet_balances?address=...`。
+2. 在 BTC `brc20-balance-resolver` 中，当 UniSat 无可用 BRC20 结果时，尝试 BestInSlot 托底。
+3. 托底失败时保留 `API_ERROR`（stage=`fallback:bestinslot`）可见化，避免静默丢失。
+4. 不改变上层 task/search 返回结构。
+
+本次不做：
+
+1. 修改 TRX/EVM 逻辑。
+2. 增加持久化缓存（仅保留进程内短期缓存）。
+3. 修改估值策略。
+
+验收标准：
+
+1. UniSat 失败且 BestInSlot 可用时，地址仍可返回 BRC20 持仓。
+2. BestInSlot 不可用（无 key 或报错）时，输出 `API_ERROR` 且不中断主流程。
+3. `src/test/tasks/search/search.test.mjs` 回归通过。
+
+### Slice S-30：BTC BRC20 异源托底追加 OKLink（token-holder/list）
+
+本次只做：
+
+1. 新增 OKLink 地址 BRC20 托底 source，读取 `/api/explorer/v2/btc/inscription/token-holder/list`。
+2. 在 `brc20-balance-resolver` 中追加托底顺序：UniSat -> BestInSlot -> OKLink。
+3. 保持接口失败可见化：OKLink 不可用时输出 `API_ERROR`（stage=`fallback:oklink`）。
+4. 不在代码中硬编码 API key，统一从环境变量读取。
+
+本次不做：
+
+1. 变更 task/search 返回协议。
+2. 新增持久化缓存。
+3. 修改估值策略。
+
+验收标准：
+
+1. 正常路径回归不受影响（run.asset 可执行）。
+2. 主源失败时可看到 fallback 链路的错误阶段（含 `fallback:oklink`）。
+3. `src/test/tasks/search/search.test.mjs` 回归通过。
+
+### Slice S-31：BTC BRC20 托底优先级调整（OKLink 首选）
+
+本次只做：
+
+1. 调整 BTC BRC20 异源托底顺序为：UniSat -> OKLink -> BestInSlot。
+2. 保持失败可见化不变：任一托底失败继续输出 `API_ERROR`。
+3. 不修改 task/search 对外返回结构。
+
+本次不做：
+
+1. 修改估值策略。
+2. 修改 TRX/EVM 链路。
+3. 新增持久化缓存。
+
+验收标准：
+
+1. 正常路径回归通过。
+2. 强制失败路径中可见 `fallback:oklink` 在 `fallback:bestinslot` 之前出现。
+3. `src/test/tasks/search/search.test.mjs` 回归通过。
+
+### Slice S-32：OKLink 增量补齐与业务错误可见化
+
+本次只做：
+
+1. OKLink source 对非 0 业务码（如 `VISIT_ALREADY_EXPIRED`）返回明确错误，不再误判为空成功。
+2. 当配置了 `OKLINK_API_KEY` 时，BTC resolver 在 UniSat 成功后也尝试 OKLink 增量补齐 ticker。
+3. OKLink 增量失败时输出 `API_ERROR`（stage=`enrich:oklink`），便于解释“为什么仍少条目”。
+
+本次不做：
+
+1. 变更 task/search 对外协议。
+2. 新增浏览器态鉴权能力。
+3. 修改估值策略。
+
+验收标准：
+
+1. OKLink 返回业务错误时，输出中可见 `enrich:oklink` 或 `fallback:oklink` 错误阶段。
+2. `src/test/tasks/search/search.test.mjs` 回归通过。
+
+### Slice S-33：临时禁用 OKLink 托底（保留代码，退出链路）
+
+本次只做：
+
+1. 在 BTC `brc20-balance-resolver` 中临时移除 OKLink enrich / fallback 调用。
+2. 保留 OKLink source 文件与 `.env` 配置，不删除实现，便于后续恢复。
+3. 托底顺序回退为：UniSat -> BestInSlot -> stale-cache -> API_ERROR。
+
+本次不做：
+
+1. 删除 OKLink source 文件。
+2. 修改 `.env` 中已有 OKLink 配置。
+3. 修改 task/search 对外协议。
+
+验收标准：
+
+1. `run.asset` 回归通过。
+2. 输出中不再出现 `enrich:oklink` / `fallback:oklink`。
+3. `src/test/tasks/search/search.test.mjs` 回归通过。
+
+### Slice S-34：BTC BRC20 改为 config 优先查询，再补剩余资产
+
+本次只做：
+
+1. 从 BTC tokenBook 读取已配置 BRC20（当前 mainnet 为 ORDI/SATS/RATS）。
+2. resolver 先逐个查询这些配置 token，优先保证核心资产可用。
+3. 随后调用 summary + 分页补齐其余未命中的 BRC20 资产。
+4. 保持异源托底、stale-cache、API_ERROR 机制不变。
+
+本次不做：
+
+1. 扩展 BTC tokenBook 的配置条目数量。
+2. 重新启用 OKLink。
+3. 修改 task/search 对外协议。
+
+验收标准：
+
+1. 已配置 token 即使 summary 抖动，也优先尝试返回。
+2. summary 可继续补齐未配置的剩余资产。
+3. `src/test/tasks/search/search.test.mjs` 回归通过。
+
+### Slice S-35：run.asset 切换为 TRX 专项排查模式
+
+本次只做：
+
+1. 在 `run.asset` 中临时跳过 BTC 地址样本，仅执行 TRX 地址。
+2. 保留 EVM 跳过逻辑，避免干扰 TRX 排查。
+3. `--debug` 模式继续输出 TRX 多源对账信息（remote / tokenBook）。
+
+本次不做：
+
+1. 修改 BTC 资产查询逻辑。
+2. 修改 TRX resolver 业务逻辑。
+3. 修改 task/search 对外协议。
+
+验收标准：
+
+1. `run.asset --debug` 仅运行 TRX 地址。
+2. 输出中明确展示 BTC/EVM 跳过列表。
+3. TRX 地址继续输出多源 debug 信息。
+
 本次不做：
 
 1. 修改价格源策略或远程接口。
@@ -530,3 +838,298 @@ token-price 层在中心表基础上扩展：
 1. `run.test.mjs` 输出可与 `portfolio-analysis.test.mjs` 逐段对照。
 2. `run.test.mjs` 可运行并完成全部段落。
 3. `search.test.mjs` 回归不受影响。
+
+### Slice S-36：Address Context 链级处理器下沉（index 仅遍历）
+
+**目标：**
+将 BTC/TRX/EVM 的 address-check 逻辑从 `modules/search-engine/index.mjs` 中拆出，改为“链级 handler 自处理，index 仅 for 遍历调度”。
+
+**本次只做：**
+
+1. 新增 address-context chain handlers 映射（btc/trx/evm）。
+2. 每条链在各自 handler 内完成：地址识别、标准化、网络字段组装（`networks/mainnetNetworks/availableNetworks`）。
+3. `detectAddressContextItems` 改为按对象遍历调用 handler，不再内嵌链分支实现。
+4. 保持 `resolveAddressContext` 对外结构兼容。
+
+**本次不做：**
+
+1. 修改 `resolveAddressContext` 的入参协议。
+2. 引入新的链或新 provider 能力类型。
+3. 改动 address assets 查询流程。
+
+**验收标准：**
+
+1. `address-context.test.mjs` 全量通过。
+2. `search.test.mjs` 回归通过。
+3. `index.mjs` 中不再包含 BTC/TRX/EVM 的 address-check 细节分支，只保留统一遍历调度。
+
+### Slice S-37：Address Check 下沉到 apps 各链目录
+
+**目标：**
+将 address-check 的链实现从 `modules/search-engine` 下沉到 `apps/{btc|trx|evm}/search`，保持 SearchEngine 中心层仅做 handler 对象遍历与聚合。
+
+**本次只做：**
+
+1. 在 `apps/btc/search`、`apps/trx/search`、`apps/evm/search` 各新增 `address-check.mjs`。
+2. 每条链在各自文件内实现地址识别、标准化与网络字段组装。
+3. `modules/search-engine/address-context-checkers.mjs` 改为仅做映射导出，不再包含链逻辑实现。
+4. 保持 `resolveAddressContext` 输出协议不变（包含 `networks/mainnetNetworks/availableNetworks`）。
+
+**本次不做：**
+
+1. 引入新链 address-check。
+2. 调整 search task 参数协议。
+3. 修改地址资产查询和估值链路。
+
+**验收标准：**
+
+1. `address-context.test.mjs` 通过。
+2. `search.test.mjs` 通过。
+3. `modules/search-engine/address-context-checkers.mjs` 中不再出现 BTC/TRX/EVM 的识别细节逻辑。
+
+### Slice S-38：run.addrescheck 脚本接入 test.data 地址样本
+
+**目标：**
+新增 address-check 专项运行脚本，直接读取 `test.data.md` 的地址样本，统一走 `search` 的 `address` 域接口，便于快速人工回归。
+
+**本次只做：**
+
+1. 实现 `run.addrescheck.test.mjs` 的 test.data 地址解析。
+2. 逐地址调用 `searchAddressCheckTask({ query })`（仅 address-check，不走 `searchTask` pipeline）。
+3. 输出每个地址的命中数量与首条候选摘要。
+
+**本次不做：**
+
+1. 修改 address-check 核心逻辑。
+2. 增加新的协议字段。
+3. 引入额外外部数据源。
+
+**验收标准：**
+
+1. 脚本可执行并读取 `# addresses` 段地址。
+2. 所有地址都能得到一条 run 输出（成功或失败）。
+3. 输出包含 `chain/network/provider` 关键摘要字段。
+
+### Slice S-39：root 批量余额接口 + run.balances 符号转地址
+
+**目标：**
+在 root/search 层新增 `address:token` 批量余额查询接口，并在 `run.balances.test` 中使用 `test.data.md` 的符号样本，先转换为 token 地址后再执行批量查询。
+
+**本次只做：**
+
+1. 新增 `searchAddressTokenBalancesBatchTask` 接口（root 层）。
+2. 复用三链已有 batch reader（EVM/TRX/BTC）执行余额查询。
+3. 新增 `run.balances.test.mjs`，解析 `## address assets test` 段的符号行与地址行。
+4. 在 `run.balances.test` 中将 `SUN USDT TRX / usdt bnb eth` 先转换为 token 地址或 native，再送入 batch 接口。
+
+**本次不做：**
+
+1. 修改 address-search 资产发现主链路。
+2. 新增缓存层或持久化结构。
+3. 扩展新的链类型。
+
+**验收标准：**
+
+1. `search.test.mjs` 新增 batch task 用例通过。
+2. `run.balances.test.mjs` 可执行并输出转换后的 token 地址映射。
+3. 批量结果包含 success/failed 汇总。
+
+### Slice S-40：root 层 token 价格查询与模糊发现接口
+
+**目标：**
+在 `tasks/search` 新增两个接口，让上层（脚本/CLI/AI）可以直接查询 token 价格或按 symbol 跨链发现 token，无需感知底层 `queryTokenPriceLiteBatchByQuery` / `searchTask` 细节。
+
+**接口设计：**
+
+1. `searchTokenPriceBatchTask({ items })` — 精确价格查询
+   - 输入：`items` 为 `"symbol:network"` 字符串或 `{ query, network }` 对象数组
+   - 解析 `"symbol:network"` 格式（最后一个冒号切分）
+   - 内部调用 `queryTokenPriceLiteBatchByQuery`
+   - 输出：`{ ok, items: [{ query, network, chain, symbol, tokenAddress, priceUsd, source, error }] }`
+
+2. `searchTokenFuzzyTask({ query?, queries?, networks? })` — 模糊跨链发现
+   - 输入：单个 query 或 queries 数组，可选 networks（默认 `["eth","bsc","mainnet"]`）
+   - 按 `(query, network)` 全组合并发调用 `searchTask(domain=token)`
+   - 按 `chain:tokenAddress` 去重
+   - 输出：`{ ok, queries, candidates, byChain }`
+
+**本次只做：**
+
+1. 在 `tasks/search/index.mjs` 增加两个接口（含 `WithEngine` 版本）。
+2. 新建 `run.price.test.mjs`，读取 `## token price` + `## fuzzy` 段，分别调用两个接口并打印结果。
+
+**本次不做：**
+
+1. 修改 `queryTokenPriceLiteBatchByQuery` 或 `searchTask` 内部逻辑。
+2. 给 `searchTokenFuzzyTask` 引入排序或权重策略。
+3. 接入 CI 强断言。
+
+**验收标准：**
+
+1. `searchTokenPriceBatchTask({ items: [{ query: "usdt", network: "eth" }] })` 返回 `ok=true`，`priceUsd` 有值。
+2. `searchTokenFuzzyTask({ query: "aave" })` 返回 `ok=true`，`byChain` 至少含一条 EVM 候选。
+3. `run.price.test.mjs` 可执行，精确查询与模糊查询均有输出，失败 case 不中断整体。
+
+### Slice S-41：asset 估值改走 root 价格批量接口（EVM 先行）
+
+**目标：**
+在地址资产估值链路中，不再直接调用 `queryTokenPriceLiteBatchByQuery`，改为统一走 root 接口 `searchTokenPriceBatchTask`；先在 `run.asset` 中验证 EVM 估值输出，TRX/BTC 价格分支先注释保留。
+
+**本次只做：**
+
+1. `tasks/search/index.mjs` 中估值批量价格查询改为通过 `searchTokenPriceBatchTaskWithEngine`。
+2. 保留 `options.priceBatchQuery` 作为测试注入优先级，避免破坏现有单测。
+3. `run.asset.test.mjs` 中 EVM 地址改用估值入口输出 `qty/price/value/total`。
+4. `run.asset.test.mjs` 中 TRX/BTC 继续走余额查询，价格逻辑先注释（不启用）。
+
+**本次不做：**
+
+1. 修改 `apps/offchain/token-price` 底层实现。
+2. 在 TRX/BTC 生产链路启用估值。
+3. 调整 `searchAddressAssetsTask` 与 `searchAddressValuationTask` 的对外协议。
+
+**验收标准：**
+
+1. EVM 估值路径通过 root 价格批量接口完成计算。
+2. `run.asset.test.mjs` 可看到 EVM 资产的 `price/value` 与 `totalValueUsd`。
+3. TRX/BTC 仍可跑余额列表，且不触发估值分支。
+
+### Slice S-42：run.asset 高风险 token 隐藏与表格展示
+
+**目标：**
+在 `run.asset` 输出层对高风险 token 做直接隐藏，避免钓鱼/诱导类资产污染人工核对结果；同时将逐行日志改为表格输出，提升可读性。
+
+**本次只做：**
+
+1. 在 `run.asset.test.mjs` 增加高风险 token 识别规则（关键词/URL 特征）。
+2. 命中高风险规则的资产不输出明细行（彻底隐藏）。
+3. 将资产明细输出改为 `console.table` 表格形式。
+4. 保留汇总信息（如隐藏条数、totalValueUsd）。
+
+**本次不做：**
+
+1. 修改资产查询或估值业务逻辑。
+2. 修改 root/search task 的返回结构。
+3. 引入新的风控评分服务。
+
+**验收标准：**
+
+1. `run.asset.test.mjs` 输出中不再出现高风险 token 明细。
+2. 资产展示改为表格结构，EVM 包含 `qty/price/value`。
+3. 脚本可正常执行，且 TRX/BTC 余额查询行为不变。
+
+### Slice S-43：run.asset 估值焦点切换到 TRX（EVM 暂注释）
+
+**目标：**
+临时将 `run.asset` 的估值验证焦点从 EVM 切换到 TRX，EVM/BTC 回到余额模式，便于单链排查 TRX 价格与估值结果。
+
+**本次只做：**
+
+1. `run.asset.test.mjs` 中改为 TRX 走 `searchAddressValuationTask`。
+2. EVM/BTC 走 `searchAddressAssetsTask`（估值分支注释保留）。
+3. `totalValueUsd` 与 `price/value` 表格列仅在 TRX 显示。
+
+**本次不做：**
+
+1. 修改 root 估值接口与任务协议。
+2. 调整高风险 token 规则。
+3. 同时开启多链估值。
+
+**验收标准：**
+
+1. TRX 地址输出包含 `totalValueUsd` 与 `price/value`。
+2. EVM 地址不再输出估值列。
+3. 脚本可执行且无新增错误。
+
+### Slice S-44：run.asset 估值焦点切换到 BTC（TRX/EVM 暂注释）
+
+**目标：**
+临时将 `run.asset` 的估值验证焦点切换到 BTC，便于单链检查 BTC 资产估值输出。
+
+**本次只做：**
+
+1. `run.asset.test.mjs` 中改为 BTC 走 `searchAddressValuationTask`。
+2. TRX/EVM 走 `searchAddressAssetsTask`（估值分支注释保留）。
+3. `totalValueUsd` 与 `price/value` 列仅在 BTC 展示。
+
+**本次不做：**
+
+1. 修改 root 估值与价格接口。
+2. 调整高风险 token 过滤规则。
+3. 同时启用多链估值。
+
+**验收标准：**
+
+1. BTC 地址输出包含 `totalValueUsd` 与 `price/value` 列。
+2. TRX/EVM 不输出估值列。
+3. 脚本可执行且无新增错误。
+
+### Slice S-45：searchTokenPriceBatchTask 强制 chain 必填
+
+**目标：**
+消除 `mainnet` 网络歧义（BTC/TRX），将 `searchTokenPriceBatchTask` 的输入升级为显式链语义：每个 item 必须传 `chain`。
+
+**本次只做：**
+
+1. `searchTokenPriceBatchTaskWithEngine` 对每个 `item` 强制校验 `chain` 非空。
+2. 停止接受字符串输入（`"symbol:network"`），仅接受对象输入。
+3. `run.price.test.mjs` 的 fuzzy 价格查询补充 `chain` 字段后再调用价格接口。
+
+**本次不做：**
+
+1. 修改底层 `queryTokenPriceLiteBatchByQuery` 实现。
+2. 修改 token fuzzy 搜索协议。
+3. 调整非价格相关任务接口。
+
+**验收标准：**
+
+1. 缺少 `chain` 的价格请求返回 `ok=false` 并给出参数错误。
+2. `run.price.test.mjs` 可执行且 fuzzy 价格查询不再缺 chain。
+3. `mainnet` 场景不再出现 BTC/TRX 歧义输入。
+
+### Slice S-46：BTC 非原生估值白名单放开（ORDI/SATS/RATS）
+
+**目标：**
+在保持 BTC 非原生默认风控的前提下，先对白名单 ticker（ORDI/SATS/RATS）放开估值，避免全部禁价导致核心资产无法估值。
+
+**本次只做：**
+
+1. `pipelines/valuation/btc.mjs` 增加 BTC 非原生估值白名单。
+2. 白名单命中时 `allowPricing=true`，其余非原生仍保持 `allowPricing=false`。
+3. 更新/新增 `search.test.mjs` 用例覆盖白名单放开与非白名单禁价。
+
+**本次不做：**
+
+1. 修改 token-price 底层远程源。
+2. 引入动态配置中心管理白名单。
+3. 放开全部 BRC20 估值。
+
+**验收标准：**
+
+1. ORDI/SATS/RATS 在 BTC 估值路径可获得非零价格（若价格源可用）。
+2. 非白名单 BTC 资产仍保持 `priceUsd=0`。
+3. `src/test/tasks/search/search.test.mjs` 回归通过。
+
+### Slice S-47：BTC 估值白名单改为 tokens 配置驱动
+
+**目标：**
+将 BTC 非原生估值白名单从硬编码迁移为 `apps/btc/config/tokens.js` 的 `BTC_DEFAULT_TOKENS` 配置驱动，后续统一在 token 配置处维护。
+
+**本次只做：**
+
+1. `pipelines/valuation/btc.mjs` 通过 `getBtcTokenBook({ network })` 读取 token 列表。
+2. 从 tokenBook 生成可估值 symbol 白名单，替代硬编码 Set。
+3. 保持非白名单禁价策略不变。
+
+**本次不做：**
+
+1. 修改 BTC token 配置内容本身。
+2. 修改远程价格源策略。
+3. 调整其他链估值逻辑。
+
+**验收标准：**
+
+1. BTC 估值白名单来源可追溯到 `BTC_DEFAULT_TOKENS`。
+2. 更新 BTC token 配置后，无需改估值代码即可影响白名单行为。
+3. `src/test/tasks/search/search.test.mjs` 回归通过。
+

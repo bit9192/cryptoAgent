@@ -1,6 +1,7 @@
 import { trxAccounts } from "./accounts.mjs";
 import { trxBalanceGet, trxBalanceBatch } from "./balances.mjs";
 import { trxSend, createTrc20 } from "./send.mjs";
+import { TRX_MULTICALL_ADDRESSES, queryTrxMulticall } from "./multicall.mjs";
 import { createTrxNetProvider, defaultTrxNetProvider, resolveTrxNetProvider } from "./netprovider.mjs";
 import {
   queryTrxTokenMetadata,
@@ -19,6 +20,8 @@ export {
   queryTrxTokenMetadataBatch,
   queryTrxTokenBalance,
   queryTrxTokenBalanceBatch,
+  TRX_MULTICALL_ADDRESSES,
+  queryTrxMulticall,
   createTrxNetProvider,
   defaultTrxNetProvider,
   resolveTrxNetProvider,
@@ -34,6 +37,8 @@ export default {
   queryTrxTokenMetadataBatch,
   queryTrxTokenBalance,
   queryTrxTokenBalanceBatch,
+  TRX_MULTICALL_ADDRESSES,
+  queryTrxMulticall,
   createTrxNetProvider,
   defaultTrxNetProvider,
   resolveTrxNetProvider,

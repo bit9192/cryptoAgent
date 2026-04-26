@@ -92,33 +92,72 @@ function appendQuery(url, query = {}) {
 	return url;
 }
 
+function delay(ms) {
+	return new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
+}
+
+function isRetriableStatus(status) {
+	return status === 403 || status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+}
+
 async function unisatRequest(endpoint, options = {}) {
 	const method = String(options.method ?? "GET").toUpperCase();
 	const apiBase = normalizeApiBase(options.apiBase);
 	const apiKey = normalizeApiKey(options.apiKey);
 	const url = appendQuery(new URL(endpoint, `${apiBase}/`), options.query ?? {});
-	const headers = buildHeaders(apiKey, options.headers ?? {});
-	const init = {
-		method,
-		headers,
-	};
+	const useNoKeyFallback = options.useNoKeyFallback !== false;
+	const attempts = [];
+	if (apiKey) attempts.push({ apiKey, tag: "with-key" });
+	if (!apiKey || useNoKeyFallback) attempts.push({ apiKey: "", tag: "no-key" });
 
-	if (options.body !== undefined) {
-		headers["content-type"] = "application/json";
-		init.body = JSON.stringify(options.body);
+	let lastError = null;
+	for (let i = 0; i < attempts.length; i += 1) {
+		const attempt = attempts[i];
+		const headers = buildHeaders(attempt.apiKey, options.headers ?? {});
+		const init = { method, headers };
+
+		if (options.body !== undefined) {
+			headers["content-type"] = "application/json";
+			init.body = JSON.stringify(options.body);
+		}
+
+		let retryCount = 0;
+		while (retryCount <= 2) {
+			let response;
+			try {
+				response = await fetch(url, init);
+			} catch (error) {
+				lastError = new Error(`UniSat network error (${attempt.tag}): ${error?.message ?? error}`);
+				if (retryCount >= 2) break;
+				retryCount += 1;
+				await delay(250 * retryCount);
+				continue;
+			}
+
+			if (!response.ok) {
+				lastError = new Error(`UniSat API error: HTTP ${response.status} (${attempt.tag})`);
+				if (!isRetriableStatus(response.status) || retryCount >= 2) break;
+				retryCount += 1;
+				await delay(250 * retryCount);
+				continue;
+			}
+
+			const json = await response.json();
+			if (Number(json?.code ?? -1) !== 0) {
+				lastError = new Error(`UniSat error: ${json?.msg || "unknown error"} (${attempt.tag})`);
+				if (retryCount >= 2) break;
+				retryCount += 1;
+				await delay(250 * retryCount);
+				continue;
+			}
+
+			return json.data ?? null;
+		}
 	}
 
-	const response = await fetch(url, init);
-	if (!response.ok) {
-		throw new Error(`UniSat API error: HTTP ${response.status}`);
-	}
-
-	const json = await response.json();
-	if (Number(json?.code ?? -1) !== 0) {
-		throw new Error(`UniSat error: ${json?.msg || "unknown error"}`);
-	}
-
-	return json.data ?? null;
+	throw lastError ?? new Error("UniSat request failed");
 }
 
 function resolveMainnetContext(address, networkNameOrProvider) {

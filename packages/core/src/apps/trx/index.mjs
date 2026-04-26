@@ -22,6 +22,8 @@ export {
 	queryTrxTokenMetadataBatch,
 	queryTrxTokenBalance,
 	queryTrxTokenBalanceBatch,
+	TRX_MULTICALL_ADDRESSES,
+	queryTrxMulticall,
 } from "./core.mjs";
 export {
 	trxNetworks,

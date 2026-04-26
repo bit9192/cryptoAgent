@@ -108,8 +108,8 @@ export async function btcBalanceGet(options = {}, networkNameOrProvider) {
 					const chainStats = addrInfo.chain_stats || {};
 					const mempoolStats = addrInfo.mempool_stats || {};
 
-					const confirmedSats = chainStats.funded_txo_sum || 0;
-					const unconfirmedSats = mempoolStats.funded_txo_sum || 0;
+					const confirmedSats = (chainStats.funded_txo_sum || 0) - (chainStats.spent_txo_sum || 0);
+					const unconfirmedSats = (mempoolStats.funded_txo_sum || 0) - (mempoolStats.spent_txo_sum || 0);
 
 					rows.push({
 						address: addr,

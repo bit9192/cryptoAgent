@@ -1,11 +1,5 @@
-import { getAddress } from "ethers";
-
-import { parseBtcAddress } from "../../apps/btc/address.mjs";
-import { btcNetworks } from "../../apps/btc/config/networks.js";
-import { evmNetworks } from "../../apps/evm/configs/networks.js";
-import { toTrxBase58Address } from "../../apps/trx/address-codec.mjs";
-import { trxNetworks } from "../../apps/trx/config/networks.js";
 import { createRequestEngine } from "../request-engine/index.mjs";
+import { ADDRESS_CONTEXT_CHECKERS } from "./address-context-checkers.mjs";
 import {
   createDefaultSearchProviders,
   registerSearchProviders,
@@ -23,22 +17,6 @@ function normalizeLower(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-function getConfiguredNetworksByChain(chain) {
-  if (chain === "btc") return Object.keys(btcNetworks);
-  if (chain === "evm") return Object.keys(evmNetworks);
-  if (chain === "trx") return Object.keys(trxNetworks);
-  return [];
-}
-
-function resolveBtcAddressType(parsed = {}) {
-  if (parsed.format === "base58") {
-    return parsed.kind;
-  }
-  if (parsed.witnessVersion === 0) return "p2wpkh";
-  if (parsed.witnessVersion === 1) return "p2tr";
-  return `segwit_v${parsed.witnessVersion}`;
-}
-
 function normalizeRequestedChain(value) {
   const raw = normalizeLower(value);
   if (!raw) return "";
@@ -48,28 +26,6 @@ function normalizeRequestedChain(value) {
   return raw;
 }
 
-function looksLikeTrxAddress(value) {
-  const raw = String(value ?? "").trim();
-  return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(raw) || /^41[0-9a-fA-F]{40}$/.test(raw);
-}
-
-function resolveAvailableNetworks(providerList = [], chain) {
-  const configured = new Set(getConfiguredNetworksByChain(chain));
-  const available = new Set();
-
-  for (const provider of providerList) {
-    if (normalizeLower(provider.chain) !== chain) continue;
-    for (const network of provider.networks || []) {
-      const normalized = String(network ?? "").trim();
-      if (configured.has(normalized)) {
-        available.add(normalized);
-      }
-    }
-  }
-
-  return [...available];
-}
-
 function detectAddressContextItems(query, providers = [], filter = {}) {
   const items = [];
   const rawQuery = String(query ?? "").trim();
@@ -77,72 +33,12 @@ function detectAddressContextItems(query, providers = [], filter = {}) {
 
   const addressProviders = providers.filter((provider) => provider.capabilities.includes("address"));
 
-  if (!requestedChain || requestedChain === "btc") {
+  for (const [chain, checker] of Object.entries(ADDRESS_CONTEXT_CHECKERS)) {
+    if (requestedChain && requestedChain !== chain) continue;
     try {
-      const parsed = parseBtcAddress(rawQuery);
-      const providerIds = addressProviders
-        .filter((provider) => normalizeLower(provider.chain) === "btc")
-        .map((provider) => provider.id);
-      if (providerIds.length > 0) {
-        items.push({
-          kind: "address-context",
-          chain: "btc",
-          addressType: resolveBtcAddressType(parsed),
-          normalizedAddress: parsed.address,
-          detectedNetwork: parsed.network,
-          availableNetworks: resolveAvailableNetworks(addressProviders, "btc"),
-          providerIds,
-          confidence: 1,
-        });
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  if (!requestedChain || requestedChain === "trx") {
-    try {
-      if (!looksLikeTrxAddress(rawQuery)) {
-        throw new Error("not-trx-address");
-      }
-      const normalizedAddress = toTrxBase58Address(rawQuery);
-      const providerIds = addressProviders
-        .filter((provider) => normalizeLower(provider.chain) === "trx")
-        .map((provider) => provider.id);
-      if (providerIds.length > 0) {
-        items.push({
-          kind: "address-context",
-          chain: "trx",
-          addressType: "base58",
-          normalizedAddress,
-          detectedNetwork: null,
-          availableNetworks: resolveAvailableNetworks(addressProviders, "trx"),
-          providerIds,
-          confidence: 1,
-        });
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  if (!requestedChain || requestedChain === "evm") {
-    try {
-      const normalizedAddress = getAddress(rawQuery);
-      const providerIds = addressProviders
-        .filter((provider) => normalizeLower(provider.chain) === "evm")
-        .map((provider) => provider.id);
-      if (providerIds.length > 0) {
-        items.push({
-          kind: "address-context",
-          chain: "evm",
-          addressType: "hex",
-          normalizedAddress,
-          detectedNetwork: null,
-          availableNetworks: resolveAvailableNetworks(addressProviders, "evm"),
-          providerIds,
-          confidence: 1,
-        });
+      const item = checker(rawQuery, addressProviders, { normalizeLower });
+      if (item) {
+        items.push(item);
       }
     } catch {
       // ignore

@@ -200,3 +200,35 @@ expected:
 
 expected:
 - 所有 SearchItem 的 key/path 中不含 "privateKey" / "mnemonic" / "seed"
+
+---
+
+## 5. tronscan-holdings-case
+
+### TH2-1: `v1/accounts` 空结果时回退 Tronscan account/tokens
+
+mock:
+- `v1/accounts` 返回空数组
+- Tronscan `account/tokens` 返回 1 个 TRC20 代币，balance > 0
+
+expected:
+- 结果中出现该 TRC20 条目
+- 不进入 tokenBook 扫描路径
+
+### TH2-2: Tronscan 失败时继续回退 wallet/getaccount
+
+mock:
+- `v1/accounts` 返回空数组
+- Tronscan 抛错或返回非 200
+- `wallet/getaccount` 返回 1 个 trc20 条目
+
+expected:
+- 最终仍可返回 wallet/getaccount 的持仓结果
+
+### TH2-3: Tronscan source 使用 `TRON-PRO-API-KEY` 请求头
+
+mock:
+- fetch 记录请求头
+
+expected:
+- 请求头中包含 `TRON-PRO-API-KEY`

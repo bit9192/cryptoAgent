@@ -215,6 +215,122 @@ test("address search: queryAddressCheck discovers assets by Alchemy when no cust
   assert.equal(row.assets[1].extra?.source, "alchemy-data");
 });
 
+test("address search: queryAddressCheck without network queries all configured discovery networks", async () => {
+  let capturedNetworks = [];
+  const row = await queryAddressCheck({
+    address: "0x00000000000000000000000000000000000000c1",
+  }, {
+    includeNative: true,
+    alchemyGetAddressAssets: async (_address, networks) => {
+      capturedNetworks = networks;
+      return {
+        ok: true,
+        assets: [],
+      };
+    },
+  });
+
+  assert.equal(row.ok, true);
+  assert.deepEqual(capturedNetworks, ["eth", "bsc", "base", "arb", "op", "polygon"]);
+  assert.equal(row.assets.length, 1);
+  assert.equal(row.assets[0].assetType, "native");
+});
+
+test("address search: queryAddressCheck keeps Alchemy tokenBalance for downstream", async () => {
+  const row = await queryAddressCheck({
+    address: "0x00000000000000000000000000000000000000c1",
+    network: "eth",
+  }, {
+    includeNative: true,
+    alchemyGetAddressAssets: async () => ({
+      ok: true,
+      assets: [
+        {
+          network: "eth",
+          tokenAddress: "0x00000000000000000000000000000000000000a1",
+          symbol: "AAA",
+          name: "Asset AAA",
+          decimals: 18,
+          tokenBalance: "1234500000000000000",
+        },
+      ],
+    }),
+  });
+
+  assert.equal(row.ok, true);
+  assert.equal(row.assets.length, 2);
+  assert.equal(row.assets[1].address, "0x00000000000000000000000000000000000000A1");
+  assert.equal(row.assets[1].extra?.alchemyTokenBalance, "1234500000000000000");
+});
+
+test("address search: by-network batch falls back to token-search for missing metadata", async () => {
+  const res = await queryAddressBalanceByNetwork([
+    {
+      address: "0x00000000000000000000000000000000000000c1",
+      assets: [
+        { assetType: "erc20", address: "0x00000000000000000000000000000000000000a1" },
+      ],
+    },
+  ], "eth", {
+    queryBalanceBatch: async (pairs) => ({
+      ok: true,
+      items: pairs.map((item, index) => ({
+        chain: "evm",
+        tokenAddress: item.token,
+        ownerAddress: item.address,
+        balance: BigInt(index + 1),
+      })),
+    }),
+    queryMetadataBatch: async () => ({
+      ok: true,
+      items: [],
+    }),
+    tokenSearch: async () => ([
+      {
+        symbol: "AAA",
+        name: "Asset AAA",
+        decimals: 18,
+      },
+    ]),
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.items.length, 1);
+  assert.equal(res.items[0].balances[1].symbol, "AAA");
+  assert.equal(res.items[0].balances[1].name, "Asset AAA");
+  assert.equal(res.items[0].balances[1].decimals, 18);
+});
+
+test("address search: by-network batch skips queryBalanceBatch when balances are preloaded", async () => {
+  const res = await queryAddressBalanceByNetwork([
+    {
+      address: "0x00000000000000000000000000000000000000c1",
+      includeNative: false,
+      assets: [
+        {
+          assetType: "erc20",
+          address: "0x00000000000000000000000000000000000000a1",
+          symbol: "AAA",
+          decimals: 18,
+          extra: {
+            alchemyTokenBalance: "1234500000000000000",
+          },
+        },
+      ],
+    },
+  ], "eth", {
+    queryBalanceBatch: async () => {
+      throw new Error("queryBalanceBatch should not be called");
+    },
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.items.length, 1);
+  assert.equal(res.items[0].balances.length, 1);
+  assert.equal(res.items[0].balances[0].rawBalance, 1234500000000000000n);
+  assert.equal(res.items[0].balances[0].formatted, "1.2345");
+});
+
 test("address search: queryAddressCheck degrades when Alchemy fails", async () => {
   const row = await queryAddressCheck({
     address: "0x00000000000000000000000000000000000000c1",

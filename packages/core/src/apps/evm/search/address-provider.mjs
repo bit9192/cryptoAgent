@@ -14,6 +14,21 @@ function shortenAddress(value) {
   return `${text.slice(0, 6)}...${text.slice(-4)}`;
 }
 
+function groupAssetsByNetwork(assets = [], fallbackNetwork = "eth") {
+  const rows = new Map();
+  const list = Array.isArray(assets) ? assets : [];
+  const defaultNetwork = String(fallbackNetwork ?? "eth").trim().toLowerCase() || "eth";
+
+  for (const asset of list) {
+    const network = String(asset?.extra?.network ?? defaultNetwork).trim().toLowerCase() || defaultNetwork;
+    const row = rows.get(network) ?? [];
+    row.push(asset);
+    rows.set(network, row);
+  }
+
+  return [...rows.entries()].map(([network, groupedAssets]) => ({ network, assets: groupedAssets }));
+}
+
 function mapAddressCheckToSearchItems(checkResult = {}) {
   if (!checkResult?.ok) {
     return [];
@@ -95,7 +110,7 @@ function mapAddressBalanceToSearchItems(balanceResult = {}) {
 export function createEvmAddressSearchProvider(options = {}) {
   async function searchAddress(input = {}) {
     const query = String(input?.query ?? input?.address ?? "").trim();
-    const requestedNetwork = String(input?.network ?? "eth").trim().toLowerCase();
+    const requestedNetwork = String(input?.network ?? "").trim().toLowerCase();
 
     if (!query || !/^0x[a-fA-F0-9]{40}$/.test(query)) {
       return [];
@@ -104,21 +119,25 @@ export function createEvmAddressSearchProvider(options = {}) {
     try {
       const checkResult = await queryAddressCheck({
         address: query,
-        network: requestedNetwork,
+        ...(requestedNetwork ? { network: requestedNetwork } : {}),
       }, options);
 
-      const balanceResult = await queryAddressBalance([
-        {
-          address: checkResult.address,
-          network: checkResult.network,
-          assets: checkResult.assets,
-        },
-      ], options);
+      const grouped = requestedNetwork
+        ? [{ network: checkResult.network, assets: checkResult.assets }]
+        : groupAssetsByNetwork(checkResult.assets, checkResult.network);
 
-      const firstRow = Array.isArray(balanceResult?.items) ? balanceResult.items[0] : null;
-      const items = mapAddressBalanceToSearchItems(firstRow);
-      if (firstRow) {
-        return items;
+      const balancePayload = grouped.map((row) => ({
+        address: checkResult.address,
+        network: row.network,
+        assets: row.assets,
+      }));
+
+      const balanceResult = await queryAddressBalance(balancePayload, options);
+      const balanceRows = Array.isArray(balanceResult?.items) ? balanceResult.items : [];
+      const mergedItems = balanceRows.flatMap((row) => mapAddressBalanceToSearchItems(row));
+
+      if (balanceRows.length > 0) {
+        return mergedItems;
       }
 
       return mapAddressCheckToSearchItems(checkResult);
@@ -130,7 +149,7 @@ export function createEvmAddressSearchProvider(options = {}) {
   return {
     id: "evm-address",
     chain: "evm",
-    networks: ["eth", "bsc", "hardhat"],
+    networks: ["eth", "bsc", "fork", "hardhat"],
     capabilities: ["address"],
     searchAddress,
   };

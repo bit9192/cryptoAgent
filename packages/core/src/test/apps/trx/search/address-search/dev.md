@@ -135,3 +135,25 @@ SearchItem 结构（每条资产一条）：
 ## 6. 当前进度
 
 - ⏳ TAS-1：待实现
+
+### Slice TAS-2：地址持仓发现接入 Tronscan source
+
+本次只做：
+
+1. 新增 Tronscan 账户资产 source，读取 `https://apilist.tronscanapi.com/api/accountv2`。
+2. 对 Tronscan 请求补充 `TRON-PRO-API-KEY` 请求头。
+3. 调整 TRX 地址持仓发现顺序为：`tronscan accountv2 -> v1/accounts -> wallet/getaccount`。
+4. accountv2 返回的 `tokenName/tokenAbbr/tokenDecimal/balance` 直接用于构建 TRC20 资产；仅在缺字段时才回补 metadata。
+
+本次不做：
+
+1. 接入 Tronscan 的 accountv2 / token overview / analysis 其他接口。
+2. 修改 task/search 对外协议。
+3. 重构 TRX provider 为多后端统一抽象。
+
+验收标准：
+
+1. Tronscan source 在传入 API key 时可将账户代币列表归一为 `{ contractAddress, rawBalance, token }[]`，其中 `token` 包含 `name/symbol/decimals`。
+2. Tronscan source 为空或失败时，可继续尝试 `v1/accounts`。
+3. `v1/accounts` 为空或失败时继续回退 `wallet/getaccount`，不抛出全局异常。
+4. address-search 相关测试通过。

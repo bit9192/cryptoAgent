@@ -4,8 +4,11 @@ import { getEvmNetworkConfig } from "../configs/networks.js";
 import { queryEvmTokenMetadata } from "../assets/token-metadata.mjs";
 import { queryEvmTokenBalanceBatch } from "../assets/balance-batch.mjs";
 import { alchemyGetAddressAssets } from "./alchemy-assets.mjs";
+import { searchToken as searchEvmToken } from "./token-provider.mjs";
+import { resolveEvmTokenCandidates } from "./token-resolver.mjs";
 
 const NATIVE_TOKEN_ADDRESS = "native";
+const DEFAULT_ALCHEMY_DISCOVERY_NETWORKS = Object.freeze(["eth", "bsc", "base", "arb", "op", "polygon"]);
 
 function normalizeLower(value) {
   return String(value ?? "").trim().toLowerCase();
@@ -33,6 +36,30 @@ function normalizeNetwork(value, fieldName = "network") {
     throw new Error(`${fieldName} 不能为空`);
   }
   return raw;
+}
+
+function normalizeNetworkList(value = []) {
+  const list = Array.isArray(value) ? value : [];
+  return [...new Set(list
+    .map((item) => String(item ?? "").trim().toLowerCase())
+    .filter(Boolean))];
+}
+
+function resolveAlchemyDiscoveryNetworks(input = {}, options = {}) {
+  const explicit = String(input?.network ?? "").trim().toLowerCase();
+  if (explicit) {
+    return [explicit];
+  }
+
+  if (Array.isArray(options.assetDiscoveryNetworks) && options.assetDiscoveryNetworks.length > 0) {
+    return normalizeNetworkList(options.assetDiscoveryNetworks);
+  }
+
+  if (Array.isArray(options.networkPriority) && options.networkPriority.length > 0) {
+    return normalizeNetworkList(options.networkPriority);
+  }
+
+  return [...DEFAULT_ALCHEMY_DISCOVERY_NETWORKS];
 }
 
 function normalizeAssetItem(item = {}) {
@@ -87,6 +114,10 @@ function normalizeAlchemyAssetRows(rows = [], ownerAddress = null) {
     const address = tryResolveAssetAddress(row);
     if (!address || normalizeLower(address) === NATIVE_TOKEN_ADDRESS) continue;
     if (owner && normalizeLower(address) === owner) continue;
+    const tokenBalanceRaw = row?.tokenBalance ?? row?.tokenBalances ?? null;
+    const tokenBalance = tokenBalanceRaw == null
+      ? null
+      : String(tokenBalanceRaw).trim();
     assets.push({
       assetType: String(row?.assetType ?? "erc20").trim().toLowerCase() || "erc20",
       address,
@@ -96,6 +127,7 @@ function normalizeAlchemyAssetRows(rows = [], ownerAddress = null) {
       extra: {
         source: "alchemy-data",
         network: String(row?.network ?? "").trim() || null,
+        ...(tokenBalance ? { alchemyTokenBalance: tokenBalance } : {}),
       },
     });
   }
@@ -128,14 +160,33 @@ function normalizeAssetList(input = [], options = {}) {
 
 async function enrichMissingAssetMetadata(assets = [], network, options = {}) {
   const list = Array.isArray(assets) ? assets : [];
-  const targets = list.filter((asset) => {
+  const localResolved = list.map((asset) => {
+    const address = normalizeLower(asset?.address);
+    if (!address || address === NATIVE_TOKEN_ADDRESS) return asset;
+
+    const matched = resolveEvmTokenCandidates({
+      query: asset.address,
+      queryKind: "address",
+      network,
+    })[0] ?? null;
+    if (!matched) return asset;
+
+    return {
+      ...asset,
+      symbol: asset.symbol ?? matched.symbol ?? null,
+      name: asset.name ?? matched.name ?? null,
+      decimals: asset.decimals ?? toFiniteNumberOrNull(matched.decimals),
+    };
+  });
+
+  const targets = localResolved.filter((asset) => {
     const address = normalizeLower(asset?.address);
     if (!address || address === NATIVE_TOKEN_ADDRESS) return false;
     return asset?.symbol == null || asset?.name == null || asset?.decimals == null;
   });
 
   if (targets.length === 0) {
-    return list;
+    return localResolved;
   }
 
   const queryMetadataBatch = typeof options.queryMetadataBatch === "function"
@@ -158,7 +209,7 @@ async function enrichMissingAssetMetadata(assets = [], network, options = {}) {
     metadataItems.map((item) => [normalizeLower(item?.tokenAddress), item]),
   );
 
-  return list.map((asset) => {
+  const mergedByMulticall = localResolved.map((asset) => {
     const metadata = metadataMap.get(normalizeLower(asset?.address));
     if (!metadata) return asset;
     return {
@@ -166,6 +217,55 @@ async function enrichMissingAssetMetadata(assets = [], network, options = {}) {
       symbol: asset.symbol ?? metadata.symbol ?? null,
       name: asset.name ?? metadata.name ?? null,
       decimals: asset.decimals ?? metadata.decimals ?? null,
+    };
+  });
+
+  const fallbackTargets = mergedByMulticall.filter((asset) => {
+    const address = normalizeLower(asset?.address);
+    if (!address || address === NATIVE_TOKEN_ADDRESS) return false;
+    return asset?.symbol == null || asset?.name == null || asset?.decimals == null;
+  });
+
+  if (fallbackTargets.length === 0) {
+    return mergedByMulticall;
+  }
+
+  const tokenSearch = typeof options.tokenSearch === "function" ? options.tokenSearch : searchEvmToken;
+  const fallbackRows = await Promise.all(fallbackTargets.map(async (asset) => {
+   
+    try {
+      const rows = await tokenSearch({
+        query: asset.address,
+        network,
+        limit: 1,
+      }, options);
+      const first = Array.isArray(rows) ? rows[0] : null;
+      if (!first) return null;
+      return {
+        tokenAddress: asset.address,
+        symbol: String(first?.symbol ?? "").trim() || null,
+        name: String(first?.name ?? "").trim() || null,
+        decimals: toFiniteNumberOrNull(first?.decimals),
+      };
+    } catch {
+      return null;
+    }
+  }));
+
+  const fallbackMap = new Map(
+    fallbackRows
+      .filter(Boolean)
+      .map((item) => [normalizeLower(item?.tokenAddress), item]),
+  );
+
+  return mergedByMulticall.map((asset) => {
+    const fallback = fallbackMap.get(normalizeLower(asset?.address));
+    if (!fallback) return asset;
+    return {
+      ...asset,
+      symbol: asset.symbol ?? fallback.symbol ?? null,
+      name: asset.name ?? fallback.name ?? null,
+      decimals: asset.decimals ?? fallback.decimals ?? null,
     };
   });
 }
@@ -206,6 +306,27 @@ function formatUnitsString(rawBalance, decimals) {
   }
   const fractionText = fraction.toString().padStart(unit, "0").replace(/0+$/, "");
   return `${negative ? "-" : ""}${whole.toString()}.${fractionText}`;
+}
+
+function toBigIntOrNull(value) {
+  if (typeof value === "bigint") return value;
+  if (value == null) return null;
+  try {
+    const text = String(value).trim();
+    if (!text) return null;
+    return BigInt(text);
+  } catch {
+    return null;
+  }
+}
+
+function extractPreloadedRawBalance(asset = {}) {
+  const extra = asset?.extra && typeof asset.extra === "object" ? asset.extra : {};
+  return toBigIntOrNull(
+    extra?.rawBalance
+    ?? extra?.alchemyTokenBalance
+    ?? extra?.balance,
+  );
 }
 
 async function resolveAddressType(input = {}, options = {}) {
@@ -280,21 +401,27 @@ async function resolveAssetsForAddress(input = {}, addressType = "unknown", opti
       const resolver = typeof options.alchemyGetAddressAssets === "function"
         ? options.alchemyGetAddressAssets
         : alchemyGetAddressAssets;
-      const alchemyRes = await resolver(input.address, [input.network], options.alchemyOptions ?? options);
+      const networks = Array.isArray(input?.discoveryNetworks) && input.discoveryNetworks.length > 0
+        ? input.discoveryNetworks
+        : [input.network];
+      const alchemyRes = await resolver(input.address, networks, options.alchemyOptions ?? options);
+      
       externalAssets = normalizeAlchemyAssetRows(alchemyRes?.assets ?? [], input.address);
     } catch {
       externalAssets = [];
     }
   }
-
+  
   return normalizeAssetList([...baseAssets, ...externalAssets], options);
 }
 
 export async function queryAddressCheck(input = {}, options = {}) {
   const address = normalizeAddress(input?.address, "address");
-  const network = normalizeNetwork(input?.network, "network");
+  const explicitNetwork = String(input?.network ?? "").trim();
+  const network = explicitNetwork ? normalizeNetwork(explicitNetwork, "network") : null;
+  const primaryNetwork = network ?? "eth";
 
-  const normalized = { address, network, chain: "evm" };
+  const normalized = { address, network: primaryNetwork, chain: "evm" };
   let addressType = "unknown";
   try {
     addressType = await resolveAddressType(normalized, options);
@@ -302,12 +429,19 @@ export async function queryAddressCheck(input = {}, options = {}) {
     addressType = "unknown";
   }
 
-  const assets = await resolveAssetsForAddress(normalized, addressType, options);
-
+  const assets = await resolveAssetsForAddress(
+    {
+      ...normalized,
+      discoveryNetworks: resolveAlchemyDiscoveryNetworks(input, options),
+    },
+    addressType,
+    options,
+  );
+  
   return {
     ok: true,
     chain: "evm",
-    network,
+    network: primaryNetwork,
     address,
     addressType,
     assets,
@@ -338,7 +472,7 @@ export async function queryAddressBalanceByNetwork(input = [], network, options 
   const rows = toBalanceByNetworkBatchInput(input);
   const networkName = normalizeNetwork(network, "network");
   const gasToken = resolveGasTokenSymbol(networkName);
-
+   
   const normalizedRows = await Promise.all(
     rows.map(async (item) => {
       const normalized = normalizeBalanceQueryItem(item, networkName);
@@ -349,18 +483,25 @@ export async function queryAddressBalanceByNetwork(input = [], network, options 
     }),
   );
 
+   
+
   const pairRows = [];
-  const pairMeta = [];
+  const preloadedBalanceMap = new Map();
   for (const row of normalizedRows) {
     for (const asset of row.assets) {
+      const ownerAddress = row.address;
+      const tokenAddress = asset.address;
+      const key = `${normalizeLower(ownerAddress)}:${normalizeLower(tokenAddress)}`;
+      const preloaded = extractPreloadedRawBalance(asset);
+
+      if (preloaded != null) {
+        preloadedBalanceMap.set(key, preloaded);
+        continue;
+      }
+
       pairRows.push({
-        address: row.address,
-        token: asset.address,
-      });
-      pairMeta.push({
-        ownerAddress: row.address,
-        tokenAddress: asset.address,
-        asset,
+        address: ownerAddress,
+        token: tokenAddress,
       });
     }
   }
@@ -369,13 +510,16 @@ export async function queryAddressBalanceByNetwork(input = [], network, options 
     ? options.queryBalanceBatch
     : queryEvmTokenBalanceBatch;
 
-  const balanceRes = await queryBalanceBatch(pairRows, {
-    ...options,
-    network: networkName,
-  });
-  const balanceItems = Array.isArray(balanceRes?.items) ? balanceRes.items : [];
+  let balanceItems = [];
+  if (pairRows.length > 0) {
+    const balanceRes = await queryBalanceBatch(pairRows, {
+      ...options,
+      network: networkName,
+    });
+    balanceItems = Array.isArray(balanceRes?.items) ? balanceRes.items : [];
+  }
 
-  const balanceMap = new Map();
+  const balanceMap = new Map(preloadedBalanceMap);
   for (const row of balanceItems) {
     const key = `${normalizeLower(row?.ownerAddress)}:${normalizeLower(row?.tokenAddress)}`;
     const amount = row?.balance == null ? 0n : BigInt(row.balance);
