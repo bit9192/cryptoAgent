@@ -12,6 +12,7 @@ export function buildBtcAssetValuationInput(asset = {}) {
       quantity: parseNumber(extra?.confirmed ?? 0),
       priceQuery: "BTC",
       priceNetwork: "btc",
+      allowPricing: true,
     };
   }
 
@@ -19,6 +20,8 @@ export function buildBtcAssetValuationInput(asset = {}) {
     quantity: parseNumber(extra?.balance ?? 0),
     priceQuery: String(extra?.ticker ?? asset?.symbol ?? "").trim() || "BTC",
     priceNetwork: "btc",
+    // BTC 非原生资产默认不估值，避免 symbol 误匹配放大组合价值。
+    allowPricing: false,
   };
 }
 

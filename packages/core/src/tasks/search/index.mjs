@@ -214,8 +214,10 @@ export async function searchAddressAssetsTaskWithEngine(input = {}, engine, opti
     const quantity = Number(valuationInput?.quantity ?? 0);
     const priceQuery = normalizeString(valuationInput?.priceQuery);
     const priceNetwork = normalizeString(valuationInput?.priceNetwork);
+    const allowPricing = valuationInput?.allowPricing !== false;
 
-    rows.push({ quantity, priceQuery, priceNetwork, chain });
+    rows.push({ quantity, priceQuery, priceNetwork, chain, allowPricing });
+    if (!allowPricing) continue;
     if (!priceQuery || !priceNetwork) continue;
 
     const key = `${chain}:${priceNetwork}:${priceQuery.toLowerCase()}`;
@@ -241,7 +243,7 @@ export async function searchAddressAssetsTaskWithEngine(input = {}, engine, opti
     const key = `${row.chain}:${row.priceNetwork}:${String(row.priceQuery ?? "").toLowerCase()}`;
     const batchIndex = priceInputIndexes.get(key);
     const priceRow = batchIndex != null ? batchItems[batchIndex] : null;
-    const priceUsd = Number(priceRow?.priceUsd ?? 0);
+    const priceUsd = row.allowPricing === false ? 0 : Number(priceRow?.priceUsd ?? 0);
     const safePrice = Number.isFinite(priceUsd) ? priceUsd : 0;
     const quantity = Number.isFinite(Number(row.quantity)) ? Number(row.quantity) : 0;
     const valueUsd = roundValue(quantity * safePrice);

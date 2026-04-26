@@ -477,3 +477,32 @@ token-price 层在中心表基础上扩展：
 2. `run.test.mjs` 可仅通过 search 接口输出组合汇总信息。
 3. `src/test/tasks/search/search.test.mjs` 全部通过。
 4. 现有 `searchTask` / `searchAddressAssetsTask` 回归不破坏。
+
+### Slice S-20：BTC 估值价格可信度门控（防止组合价值异常放大）
+
+**目标：**
+对 `tasks/search` 的资产估值增加链级门控规则，先在 BTC 链生效：native BTC 允许估值，BRC20 等非原生资产默认不估值（价格记 0），避免远程 symbol 误匹配导致组合总值异常放大。
+
+**本次只做：**
+
+1. 在 `pipelines/valuation/btc.mjs` 增加估值门控字段：
+   - native: `allowPricing=true`
+   - non-native: `allowPricing=false`（默认）
+2. 在 `searchAddressAssetsTask` 中接入门控字段：
+   - `allowPricing=false` 时不发起价格查询，直接按 `priceUsd=0` 计算。
+3. 新增任务层单测：
+   - BTC non-native 资产即使价格源返回高价，也不参与估值。
+4. 回归 `run.test.mjs` 观察组合总值稳定性。
+
+**本次不做：**
+
+1. BRC20 专属价格源接入。
+2. BTC non-native 的白名单定价策略。
+3. 其他链（EVM/TRX）的价格门控调整。
+
+**验收标准：**
+
+1. BTC non-native 资产默认 `valueUsd=0`，不再放大组合总值。
+2. BTC native 资产估值行为保持不变。
+3. `src/test/tasks/search/search.test.mjs` 全部通过。
+4. `run.test.mjs` 可运行且组合总值不出现异常数量级。
