@@ -25,6 +25,7 @@ import {
   setPanelAwaitingInput,
   setPanelRunning,
 } from "./lon-panel.mjs";
+import { buildWalletTreeSummary } from "./lon-wallet-tree-view.mjs";
 import createWallet from "../apps/wallet/index.mjs";
 import {
   execute,
@@ -293,6 +294,11 @@ async function runTask(session, taskId, args, resumeToken) {
     session.lastResult = result.data;
     console.log("  [task] 执行成功");
     if (result.data != null) {
+      if (taskId === "wallet:session" && String(args?.action ?? "") === "wallet.tree") {
+        const summary = buildWalletTreeSummary(result.data);
+        console.log("  [wallet.tree] 摘要");
+        printData(summary);
+      }
       printData(result.data);
     }
   } else {
