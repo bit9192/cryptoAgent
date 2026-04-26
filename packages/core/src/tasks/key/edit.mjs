@@ -56,6 +56,9 @@ function buildPlaceholder(entry, index) {
 
 function buildSecretProtection(content) {
   const parsed = parseKeyFile(content);
+  if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+    throw new Error(`编辑失败：${parsed.errors.join("；")}`);
+  }
   if (!Array.isArray(parsed.entries) || parsed.entries.length === 0) {
     throw new Error("编辑失败：未解析到有效密钥条目");
   }
@@ -113,6 +116,9 @@ function applySecretProtectionCommit(editedContent, protection) {
 
 function validateFinalContent(finalContent, protection) {
   const parsed = parseKeyFile(finalContent);
+  if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+    throw new Error(`编辑提交失败：${parsed.errors.join("；")}`);
+  }
   const entries = Array.isArray(parsed.entries) ? parsed.entries : [];
 
   const expectedCount = Number(protection?.originalEntryCount ?? 0);
@@ -137,7 +143,7 @@ function validateFinalContent(finalContent, protection) {
 
   return {
     entryCount: entries.length,
-    warnings: Array.isArray(parsed.errors) ? parsed.errors : [],
+    warnings: [],
   };
 }
 

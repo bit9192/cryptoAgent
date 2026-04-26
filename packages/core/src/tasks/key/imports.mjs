@@ -174,6 +174,9 @@ export async function keyImports(options = {}) {
         const sourceText = await fs.readFile(abs, "utf8");
         const preprocessed = preprocessKeyDocument({ sourceText });
         const parsed = parseKeyFile(preprocessed.content);
+        if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+          throw new Error(parsed.errors.join("；"));
+        }
         if (!Array.isArray(parsed.entries) || parsed.entries.length === 0) {
           throw new Error("未解析到有效密钥条目");
         }
@@ -190,7 +193,6 @@ export async function keyImports(options = {}) {
             generatedCount: preprocessed.generated.length,
             warnings: [
               ...(Array.isArray(preprocessed.warnings) ? preprocessed.warnings : []),
-              ...(Array.isArray(parsed.errors) ? parsed.errors : []),
             ],
           });
           continue;
@@ -220,7 +222,6 @@ export async function keyImports(options = {}) {
           generatedCount: preprocessed.generated.length,
           warnings: [
             ...(Array.isArray(preprocessed.warnings) ? preprocessed.warnings : []),
-            ...(Array.isArray(parsed.errors) ? parsed.errors : []),
           ],
         });
       } catch (error) {

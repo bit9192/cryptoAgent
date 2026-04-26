@@ -68,6 +68,10 @@ export async function keyAdd(options = {}) {
   const preprocessed = preprocessKeyDocument({ sourceText });
   const parsed = parseKeyFile(preprocessed.content);
 
+  if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+    throw new Error(`新增失败：${parsed.errors.join("；")}`);
+  }
+
   if (!Array.isArray(parsed.entries) || parsed.entries.length === 0) {
     throw new Error("新增失败：未解析到有效密钥条目");
   }

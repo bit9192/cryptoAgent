@@ -13,7 +13,7 @@
  * 规则：
  *   - 空行、以 # 开头的注释行忽略
  *   - 以密钥行为锚点，向上找最近的非密钥行作为名称
- *   - 名称缺失时用 unnamed_<密钥前8字符> 补位
+ *   - 名称为必填，缺失时该条目报错并跳过
  *   - 不支持路径行（path 解析属于更上层的关注点）
  */
 
@@ -43,6 +43,10 @@ function looksLikeSecret(line) {
   const s = stripNoisePrefixes(line).trim();
   if (!s) return false;
   return isHexPrivateKey(s) || isWifPrivateKey(s) || isMnemonic(s);
+}
+
+function looksLikeDirective(line) {
+  return String(line ?? "").trim().startsWith("@");
 }
 
 // ── 密钥清理（去掉引用标记等噪声字符）────────────────────────
@@ -109,12 +113,13 @@ export function parseKeyFile(text) {
     const secret = sanitizeSecret(rawSecret);
     usedIndices.add(secretIdx);
 
-    // 向上找最近的非空、非注释、非密钥行作为名称
+    // 向上找最近的非空、非注释、非密钥、非指令行作为名称
     let name = null;
     for (let i = secretIdx - 1; i >= 0; i--) {
       const l = lines[i];
       if (usedIndices.has(i)) continue;
       if (l.isBlank || l.isComment) continue;
+      if (looksLikeDirective(l.trimmed)) continue;
       if (looksLikeSecret(l.trimmed)) break; // 遇到另一个密钥行，停止
       name = l.trimmed;
       usedIndices.add(i);
@@ -122,8 +127,8 @@ export function parseKeyFile(text) {
     }
 
     if (!name) {
-      name = `unnamed_${secret.replace(/\s+/g, "").slice(0, 8)}`;
-      errors.push(`第 ${secretIdx + 1} 行的密钥未找到名称，已自动命名为 "${name}"`);
+      errors.push(`第 ${secretIdx + 1} 行的密钥未找到名称；名称为必填项`);
+      continue;
     }
 
     entries.push({

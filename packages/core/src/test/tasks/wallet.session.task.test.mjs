@@ -183,3 +183,37 @@ test("wallet:session wallet.unlock uses select + password and upserts key cache"
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test("wallet:session wallet.tree builds minimal tree from cached session", async () => {
+  await task.run(createCtx({ action: "wallet.clear" }, {}));
+  const wallet = {
+    async listKeys() {
+      return {
+        items: [
+          { keyId: "k1", name: "alpha", source: "file", sourceFile: "storage/key/a.enc.json", status: "unlocked" },
+          { keyId: "k2", name: "beta", source: "file", sourceFile: "storage/key/b.enc.json", status: "unlocked" },
+        ],
+      };
+    },
+    async deriveConfiguredAddresses() {
+      return {
+        items: [
+          { keyId: "k1", chain: "evm", address: "0xabc", name: "e1", path: "m/44'/60'/0'/0/0", addressType: null },
+          { keyId: "k1", chain: "btc", address: "bc1qabc", name: "b1", path: "m/84'/0'/0'/0/0", addressType: "p2wpkh" },
+          { keyId: "k2", chain: "trx", address: "TRXabc", name: "t1", path: "m/44'/195'/0'/0/0", addressType: null },
+        ],
+        warnings: [],
+      };
+    },
+  };
+
+  const derived = await task.run(createCtx({ action: "wallet.deriveConfigured" }, wallet));
+  assert.equal(derived.ok, true);
+
+  const treeRes = await task.run(createCtx({ action: "wallet.tree" }, wallet));
+  assert.equal(treeRes.ok, true);
+  assert.equal(treeRes.action, "wallet.tree");
+  assert.equal(treeRes.counts.accounts, 2);
+  assert.equal(treeRes.counts.addresses, 3);
+  assert.equal(Array.isArray(treeRes.tree), true);
+});

@@ -240,6 +240,9 @@ export async function loadKeyQueueFromStoredFile(options = {}) {
     }
 
     const parsed = await parseKeyFileFromPath(keyFile);
+    if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+      throw new Error(`密钥文档格式错误：${parsed.errors.join("；")}`);
+    }
     return {
       ...parsed,
       parsedFile: keyFile,

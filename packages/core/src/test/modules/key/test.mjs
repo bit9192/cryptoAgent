@@ -70,16 +70,16 @@ test("密钥行带 '>' 引用标记：应被清理", () => {
   assert.equal(errors.length, 0);
 });
 
-// ── 无名称自动补位 ────────────────────────────────────────────
+// ── 名称必填校验 ──────────────────────────────────────────────
 
-test("无名称的密钥：自动生成 unnamed_xxxxxxxx", () => {
+test("无名称的密钥：严格模式下报错并跳过", () => {
   const text = `
 f3a4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2a1b2c3d4e5f6a7b8c9d0e1f2
 `;
   const { entries, errors } = parseKeyFile(text);
-  assert.equal(entries.length, 1);
-  assert.ok(entries[0].name.startsWith("unnamed_"));
-  assert.equal(errors.length, 1); // 应有警告
+  assert.equal(entries.length, 0);
+  assert.ok(errors.length >= 1);
+  assert.ok(errors.some((item) => /名称为必填项/.test(item)));
 });
 
 // ── 注释行忽略 ────────────────────────────────────────────────
@@ -130,8 +130,9 @@ test("无密钥的纯文本：返回空条目并有错误信息", () => {
 
 test("从 testdata.md 读取：应解析出至少 5 条条目", async () => {
   const { entries, errors } = await parseKeyFileFromPath(TESTDATA_PATH);
-  // testdata 包含 6 个场景（助记词+5个私钥），其中1个无名称
+  // testdata 包含 6 个场景（助记词+5个私钥）
   assert.ok(entries.length >= 5, `期望至少5条，实际: ${entries.length}`);
+  assert.equal(errors.length, 0);
   // 场景1 助记词
   const mnemonic = entries.find((e) => e.name === "t43");
   assert.ok(mnemonic, "应有 t43 条目");
@@ -143,9 +144,9 @@ test("从 testdata.md 读取：应解析出至少 5 条条目", async () => {
   // 场景6 注释不干扰
   const commentTest = entries.find((e) => e.name === "test-comment-ignore");
   assert.ok(commentTest, "应有 test-comment-ignore 条目");
-  // 无名称场景应有 unnamed 条目
-  const unnamed = entries.find((e) => e.name.startsWith("unnamed_"));
-  assert.ok(unnamed, "应有自动命名的 unnamed_ 条目");
+  // 场景5 为严格命名，显式名称应存在
+  const named = entries.find((e) => e.name === "kkshg");
+  assert.ok(named, "应有 kkshg 条目");
   // 场景3 噪声清理
   const noisy = entries.find((e) => e.name === "哈哈");
   assert.ok(noisy, "应有 哈哈 条目");

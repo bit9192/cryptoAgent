@@ -377,7 +377,8 @@ function renderPageHtml({ title, submitPath, expiresAt }) {
         if (password !== password2) throw new Error("两次输入的密码不一致");
         if (password.length < 8) throw new Error("加密密码至少 8 位");
         const { entries, errors } = parseKeyFile(rawText);
-        if (entries.length === 0) throw new Error(errors[0] || "未找到有效密钥");
+        if (errors.length > 0) throw new Error(errors[0] || "密钥文档格式错误");
+        if (entries.length === 0) throw new Error("未找到有效密钥");
         setStatus("正在本地加密，包含 " + entries.length + " 条记录，请稍候...", "success");
         const envelope = await buildEnvelope(walletName, rawText, password);
         const response = await fetch(submitPath, {

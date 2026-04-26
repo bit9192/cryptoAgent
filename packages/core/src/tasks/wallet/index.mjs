@@ -15,6 +15,7 @@ import {
   upsertAddress,
   upsertKey,
 } from "./session-cache.mjs";
+import { buildWalletTree } from "../../modules/wallet-tree/index.mjs";
 
 const WALLET_SESSION_TASK_ID = "wallet:session";
 
@@ -294,6 +295,21 @@ async function deriveConfiguredToCache(ctx) {
   };
 }
 
+async function buildTreeFromSession() {
+  const session = getDefaultSession();
+  const snap = snapshotSession(session);
+  const tree = buildWalletTree({
+    keys: snap.keys,
+    addresses: snap.addresses,
+  });
+
+  return {
+    ok: true,
+    action: "wallet.tree",
+    ...tree,
+  };
+}
+
 export const walletSessionActionObject = Object.freeze({
   "wallet.unlock": {
     taskId: WALLET_SESSION_TASK_ID,
@@ -360,6 +376,17 @@ export const walletSessionActionObject = Object.freeze({
         counts: snap.counts,
       };
     },
+  },
+  "wallet.tree": {
+    taskId: WALLET_SESSION_TASK_ID,
+    sub: "tree",
+    usage: "wallet tree",
+    description: "按会话缓存生成最小 wallet tree（account/chain/address）",
+    argsSchema: {
+      required: [],
+      properties: {},
+    },
+    handler: async () => await buildTreeFromSession(),
   },
 });
 

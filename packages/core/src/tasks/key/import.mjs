@@ -65,6 +65,10 @@ export async function keyImport(options = {}) {
   const preprocessed = preprocessKeyDocument({ sourceText });
   const parsed = parseKeyFile(preprocessed.content);
 
+  if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+    throw new Error(`导入失败：${parsed.errors.join("；")}`);
+  }
+
   if (!Array.isArray(parsed.entries) || parsed.entries.length === 0) {
     throw new Error("导入失败：未解析到有效密钥条目");
   }
@@ -90,7 +94,6 @@ export async function keyImport(options = {}) {
     const backupGroups = [];
     const warnings = [
       ...(Array.isArray(preprocessed.warnings) ? preprocessed.warnings : []),
-      ...(Array.isArray(parsed.errors) ? parsed.errors : []),
     ];
 
     if (backup) {

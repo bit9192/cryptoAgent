@@ -20,3 +20,13 @@ SSS 加密模块
 已完成
 
 create import add backup recory 基本操作
+
+## 本地开发测试基线
+
+后续 wallet / asset / search 联调，统一先使用 `src/test/modules/key/testdata.md` 导入测试钱包。
+
+建议固定流程：
+
+1. `pnpm key import --input ./src/test/modules/key/testdata.md --name key-dev-baseline --password <dev-password>`
+2. 导入成功后，使用生成的 `storage/key/*.enc.json` 作为后续 `ex:lon` 与任务联调输入。
+3. 如需重置测试基线，删除对应 `storage/key/<name>.enc.json` 后重新导入。
