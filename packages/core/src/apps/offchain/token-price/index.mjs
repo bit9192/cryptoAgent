@@ -1,11 +1,7 @@
 import { detectAddressKind } from "../address-validators.mjs";
 import { DexScreenerSource } from "../sources/dexscreener/index.mjs";
 import { CoinGeckoSource } from "../sources/coingecko/index.mjs";
-import { resolveEvmToken } from "../../evm/configs/tokens.js";
-import { resolveBtcToken } from "../../btc/config/tokens.js";
-import { resolveTrxToken } from "../../trx/config/tokens.js";
-import { queryEvmTokenMetadataBatch } from "../../evm/assets/token-metadata.mjs";
-import { queryTrxTokenMetadata } from "../../trx/assets/token-metadata.mjs";
+import { CHAIN_ADAPTERS, getChainAdapter } from "./chain-adapters.mjs";
 import {
   getCachedTokenMetadataMap,
   putCachedTokenMetadata,
@@ -49,22 +45,18 @@ function detectAddressKindSafe(value) {
 
 function inferExpectedChainFromNetwork(network, networkRaw = null) {
   const rawHint = normalizeLower(networkRaw);
-  if (["trx", "tron"].includes(rawHint)) return "trx";
-  if (["btc", "bitcoin"].includes(rawHint)) return "btc";
-  if (["eth", "ethereum", "evm", "bsc", "binance-smart-chain", "polygon", "arb", "arbitrum", "op", "optimism", "base", "avax", "linea", "scroll", "zksync"].includes(rawHint)) {
-    return "evm";
+  if (rawHint) {
+    for (const adapter of CHAIN_ADAPTERS) {
+      if (adapter.chain === rawHint) return adapter.chain;
+      if ((adapter.networkAliases ?? []).includes(rawHint)) return adapter.chain;
+      if (adapter.networkNames.includes(rawHint)) return adapter.chain;
+    }
   }
 
   const net = normalizeNetworkName(network);
   if (!net) return null;
-  if (["eth", "bsc", "polygon", "arb", "arbitrum", "op", "optimism", "base", "avax", "linea", "scroll", "zksync"].includes(net)) {
-    return "evm";
-  }
-  if (["nile", "shasta"].includes(net)) {
-    return "trx";
-  }
-  if (["btc", "bitcoin", "testnet", "regtest", "signet"].includes(net)) {
-    return "btc";
+  for (const adapter of CHAIN_ADAPTERS) {
+    if (adapter.networkNames.includes(net)) return adapter.chain;
   }
   return null;
 }
@@ -89,8 +81,10 @@ function isRemoteMatchForItem(item, normalized) {
   if (normalized?.chain && normalized.chain !== expectedChain) return false;
   if (tokenKind && tokenKind !== expectedChain) return false;
   if (!tokenKind && tokenAddress && tokenAddress !== "native") {
-    if (expectedChain === "evm" && !/^0x[0-9a-fA-F]{40}$/.test(tokenAddress)) return false;
-    if (expectedChain === "trx" && !/^T[1-9A-HJ-NP-Za-km-z]{25,34}$/.test(tokenAddress)) return false;
+    const adapter = getChainAdapter(expectedChain);
+    if (adapter?.addressTokenFormat) {
+      if (!new RegExp(adapter.addressTokenFormat).test(tokenAddress)) return false;
+    }
   }
   if (expectedNetwork && actualNetwork && expectedNetwork !== actualNetwork) return false;
   if (expectedNetwork && !actualNetwork) return false;
@@ -220,48 +214,19 @@ function resolveNativeTokenCandidate(query, network) {
   const key = normalizeLower(query);
   const net = normalizeNetworkName(network);
 
-  if (net === "bsc" && ["bnb", "native"].includes(key)) {
-    return {
-      chain: "evm",
-      network: "bsc",
-      tokenAddress: "native",
-      symbol: "BNB",
-      name: "BNB",
-      decimals: 18,
-    };
-  }
-
-  if (net === "eth" && ["eth", "native"].includes(key)) {
-    return {
-      chain: "evm",
-      network: "eth",
-      tokenAddress: "native",
-      symbol: "ETH",
-      name: "Ether",
-      decimals: 18,
-    };
-  }
-
-  if (net === "mainnet" && ["trx", "native"].includes(key)) {
-    return {
-      chain: "trx",
-      network: "mainnet",
-      tokenAddress: "native",
-      symbol: "TRX",
-      name: "TRON",
-      decimals: 6,
-    };
-  }
-
-  if (["btc", "bitcoin", "mainnet"].includes(net || "") && ["btc", "native"].includes(key)) {
-    return {
-      chain: "btc",
-      network: net || "mainnet",
-      tokenAddress: "native",
-      symbol: "BTC",
-      name: "Bitcoin",
-      decimals: 8,
-    };
+  for (const adapter of CHAIN_ADAPTERS) {
+    if (typeof adapter.resolveNativeToken !== "function") continue;
+    if (!net && key !== "native") continue;
+    // 仅当 network 属于该链，或 key 与 chain 相同时才尝试
+    const networkMatchesChain = net ? adapter.networkNames.includes(net) : false;
+    const keyMatchesChain = adapter.chain === key || (adapter.networkAliases ?? []).includes(key);
+    if (!networkMatchesChain && key !== "native" && !keyMatchesChain) continue;
+    try {
+      const result = adapter.resolveNativeToken(net);
+      if (result) return result;
+    } catch {
+      // ignore
+    }
   }
 
   return null;
@@ -292,29 +257,6 @@ async function getDefaultTokenInfoSources() {
   return [coinGecko, dexscreener].filter(Boolean);
 }
 
-const EVM_PROOF_NETWORKS = ["eth", "bsc"];
-
-async function resolveEvmAddressNetworksByMetadata(tokenAddress) {
-  const normalizedAddress = normalizeString(tokenAddress).toLowerCase();
-  if (!/^0x[a-fA-F0-9]{40}$/.test(normalizedAddress)) {
-    return [];
-  }
-
-  const matchedNetworks = [];
-  for (const network of EVM_PROOF_NETWORKS) {
-    try {
-      const metadata = await queryEvmTokenMetadataBatch([normalizedAddress], { network });
-      const row = Array.isArray(metadata?.items) ? metadata.items[0] : null;
-      if (!row) continue;
-      const hasMetadata = Boolean(row?.symbol || row?.name || Number.isFinite(Number(row?.decimals)));
-      if (hasMetadata) matchedNetworks.push(network);
-    } catch {
-      // ignore network proof error, keep trying other networks
-    }
-  }
-  return matchedNetworks;
-}
-
 async function resolveConfigCandidates(item) {
   const query = item.query;
   const network = item.network;
@@ -341,19 +283,20 @@ async function resolveConfigCandidates(item) {
   let proofNetworks = null;
   if (kind === "address") {
     const detected = detectAddressKindSafe(query);
-    if (detected === "evm") {
+    const adapter = detected ? getChainAdapter(detected) : null;
+    if (adapter) {
       if (network) {
-        maybeResolve("evm", resolveEvmToken, { network, address: query });
-      } else {
-        const matchedNetworks = await resolveEvmAddressNetworksByMetadata(query);
+        maybeResolve(adapter.chain, adapter.resolveToken.bind(adapter), { network, address: query });
+      } else if (typeof adapter.proofAddressNetworks === "function" && adapter.proofNetworks.length > 0) {
+        const matchedNetworks = await adapter.proofAddressNetworks(query);
         proofNetworks = matchedNetworks;
         for (const matchedNetwork of matchedNetworks) {
-          maybeResolve("evm", resolveEvmToken, { network: matchedNetwork, address: query });
+          maybeResolve(adapter.chain, adapter.resolveToken.bind(adapter), { network: matchedNetwork, address: query });
         }
+      } else {
+        maybeResolve(adapter.chain, adapter.resolveToken.bind(adapter), { network, address: query });
       }
     }
-    if (detected === "btc") maybeResolve("btc", resolveBtcToken, { network, address: query });
-    if (detected === "trx") maybeResolve("trx", resolveTrxToken, { network, address: query });
     return { candidates, proofNetworks };
   }
 
@@ -365,9 +308,9 @@ async function resolveConfigCandidates(item) {
     }));
   }
 
-  maybeResolve("evm", resolveEvmToken, { network, key: query });
-  maybeResolve("btc", resolveBtcToken, { network, key: query });
-  maybeResolve("trx", resolveTrxToken, { network, key: query });
+  for (const adapter of CHAIN_ADAPTERS) {
+    maybeResolve(adapter.chain, adapter.resolveToken.bind(adapter), { network, key: query });
+  }
   return { candidates, proofNetworks };
 }
 
@@ -424,66 +367,13 @@ async function resolveFromCache(item, cacheApi, options = {}) {
 async function enrichResolvedMetadata(item, normalized, options = {}) {
   if (!normalized?.tokenAddress || !normalized?.chain) return normalized;
 
-  if (normalized.chain === "evm" && detectAddressKindSafe(normalized.tokenAddress) === "evm") {
+  const adapterChain = normalized.chain;
+  const tokenKind = detectAddressKindSafe(normalized.tokenAddress);
+  const adapter = getChainAdapter(adapterChain);
+
+  if (adapter && tokenKind === adapterChain && typeof adapter.enrichMetadata === "function") {
     try {
-      let meta = null;
-      if (typeof options.evmMetadataReader === "function") {
-        meta = await options.evmMetadataReader({
-          query: normalized.tokenAddress,
-          network: normalized.network ?? item.network,
-          kind: "address",
-        }, options);
-      } else {
-        const batchReader = typeof options.evmMetadataBatchReader === "function"
-          ? options.evmMetadataBatchReader
-          : queryEvmTokenMetadataBatch;
-        const batchRes = await batchReader([{ token: normalized.tokenAddress }], {
-          ...(options.evmMetadataOptions && typeof options.evmMetadataOptions === "object" ? options.evmMetadataOptions : {}),
-          network: normalized.network ?? item.network ?? undefined,
-          networkName: normalized.network ?? item.network ?? undefined,
-        });
-        meta = batchRes?.items?.[0] ?? null;
-      }
-
-      if (meta && typeof meta === "object") {
-        return {
-          ...normalized,
-          name: normalized.name ?? (meta.name ?? null),
-          symbol: normalized.symbol ?? (meta.symbol ?? null),
-          decimals: Number.isFinite(Number(meta.decimals)) ? Number(meta.decimals) : normalized.decimals,
-        };
-      }
-    } catch {
-      // ignore enrichment failure, keep normalized remote result
-    }
-  }
-
-  if (normalized.chain === "trx" && detectAddressKindSafe(normalized.tokenAddress) === "trx") {
-    try {
-      let meta = null;
-      if (typeof options.trxMetadataReader === "function") {
-        meta = await options.trxMetadataReader({
-          query: normalized.tokenAddress,
-          network: normalized.network ?? item.network ?? "mainnet",
-          kind: "address",
-        }, options);
-      } else {
-        meta = await queryTrxTokenMetadata({
-          tokenAddress: normalized.tokenAddress,
-          network: normalized.network ?? item.network ?? undefined,
-          networkName: normalized.network ?? item.network ?? undefined,
-          callerAddress: options.trxCallerAddress ?? options.callerAddress ?? undefined,
-        });
-      }
-
-      if (meta && typeof meta === "object") {
-        return {
-          ...normalized,
-          name: normalized.name ?? (meta.name ?? null),
-          symbol: normalized.symbol ?? (meta.symbol ?? null),
-          decimals: Number.isFinite(Number(meta.decimals)) ? Number(meta.decimals) : normalized.decimals,
-        };
-      }
+      return await adapter.enrichMetadata(item, normalized, options);
     } catch {
       // ignore enrichment failure, keep normalized remote result
     }
@@ -499,53 +389,14 @@ async function resolveFromRemote(item, options, cacheApi) {
       resolved = await options.remoteResolver(item, options);
     } else {
       const queryKind = inferQueryKind(item);
-      if (queryKind === "address" && detectAddressKindSafe(item.query) === "evm") {
-        if (typeof options.evmMetadataReader === "function") {
-          resolved = await options.evmMetadataReader(item, options);
-        } else {
-          const batchReader = typeof options.evmMetadataBatchReader === "function"
-            ? options.evmMetadataBatchReader
-            : queryEvmTokenMetadataBatch;
-          const batchRes = await batchReader([
-            { token: item.query },
-          ], {
-            ...(options.evmMetadataOptions && typeof options.evmMetadataOptions === "object" ? options.evmMetadataOptions : {}),
-            network: item.network ?? undefined,
-            networkName: item.network ?? undefined,
-          });
-          const first = batchRes?.items?.[0] ?? null;
-          if (first && (first.name != null || first.symbol != null || first.decimals != null)) {
-            resolved = {
-              chain: "evm",
-              network: item.network,
-              tokenAddress: item.query,
-              name: first.name ?? null,
-              symbol: first.symbol ?? null,
-              decimals: first.decimals ?? null,
-            };
-          }
-        }
-      }
-
-      if (queryKind === "address" && !resolved && detectAddressKindSafe(item.query) === "trx") {
-        if (typeof options.trxMetadataReader === "function") {
-          resolved = await options.trxMetadataReader(item, options);
-        } else {
-          const meta = await queryTrxTokenMetadata({
-            tokenAddress: item.query,
-            network: item.network ?? undefined,
-            networkName: item.network ?? undefined,
-            callerAddress: options.trxCallerAddress ?? options.callerAddress ?? undefined,
-          });
-          if (meta && typeof meta === "object") {
-            resolved = {
-              chain: "trx",
-              network: item.network ?? "mainnet",
-              tokenAddress: item.query,
-              name: meta.name ?? null,
-              symbol: meta.symbol ?? null,
-              decimals: meta.decimals ?? null,
-            };
+      if (queryKind === "address" && !resolved) {
+        const detectedChain = detectAddressKindSafe(item.query);
+        const adapterForRemote = detectedChain ? getChainAdapter(detectedChain) : null;
+        if (adapterForRemote && typeof adapterForRemote.resolveMetadata === "function") {
+          try {
+            resolved = await adapterForRemote.resolveMetadata(item, options);
+          } catch {
+            // ignore, continue to sources
           }
         }
       }

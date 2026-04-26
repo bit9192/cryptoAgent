@@ -330,3 +330,47 @@
 1. `queryTokenMetaBatch` 返回结果中，EVM address 型 token 的 result.debugStats.proofNetworks 有值。
 2. `portfolio-analysis.test.mjs` 输出能显示"证明命中网络分布"统计行。
 3. 回归测试通过（总请求数与错误率不回退）。
+
+### Slice S-15：提取 ChainTokenAdapter 注册机制，消除 token-price 中硬编码链分支
+
+**背景：**
+`token-price/index.mjs` 中多处存在 `if (detected === "evm") ... if (detected === "btc") ... if (detected === "trx")` 的硬编码分支，导致增加新链时需要修改多处核心文件，容易遗漏。
+
+**目标架构：**
+- 每条链实现标准适配器接口 `ChainTokenAdapter`，字段包括：
+  - `chain`：链标识符
+  - `networkNames`：该链对应的 network 名称列表（用于 `inferExpectedChainFromNetwork`）
+  - `resolveToken(input)`：从 config 解析 token（输入 { network?, address?, key? }）
+  - `proofNetworks`：支持地址归属预验证的网络列表（`[]` 表示不支持）
+  - `proofAddressNetworks?(tokenAddress)`：地址归属预验证异步函数（可选）
+  - `resolveNativeToken?(network)`：解析原生 token config（可选）
+  - `resolveMetadata?(item, options)`：从链上解析 metadata（可选，用于 `resolveFromRemote`）
+  - `enrichMetadata?(item, normalized, options)`：补充 metadata 字段（可选，用于 `enrichResolvedMetadata`）
+- 新增 `src/apps/offchain/token-price/chain-adapters.mjs`：各链适配器的实现与注册
+- `index.mjs` 中的 `resolveConfigCandidates`、`resolveNativeTokenCandidate`、`resolveFromRemote`、`enrichResolvedMetadata`、`inferExpectedChainFromNetwork` 均通过注册表驱动，不再写死链名
+
+**本次只做：**
+
+1. 定义 `ChainTokenAdapter` 接口（JSDoc 注释形式）。
+2. 创建 `chain-adapters.mjs`，实现并注册 evm / btc / trx 三条链的适配器。
+3. 在 `index.mjs` 中替换以下四处硬编码逻辑为注册表驱动：
+   - `inferExpectedChainFromNetwork`（network 名称 → chain 映射）
+   - `resolveConfigCandidates` 中的 address/symbol 解析分支
+   - `resolveNativeTokenCandidate`（原生 token 解析）
+   - `resolveFromRemote` 中的链特化 metadata 解析
+   - `enrichResolvedMetadata` 中的链特化补充逻辑
+4. 增加新链只需在 `chain-adapters.mjs` 追加一个适配器对象，其余文件不改动。
+
+**本次不做：**
+
+1. 修改 price 查询逻辑（coingecko/dexscreener）。
+2. 修改 `queryTokenPriceLiteBatch`、`queryTokenPriceBatch` 等对外 API 签名。
+3. 将适配器接口扩展到 search-engine 或 task 层。
+
+**验收标准：**
+
+1. `chain-adapters.mjs` 存在，包含 evm/btc/trx 三个适配器，每个字段齐备。
+2. `index.mjs` 中不再出现 `detected === "evm"`、`detected === "btc"`、`detected === "trx"` 的硬编码分支（替换为注册表循环/查找）。
+3. `inferExpectedChainFromNetwork` 的 network 名称列表从各适配器 `networkNames` 中聚合而来。
+4. `portfolio-analysis.test.mjs` 回归通过（请求数/错误率不回退）。
+5. 理论上添加新链只需在 `chain-adapters.mjs` 末尾追加一个对象。
