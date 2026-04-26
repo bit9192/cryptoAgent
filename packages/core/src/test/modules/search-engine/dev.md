@@ -96,17 +96,23 @@
 
 当前进度：
 
-1. 已完成 search 模块计划拆分
-2. 已完成 token-search TS-1（最小闭环）
-3. 已补齐 token-search 样本与单测
-4. 已完成 token-search TS-2~TS-4（注册式、缓存、trx与排序）
-5. 已完成 S-5：trade/contract/address 协议接入（mock）
-6. 已完成 S-6：composition root 外置默认 provider 装配
+1. ✅ 已完成 search 模块计划拆分
+2. ✅ 已完成 token-search TS-1（最小闭环）
+3. ✅ 已补齐 token-search 样本与单测
+4. ✅ 已完成 token-search TS-2~TS-4（注册式、缓存、trx与排序）
+5. ✅ 已完成 S-5：trade/contract/address 协议接入（mock）
+6. ✅ 已完成 S-6：composition root 外置默认 provider 装配
+7. ✅ 已完成 S-7：EVM search provider 注册注入
+8. ✅ 已完成 S-8：BTC search 接口骨架设计
+9. ✅ 已完成 S-9：基于 test.data 的多链多接口使用测试脚本
+10. ✅ 已完成 S-10：投资组合分析全流程测试（API 瓶颈监测）
+11. ✅ 已完成 S-10b：价格批量请求改造与并发压测
 
 下一步：
 
-1. 进入各链真实 provider 替换切片（先 EVM contract/address）
-2. 进入 tasks/search 接入统一 SearchEngine 入口
+1. 进入 S-12：EVM tokenAddress 先做网络归属验证（仅非 fork 网络）再查价
+2. 进入各链真实 provider 替换切片（先 EVM contract/address）
+3. 进入 tasks/search 接入统一 SearchEngine 入口
 
 ### Slice S-7：EVM search provider 注册注入到中心 SearchEngine
 
@@ -147,3 +153,137 @@
 
 1. BTC search 开发门禁文档齐备（dev.md + test-data）。
 2. 接口签名与输出字段可直接指导后续切片实现。
+
+### Slice S-9：基于 test.data 的多链多接口使用测试脚本
+
+本次只做：
+
+1. 新增 `test/modules/search-engine/run.test.mjs`（手工运行脚本，非单元断言）。
+2. 脚本读取 `test.data.md`，抽取 token / 地址样本。
+3. 通过 `createDefaultSearchEngine()` 执行三类 domain：`token` / `trade` / `address`。
+4. 覆盖三链：BTC / EVM / TRX，并输出按 domain 与链路的统计摘要。
+
+本次不做：
+
+1. 把该脚本纳入 CI 强断言（避免外部源波动导致不稳定）。
+2. 修改 search-engine 核心排序或路由逻辑。
+
+验收标准：
+
+1. `node src/test/modules/search-engine/run.test.mjs` 可执行。
+2. 输出包含每个 case 的 `ok/count/error` 与总览统计。
+3. 失败 case 不中断整体运行，便于排查外部源问题。
+
+### Slice S-10：投资组合分析全流程测试（API 瓶颈监测）
+
+本次只做：
+
+1. 创建 `test/modules/search-engine/portfolio-analysis.test.mjs` 端到端测试脚本。
+2. 实现完整流程：
+   - Step 1: searchToken() 获取各 token 信息
+   - Step 2: 通过 token-price 统一价格入口获取各 token 价格（先解析 token，再按链路取价）
+   - Step 3: searchAddress() 获取各地址资产列表
+   - Step 4: 针对地址资产，优先按 tokenAddress / native symbol 再次获取完整价格
+   - Step 5: 计算资产价值（quantity × price）
+   - Step 6: 标注 EVM 高风险（price=0）的 token
+3. 监测 API 性能指标：
+   - 总请求数与去重后请求数对比
+   - 响应时间分布（min/avg/max/p95）
+   - 单链/多链并发对API的压力
+   - 是否出现接口抱死/429/timeout 的信号
+
+本次不做：
+
+1. 修改 provider 或 request-engine 实现（只测不改）。
+2. 实现请求限流或缓存策略（如果发现瓶颈再优化）。
+3. CI 集成（手工测试脚本）。
+
+验收标准：
+
+1. `node src/test/modules/search-engine/portfolio-analysis.test.mjs` 可执行。
+2. 输出完整资产列表：{name, quantity, price, value, riskFlag}。
+3. 分链输出投资组合总价值与资产分布。
+4. API 监测报告包含：request_count, dedup_ratio, response_times, error_rate。
+5. 无崩溃、无卡顿（若出现，记录瓶颈信号）。
+
+### Slice S-10b：批量请求模式与并发压力测试
+
+本次只做：
+
+1. 改写 `preloadTokenPrices()` 为批量模式：
+   - 收集所有 token（BTC/EVM/TRX）
+   - 按链/网络分组后，调用 `queryTokenPriceLiteBatchByQuery()` 批量查价
+   - 结果映射到 `tokenPriceMap`
+2. 改写步骤 3 资产估值的价格查询为批量：
+   - 收集所有 (chain, network, query) 三元组
+   - 按 (chain, network) 分组
+   - 对每组调用批量价格接口
+3. 保留 PerformanceMonitor 监测能力，统计：
+   - 批量请求数 vs 单个请求数的对比
+   - 并发能否改善响应时间分布
+   - 是否暴露接口稳定性问题（timeout/429/partial-fail）
+4. 运行并对比结果：预期请求数 78→30，耗时 30s→10s
+
+本次不做：
+
+1. 修改 queryTokenPrice 或 queryTokenPriceLiteBatchByQuery 源码。
+2. 实现请求限流或熔断策略。
+3. 修改 address/token search 接口。
+
+验收标准：
+
+1. `preloadTokenPrices()` 改为批量，一次性拉取所有 token 价格。
+2. 步骤 3 资产估值也改为批量，收集待查资产后批量查价。
+3. 监测输出显示：批量请求数 < 单个请求数，性能提升 ≥ 2 倍。
+4. 并发过程中无接口错误 (timeout/429)。
+5. 脚本仍可执行、结果正确。
+
+### Slice S-11：Address Context 入口（root search 前置判定）
+
+本次只做：
+
+1. 在 `modules/search-engine` 增加地址前置判定接口：`resolveAddressContext()`。
+2. 输入 address 后返回：
+   - chain
+   - addressType
+   - normalizedAddress
+   - detectedNetwork
+   - availableNetworks（以各链 config + 已注册 provider 为准）
+   - providerIds
+3. 支持三链最小识别：BTC / EVM / TRX。
+4. 仅做本地判定与 provider/配置聚合，不触发资产查询。
+
+本次不做：
+
+1. token scope/root token context 接口。
+2. 地址资产查询联动。
+3. EVM 合约/EOA 深度链上探测。
+
+验收标准：
+
+1. `createDefaultSearchEngine().resolveAddressContext()` 可用。
+2. BTC/TRX/EVM 地址均可返回 chain、addressType、availableNetworks。
+3. TRX 地址不再被 BTC 误识别。
+4. availableNetworks 受已注册 provider 与 config 共同约束。
+
+### Slice S-12：EVM tokenAddress 先验证网络归属再查价（批量）
+
+本次只做：
+
+1. 在 `portfolio-analysis.test.mjs` 中，针对 EVM token address 查询新增“网络归属预验证”阶段。
+2. 预验证仅覆盖非 fork 网络（eth / bsc），通过 EVM metadata batch（multicall）判定该地址是否为该网络 token。
+3. 仅对命中网络执行价格批量查询，跳过未命中网络，减少无效 IO。
+4. 监测中新增该阶段的请求统计，便于对比优化效果。
+
+本次不做：
+
+1. 修改 `apps/offchain/token-price` 的核心解析算法。
+2. 扩展到 polygon/base 等新网络。
+3. 在 root search/task 层暴露新 API。
+
+验收标准：
+
+1. EVM address 类型 token 不再默认对所有非 fork 网络盲查价格。
+2. 预验证命中后才进入对应网络价格查询。
+3. `portfolio-analysis.test.mjs` 可执行且结果正确。
+4. 监测输出可看到预验证阶段请求记录。
