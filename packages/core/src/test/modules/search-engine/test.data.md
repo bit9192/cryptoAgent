@@ -48,7 +48,7 @@ usdc
 - 0xdac17f958d2ee523a2206206994597c13d831ec7
 - 0x39AA39c021dfbaE8faC545936693aC917d5E7563
 
-### trc
+### trc20
 TUjwNG28iEa18s8WVnbxChu7g6SN2VCxUP
 TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
 TMacq4TDUw5q8NFBwmbY4RLXvzvG5JTkvi
@@ -59,6 +59,7 @@ TU1ntBzpGPp7GJkzxLTKwYsneJ9JKUmBCK
 # addresses
 TGiadwLepcnXD8RMsT9ZrhaA4JL9A7be8h
 TP3wnPRXr7zUWExZXb4qKxjfGHBgTkC15N
+TPsMJ3BE9ixSQ7guFbVLZ4eou6SATBSqHH
 
 bc1p8w6zr5e2q60s0r8al4tvmsfer77c0eqc8j55gk8r7hzv39zhs2lqa8p0k6
 bc1ps793rn2savj7u7stawzly7uua62nuay7pzq027ck8hfrdzffdnnqf3gegf

@@ -47,8 +47,14 @@ function detectNetworkFromBase58(version) {
 	if (version === BTC_NETWORK_CONFIG.mainnet.pubKeyHash || version === BTC_NETWORK_CONFIG.mainnet.scriptHash) {
 		return "mainnet";
 	}
+	if (version === BTC_NETWORK_CONFIG.testnet.pubKeyHash || version === BTC_NETWORK_CONFIG.testnet.scriptHash) {
+		return "testnet";
+	}
+	if (version === BTC_NETWORK_CONFIG.regtest.pubKeyHash || version === BTC_NETWORK_CONFIG.regtest.scriptHash) {
+		return "testnet";
+	}
 	// testnet / regtest 的 Base58 前缀相同
-	return "testnet";
+	throw new Error(`未知 BTC Base58 version: ${version}`);
 }
 
 function detectNetworkFromBech32(prefix) {
@@ -81,6 +87,17 @@ export function parseBtcAddress(addressInput) {
 
 	try {
 		const decoded = bitcoin.address.fromBase58Check(address);
+		const isMainnetP2sh = decoded.version === BTC_NETWORK_CONFIG.mainnet.scriptHash;
+		const isTestnetP2sh = decoded.version === BTC_NETWORK_CONFIG.testnet.scriptHash;
+		const isRegtestP2sh = decoded.version === BTC_NETWORK_CONFIG.regtest.scriptHash;
+		const isMainnetP2pkh = decoded.version === BTC_NETWORK_CONFIG.mainnet.pubKeyHash;
+		const isTestnetP2pkh = decoded.version === BTC_NETWORK_CONFIG.testnet.pubKeyHash;
+		const isRegtestP2pkh = decoded.version === BTC_NETWORK_CONFIG.regtest.pubKeyHash;
+
+		if (!isMainnetP2sh && !isTestnetP2sh && !isRegtestP2sh && !isMainnetP2pkh && !isTestnetP2pkh && !isRegtestP2pkh) {
+			throw new Error(`未知 BTC Base58 version: ${decoded.version}`);
+		}
+
 		const kind = decoded.version === BTC_NETWORK_CONFIG.mainnet.scriptHash
 			|| decoded.version === BTC_NETWORK_CONFIG.testnet.scriptHash
 			|| decoded.version === BTC_NETWORK_CONFIG.regtest.scriptHash

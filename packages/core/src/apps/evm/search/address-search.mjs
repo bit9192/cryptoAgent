@@ -11,6 +11,14 @@ function normalizeLower(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
+function toFiniteNumberOrNull(value) {
+  if (value == null || String(value).trim?.() === "") {
+    return null;
+  }
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
 function normalizeAddress(value, fieldName) {
   const raw = String(value ?? "").trim();
   if (!raw) {
@@ -36,7 +44,7 @@ function normalizeAssetItem(item = {}) {
     ? NATIVE_TOKEN_ADDRESS
     : normalizeAddress(rawAddress, "asset.address");
 
-  const decimals = Number.isFinite(Number(item?.decimals)) ? Number(item.decimals) : null;
+  const decimals = toFiniteNumberOrNull(item?.decimals);
 
   return {
     assetType,
@@ -84,7 +92,7 @@ function normalizeAlchemyAssetRows(rows = [], ownerAddress = null) {
       address,
       symbol: String(row?.symbol ?? row?.tokenSymbol ?? "").trim() || null,
       name: String(row?.name ?? row?.tokenName ?? "").trim() || null,
-      decimals: Number.isFinite(Number(row?.decimals)) ? Number(row.decimals) : null,
+      decimals: toFiniteNumberOrNull(row?.decimals),
       extra: {
         source: "alchemy-data",
         network: String(row?.network ?? "").trim() || null,
@@ -116,6 +124,50 @@ function normalizeAssetList(input = [], options = {}) {
     if (!dedup.has(key)) dedup.set(key, item);
   }
   return [...dedup.values()];
+}
+
+async function enrichMissingAssetMetadata(assets = [], network, options = {}) {
+  const list = Array.isArray(assets) ? assets : [];
+  const targets = list.filter((asset) => {
+    const address = normalizeLower(asset?.address);
+    if (!address || address === NATIVE_TOKEN_ADDRESS) return false;
+    return asset?.symbol == null || asset?.name == null || asset?.decimals == null;
+  });
+
+  if (targets.length === 0) {
+    return list;
+  }
+
+  const queryMetadataBatch = typeof options.queryMetadataBatch === "function"
+    ? options.queryMetadataBatch
+    : queryEvmTokenMetadata;
+
+  let metadataItems = [];
+  try {
+    const metadataRes = await queryMetadataBatch({
+      items: targets.map((asset) => ({ tokenAddress: asset.address })),
+      network,
+      ...options,
+    });
+    metadataItems = Array.isArray(metadataRes?.items) ? metadataRes.items : [];
+  } catch {
+    return list;
+  }
+
+  const metadataMap = new Map(
+    metadataItems.map((item) => [normalizeLower(item?.tokenAddress), item]),
+  );
+
+  return list.map((asset) => {
+    const metadata = metadataMap.get(normalizeLower(asset?.address));
+    if (!metadata) return asset;
+    return {
+      ...asset,
+      symbol: asset.symbol ?? metadata.symbol ?? null,
+      name: asset.name ?? metadata.name ?? null,
+      decimals: asset.decimals ?? metadata.decimals ?? null,
+    };
+  });
 }
 
 function toCheckBatchInput(input) {
@@ -202,7 +254,7 @@ async function resolveAssetsForAddress(input = {}, addressType = "unknown", opti
         address: input.address,
         symbol: String(metadata?.symbol ?? "").trim() || null,
         name: String(metadata?.name ?? "").trim() || null,
-        decimals: Number.isFinite(Number(metadata?.decimals)) ? Number(metadata.decimals) : null,
+        decimals: toFiniteNumberOrNull(metadata?.decimals),
       });
     } catch {
       baseAssets.push({
@@ -287,7 +339,15 @@ export async function queryAddressBalanceByNetwork(input = [], network, options 
   const networkName = normalizeNetwork(network, "network");
   const gasToken = resolveGasTokenSymbol(networkName);
 
-  const normalizedRows = rows.map((item) => normalizeBalanceQueryItem(item, networkName));
+  const normalizedRows = await Promise.all(
+    rows.map(async (item) => {
+      const normalized = normalizeBalanceQueryItem(item, networkName);
+      return {
+        ...normalized,
+        assets: await enrichMissingAssetMetadata(normalized.assets, networkName, options),
+      };
+    }),
+  );
 
   const pairRows = [];
   const pairMeta = [];
@@ -326,7 +386,7 @@ export async function queryAddressBalanceByNetwork(input = [], network, options 
     const balances = row.assets.map((asset) => {
       const key = `${normalizeLower(row.address)}:${normalizeLower(asset.address)}`;
       const rawBalance = balanceMap.get(key) ?? 0n;
-      const decimals = Number.isFinite(Number(asset?.decimals))
+      const decimals = toFiniteNumberOrNull(asset?.decimals) != null
         ? Number(asset.decimals)
         : (normalizeLower(asset.address) === NATIVE_TOKEN_ADDRESS ? 18 : null);
       return {

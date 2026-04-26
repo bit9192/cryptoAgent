@@ -1,9 +1,17 @@
 import {
   queryAddressCheck,
+  queryAddressBalance,
 } from "./address-search.mjs";
 
 function normalizeLower(value) {
   return String(value ?? "").trim().toLowerCase();
+}
+
+function shortenAddress(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "Token";
+  if (normalizeLower(text) === "native") return "ETH";
+  return `${text.slice(0, 6)}...${text.slice(-4)}`;
 }
 
 function mapAddressCheckToSearchItems(checkResult = {}) {
@@ -41,6 +49,49 @@ function mapAddressCheckToSearchItems(checkResult = {}) {
   }));
 }
 
+function mapAddressBalanceToSearchItems(balanceResult = {}) {
+  if (!balanceResult?.ok) {
+    return [];
+  }
+
+  const { address, network, chain } = balanceResult;
+  const balances = Array.isArray(balanceResult.balances) ? balanceResult.balances : [];
+  const nonZeroBalances = balances.filter((asset) => {
+    try {
+      return BigInt(asset?.rawBalance ?? 0n) > 0n;
+    } catch {
+      return false;
+    }
+  });
+
+  return nonZeroBalances.map((asset) => ({
+    domain: "address",
+    chain,
+    network,
+    id: `address:evm:${normalizeLower(network)}:${normalizeLower(address)}:${normalizeLower(asset.address)}`,
+    title: asset.symbol || asset.name || shortenAddress(asset.address),
+    address,
+    tokenAddress: asset.address,
+    symbol: asset.symbol,
+    name: asset.name,
+    decimals: asset.decimals,
+    source: "evm-address-search",
+    confidence: 0.9,
+    extra: {
+      asset: {
+        address: asset.address,
+        symbol: asset.symbol,
+        name: asset.name,
+        decimals: asset.decimals,
+        assetType: asset.assetType,
+        rawBalance: asset.rawBalance,
+        formatted: asset.formatted,
+        ...(asset.extra && typeof asset.extra === "object" ? { ...asset.extra } : {}),
+      },
+    },
+  }));
+}
+
 export function createEvmAddressSearchProvider(options = {}) {
   async function searchAddress(input = {}) {
     const query = String(input?.query ?? input?.address ?? "").trim();
@@ -55,6 +106,20 @@ export function createEvmAddressSearchProvider(options = {}) {
         address: query,
         network: requestedNetwork,
       }, options);
+
+      const balanceResult = await queryAddressBalance([
+        {
+          address: checkResult.address,
+          network: checkResult.network,
+          assets: checkResult.assets,
+        },
+      ], options);
+
+      const firstRow = Array.isArray(balanceResult?.items) ? balanceResult.items[0] : null;
+      const items = mapAddressBalanceToSearchItems(firstRow);
+      if (firstRow) {
+        return items;
+      }
 
       return mapAddressCheckToSearchItems(checkResult);
     } catch {

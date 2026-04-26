@@ -36,8 +36,8 @@ export function createNativeBalanceResolver() {
       const { address, network } = input;
       try {
         const result = await btcBalanceGet({ addresses: [address] }, network);
-        const items = Array.isArray(result?.items) ? result.items : [];
-        return items.map((item) => mapNativeBalanceItem(item, network));
+        const rows = Array.isArray(result?.rows) ? result.rows : [];
+        return rows.map((item) => mapNativeBalanceItem(item, network));
       } catch {
         // 降级：resolver 失败不影响其他资产查询
         return [];

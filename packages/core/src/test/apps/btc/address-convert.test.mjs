@@ -58,3 +58,10 @@ test("btc/address-convert: 非法地址会抛错", () => {
     /无效 BTC 地址/
   );
 });
+
+test("btc/address-convert: TRX 地址不能被当成 BTC Base58 地址", () => {
+  assert.throws(
+    () => parseBtcAddress("TGiadwLepcnXD8RMsT9ZrhaA4JL9A7be8h"),
+    /无效 BTC 地址/
+  );
+});

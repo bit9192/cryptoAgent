@@ -45,6 +45,8 @@ function toTradeItem(pair, tokenAddress) {
       pairAddress,
       dexId,
       pairLabel: `${baseSymbol}/${quoteSymbol}`,
+      baseToken: pair?.baseToken ?? null,
+      quoteToken: pair?.quoteToken ?? null,
       priceNative: pair?.priceNative ?? null,
       priceUsd: pair?.priceUsd ?? null,
       liquidityUsd: toNumberOrZero(pair?.liquidity?.usd),

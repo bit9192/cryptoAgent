@@ -76,6 +76,46 @@ test("address search: by-network batch returns balances", async () => {
   assert.equal(res.items[1].balances[1].rawBalance, 4n);
 });
 
+test("address search: by-network batch backfills missing token metadata", async () => {
+  const res = await queryAddressBalanceByNetwork([
+    {
+      address: "0x00000000000000000000000000000000000000c1",
+      assets: [
+        { assetType: "erc20", address: "0x00000000000000000000000000000000000000a1" },
+      ],
+    },
+  ], "bsc", {
+    queryBalanceBatch: async (pairs) => ({
+      ok: true,
+      items: pairs.map((item, index) => ({
+        chain: "evm",
+        tokenAddress: item.token,
+        ownerAddress: item.address,
+        balance: BigInt(index + 1),
+      })),
+    }),
+    queryMetadataBatch: async () => ({
+      ok: true,
+      items: [
+        {
+          chain: "evm",
+          tokenAddress: "0x00000000000000000000000000000000000000A1",
+          symbol: "AAA",
+          name: "Asset AAA",
+          decimals: 18,
+        },
+      ],
+    }),
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.items.length, 1);
+  assert.equal(res.items[0].balances[1].symbol, "AAA");
+  assert.equal(res.items[0].balances[1].name, "Asset AAA");
+  assert.equal(res.items[0].balances[1].decimals, 18);
+  assert.equal(res.items[0].balances[1].formatted, "0.000000000000000002");
+});
+
 test("address search: mixed-network batch groups by network and keeps order", async () => {
   const networkCalls = [];
   const res = await queryAddressBalance([
