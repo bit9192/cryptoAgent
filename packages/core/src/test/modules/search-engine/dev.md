@@ -287,3 +287,23 @@
 2. 预验证命中后才进入对应网络价格查询。
 3. `portfolio-analysis.test.mjs` 可执行且结果正确。
 4. 监测输出可看到预验证阶段请求记录。
+
+### Slice S-13：下沉 EVM 地址归属预验证到 token-price 公共层
+
+本次只做：
+
+1. 在 `apps/offchain/token-price/index.mjs` 中，为 EVM address 且未指定 network 的查询增加网络预验证（eth/bsc，非 fork）。
+2. 预验证使用 EVM metadata batch（multicall）判定 token 在网络上是否存在。
+3. `queryTokenMetaBatch` 走配置候选前先应用预验证结果，避免默认网络误匹配。
+
+本次不做：
+
+1. 修改远程价格源（coingecko/dexscreener）策略。
+2. 扩展到更多 EVM 网络。
+3. 改 task/root-search 对外协议。
+
+验收标准：
+
+1. EVM address 无 network 时，config 解析优先使用预验证命中的网络。
+2. 未命中任何网络时不产生错误的 config 候选。
+3. 现有脚本 `portfolio-analysis.test.mjs` 回归通过。

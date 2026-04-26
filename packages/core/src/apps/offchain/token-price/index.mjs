@@ -292,7 +292,30 @@ async function getDefaultTokenInfoSources() {
   return [coinGecko, dexscreener].filter(Boolean);
 }
 
-function resolveConfigCandidates(item) {
+const EVM_PROOF_NETWORKS = ["eth", "bsc"];
+
+async function resolveEvmAddressNetworksByMetadata(tokenAddress) {
+  const normalizedAddress = normalizeString(tokenAddress).toLowerCase();
+  if (!/^0x[a-fA-F0-9]{40}$/.test(normalizedAddress)) {
+    return [];
+  }
+
+  const matchedNetworks = [];
+  for (const network of EVM_PROOF_NETWORKS) {
+    try {
+      const metadata = await queryEvmTokenMetadataBatch([normalizedAddress], { network });
+      const row = Array.isArray(metadata?.items) ? metadata.items[0] : null;
+      if (!row) continue;
+      const hasMetadata = Boolean(row?.symbol || row?.name || Number.isFinite(Number(row?.decimals)));
+      if (hasMetadata) matchedNetworks.push(network);
+    } catch {
+      // ignore network proof error, keep trying other networks
+    }
+  }
+  return matchedNetworks;
+}
+
+async function resolveConfigCandidates(item) {
   const query = item.query;
   const network = item.network;
   const kind = inferQueryKind(item);
@@ -317,7 +340,16 @@ function resolveConfigCandidates(item) {
 
   if (kind === "address") {
     const detected = detectAddressKindSafe(query);
-    if (detected === "evm") maybeResolve("evm", resolveEvmToken, { network, address: query });
+    if (detected === "evm") {
+      if (network) {
+        maybeResolve("evm", resolveEvmToken, { network, address: query });
+      } else {
+        const matchedNetworks = await resolveEvmAddressNetworksByMetadata(query);
+        for (const matchedNetwork of matchedNetworks) {
+          maybeResolve("evm", resolveEvmToken, { network: matchedNetwork, address: query });
+        }
+      }
+    }
     if (detected === "btc") maybeResolve("btc", resolveBtcToken, { network, address: query });
     if (detected === "trx") maybeResolve("trx", resolveTrxToken, { network, address: query });
     return candidates;
@@ -641,7 +673,7 @@ export async function queryTokenMetaBatch(input = [], options = {}) {
       }
     }
 
-    const configCandidates = resolveConfigCandidates(item);
+    const configCandidates = await resolveConfigCandidates(item);
     const matchedConfigCandidates = configCandidates
       .map((row) => normalizeResolvedRow(row, row))
       .filter((row) => isRemoteMatchForItem(item, row));
