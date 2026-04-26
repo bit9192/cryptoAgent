@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { searchTask } from "../../../tasks/search/index.mjs";
+import { searchTask, searchTaskWithEngine } from "../../../tasks/search/index.mjs";
 
 // ─── Happy Path ───────────────────────────────────────────────────────────────
 
@@ -55,4 +55,82 @@ test("searchTask: 多次调用复用同一 engine 实例（不重复装配）", 
   const r2 = await searchTask({ domain: "token", query: "BNB", network: "bsc" });
   assert.equal(r1.ok, true);
   assert.equal(r2.ok, true);
+});
+
+test("searchTaskWithEngine: EVM 地址在未指定网络时按回退顺序命中非空网络", async () => {
+  const calls = [];
+  const engine = {
+    async resolveAddressContext() {
+      return {
+        ok: true,
+        items: [
+          {
+            chain: "evm",
+            availableNetworks: ["bsc", "eth"],
+          },
+        ],
+      };
+    },
+    async search(input = {}) {
+      calls.push(input.network);
+      if (input.domain !== "address") {
+        return { ok: true, candidates: [] };
+      }
+      if (input.network === "eth") {
+        return { ok: true, candidates: [] };
+      }
+      return {
+        ok: true,
+        candidates: [
+          {
+            domain: "address",
+            chain: "evm",
+            network: "bsc",
+            address: "0x1111111111111111111111111111111111111111",
+          },
+        ],
+      };
+    },
+  };
+
+  const result = await searchTaskWithEngine({
+    domain: "address",
+    query: "0x1111111111111111111111111111111111111111",
+  }, engine);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.network, "bsc");
+  assert.equal(result.candidates.length, 1);
+  assert.deepEqual(calls, ["eth", "bsc"]);
+});
+
+test("searchTaskWithEngine: 指定网络时不做跨网回退", async () => {
+  const calls = [];
+  const engine = {
+    async resolveAddressContext() {
+      return {
+        ok: true,
+        items: [
+          {
+            chain: "evm",
+            availableNetworks: ["eth", "bsc"],
+          },
+        ],
+      };
+    },
+    async search(input = {}) {
+      calls.push(input.network);
+      return { ok: true, candidates: [] };
+    },
+  };
+
+  const result = await searchTaskWithEngine({
+    domain: "address",
+    query: "0x2222222222222222222222222222222222222222",
+    network: "bsc",
+  }, engine);
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.candidates, []);
+  assert.deepEqual(calls, ["bsc"]);
 });
