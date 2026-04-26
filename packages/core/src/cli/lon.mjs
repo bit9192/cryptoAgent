@@ -789,6 +789,85 @@ async function pickWalletTargetsFromTree(session) {
   return null;
 }
 
+async function readWalletInputs(session, scope = "wallet") {
+  try {
+    const result = await execute(
+      {
+        task: "wallet:session",
+        args: { action: "wallet.inputs.show", scope },
+        source: "cli",
+        network: session.network,
+      },
+      {
+        registry: session.registry,
+        wallet: session.wallet,
+        confirm: async () => true,
+        interact: async () => null,
+        checkpointStore: session.checkpointStore,
+      },
+    );
+    
+    if (result?.ok) {
+      return result.data ?? {};
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+async function queryInputsAssets(session, domain = "token", network = null) {
+  const inputs = await readWalletInputs(session);
+  
+  // 尝试提取第一个有效地址
+  let targetAddress = null;
+  if (inputs?.address) {
+    targetAddress = inputs.address;
+  } else if (Array.isArray(inputs?.targets) && inputs.targets.length > 0) {
+    targetAddress = inputs.targets[0].address;
+  }
+  
+  if (!targetAddress) {
+    return {
+      ok: false,
+      error: "inputs 中未找到有效地址，请先执行 wallet inputs.set",
+    };
+  }
+  
+  console.log(`  [search-inputs] 查询地址: ${targetAddress}`);
+  console.log(`  [search-inputs] domain: ${domain}${network ? `, network: ${network}` : ""}`);
+  
+  try {
+    const result = await execute(
+      {
+        task: "search",
+        args: {
+          domain,
+          query: targetAddress,
+          network,
+          limit: 50,
+        },
+        source: "cli",
+        network: session.network,
+      },
+      {
+        registry: session.registry,
+        wallet: session.wallet,
+        confirm: async () => true,
+        interact: async () => null,
+        checkpointStore: session.checkpointStore,
+      },
+    );
+    
+    return result;
+  } catch (err) {
+    return {
+      ok: false,
+      error: err.message,
+    };
+  }
+}
+
 async function prepareWalletInputsArgs(session, action, rawArgs = {}) {
   const args = normalizeTaskArgs(rawArgs);
   delete args._;
@@ -1178,6 +1257,31 @@ async function dispatchCommand(line, session) {
       break;
     }
 
+    // ── si <domain> [--network <network>] ──  搜索 inputs 地址的资产
+    case "si":
+    case "search-inputs": {
+      const positional = args._ ?? [];
+      const domain = (String(positional[0] ?? "").toLowerCase()).trim() || "token";
+      const network = (String(args.network ?? "").trim()) || null;
+      
+      if (!["token", "trade", "address"].includes(domain)) {
+        console.error(`  用法: si <domain> [--network <network>]`);
+        console.error(`  domain: token | trade | address`);
+        break;
+      }
+      
+      const result = await queryInputsAssets(session, domain, network);
+      if (result.ok) {
+        console.log(`  [search-inputs] 查询成功`);
+        const candidates = Array.isArray(result.candidates) ? result.candidates : [];
+        console.log(`  [search-inputs] 找到 ${candidates.length} 条结果`);
+        printData(result);
+      } else {
+        console.error(`  [search-inputs] 查询失败: ${result.error}`);
+      }
+      break;
+    }
+
     // ── help ──
     case "help":
     case "?": {
@@ -1192,6 +1296,7 @@ async function dispatchCommand(line, session) {
     test <filePattern>                运行 Node 测试文件
     resume <token>                    恢复已暂停的任务
     use  <dev|op>                     切换 wallet 模式
+    si   <domain> [--network net]     查询 inputs 地址的资产（token|trade|address）
     tasks [--json]                    列出所有已注册任务（--json 机器可读）
     reload                            重新加载任务注册表
     state                             查看当前 Session 状态
