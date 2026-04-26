@@ -6,7 +6,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { searchTask, searchAddressAssetsTask } from "../../../tasks/search/index.mjs";
+import { searchTask, searchAddressAssetsTask, searchPortfolioTask } from "../../../tasks/search/index.mjs";
 
 // ─── 解析 test.data.md ──────────────────────────────────────────────────────
 
@@ -136,6 +136,26 @@ async function main() {
         `      - ${asset.symbol ?? asset.title ?? "ASSET"}: qty=${quantity} priceUsd=${valuation.priceUsd ?? 0} valueUsd=${valuation.valueUsd ?? 0}`,
       );
     }
+  }
+
+  // ── 7. 地址组合汇总（仅 search 任务层接口）────────────────────────────
+  console.log("\n=== 7. 地址组合汇总（searchPortfolioTask）===");
+  const portfolio = await searchPortfolioTask({
+    addresses: d.addresses,
+    withPrice: true,
+    timeoutMs: 15000,
+  });
+
+  if (!portfolio.ok) {
+    console.log(`FAIL  \"${portfolio.error}\"`);
+  } else {
+    console.log(`ok  addresses=${portfolio.addresses.length}  totalValueUsd=${portfolio.totalValueUsd}`);
+    for (const [chain, row] of Object.entries(portfolio.byChain || {})) {
+      console.log(
+        `      - ${chain.toUpperCase()}: addresses=${(row?.addresses || []).length} assets=${(row?.assets || []).length} totalValueUsd=${row?.totalValueUsd ?? 0}`,
+      );
+    }
+    console.log(`      - riskFlags=${Array.isArray(portfolio.riskFlags) ? portfolio.riskFlags.length : 0}`);
   }
 
   console.log("\n✅ 完成\n");

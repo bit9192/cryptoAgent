@@ -5,6 +5,7 @@ import {
   searchTask,
   searchTaskWithEngine,
   searchAddressAssetsTaskWithEngine,
+  searchPortfolioTaskWithEngine,
 } from "../../../tasks/search/index.mjs";
 
 // ─── Happy Path ───────────────────────────────────────────────────────────────
@@ -208,4 +209,78 @@ test("searchAddressAssetsTaskWithEngine: 只靠 search 接口可返回资产估�
   assert.equal(result.assets[0].extra.valuation.valueUsd, 0.4);
   assert.equal(result.assets[1].extra.valuation.valueUsd, 3);
   assert.equal(result.totalValueUsd, 3.4);
+});
+
+test("searchPortfolioTaskWithEngine: 聚合分链总价值并输出风险标记", async () => {
+  const evmAssets = [
+    {
+      domain: "address",
+      chain: "evm",
+      network: "eth",
+      symbol: "USDT",
+      tokenAddress: "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      extra: { asset: { assetType: "erc20" }, balance: "10" },
+    },
+  ];
+  const trxAssets = [
+    {
+      domain: "address",
+      chain: "trx",
+      network: "mainnet",
+      symbol: "TRX",
+      tokenAddress: "native",
+      extra: { protocol: "native", balance: "5" },
+    },
+  ];
+
+  const engine = {
+    async resolveAddressContext(input = {}) {
+      const isEvm = String(input?.query ?? "").startsWith("0x");
+      return {
+        ok: true,
+        items: [
+          {
+            chain: isEvm ? "evm" : "trx",
+            availableNetworks: [isEvm ? "eth" : "mainnet"],
+          },
+        ],
+      };
+    },
+    async search(input = {}) {
+      if (input.domain !== "address") return { ok: true, candidates: [] };
+      const isEvm = String(input?.query ?? "").startsWith("0x");
+      return {
+        ok: true,
+        candidates: isEvm ? evmAssets : trxAssets,
+      };
+    },
+  };
+
+  const result = await searchPortfolioTaskWithEngine(
+    {
+      addresses: [
+        "0x1111111111111111111111111111111111111111",
+        "TGiadwLepcnXD8RMsT9ZrhaA4JL9A7be8h",
+      ],
+      withPrice: true,
+    },
+    engine,
+    {
+      priceBatchQuery: async (items = []) => ({
+        ok: true,
+        items: items.map((it) => {
+          if (it.chain === "evm") return { ok: true, priceUsd: 0, source: "mock" };
+          return { ok: true, priceUsd: 0.3, source: "mock" };
+        }),
+      }),
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(Number(result.byChain.evm.totalValueUsd), 0);
+  assert.equal(Number(result.byChain.trx.totalValueUsd), 1.5);
+  assert.equal(result.totalValueUsd, 1.5);
+  assert.equal(Array.isArray(result.riskFlags), true);
+  assert.equal(result.riskFlags.length, 1);
+  assert.equal(result.riskFlags[0].chain, "evm");
 });

@@ -447,3 +447,33 @@ token-price 层在中心表基础上扩展：
 2. `searchTask({ domain: "token", query: "USDT", network: "eth" })` 返回 `{ ok: true, candidates: [...] }`。
 3. 非法 domain 返回 `{ ok: false, error: "..." }`，不抛异常。
 4. engine 实例在进程内复用（不重复装配）。
+
+### Slice S-19：下沉组合汇总到 tasks/search（run.test 仅走 search 接口）
+
+**目标：**
+将 `portfolio-analysis.test.mjs` 中“地址资产汇总 + 价值汇总 + 风险标记”的核心编排下沉到 `tasks/search`，使 `run.test.mjs` 仅通过 search 任务接口即可输出 analysis 同类结果结构。
+
+**本次只做：**
+
+1. 在 `src/tasks/search/index.mjs` 增加 `searchPortfolioTask(input)`：
+   - 输入：`addresses[]`，可选 `withPrice`/`timeoutMs`
+   - 内部复用 `searchAddressAssetsTask()` 逐地址查询
+   - 输出：`byChain` 汇总、`totalValueUsd`、`riskFlags`
+2. 新增按职责拆分的 pipeline 文件（非链业务代码不混在 root）：
+   - `pipelines/portfolio/summary.mjs`（按链聚合）
+   - `pipelines/portfolio/risk.mjs`（风险标记规则）
+3. 更新 `run.test.mjs`：新增调用 `searchPortfolioTask()` 的汇总输出段（分链总价值 + 风险数量）。
+4. 新增 `src/test/tasks/search/search.test.mjs` 的组合汇总单测（mock engine）。
+
+**本次不做：**
+
+1. 下沉 analysis 的性能监测报表（PerformanceMonitor）。
+2. token 预热/预验证命中统计下沉。
+3. 引入新链 provider 或修改 apps 层 provider 实现。
+
+**验收标准：**
+
+1. `searchPortfolioTask()` 返回 `byChain`、`totalValueUsd`、`riskFlags`。
+2. `run.test.mjs` 可仅通过 search 接口输出组合汇总信息。
+3. `src/test/tasks/search/search.test.mjs` 全部通过。
+4. 现有 `searchTask` / `searchAddressAssetsTask` 回归不破坏。

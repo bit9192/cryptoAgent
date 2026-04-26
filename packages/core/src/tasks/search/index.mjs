@@ -2,6 +2,8 @@ import { createDefaultSearchEngine } from "../../modules/search-engine/index.mjs
 import { queryTokenPriceLiteBatchByQuery } from "../../apps/offchain/token-price/query-token-price.mjs";
 import { runAddressPipeline } from "./pipelines/address/index.mjs";
 import { buildAssetValuationInput } from "./pipelines/valuation/index.mjs";
+import { createPortfolioSummaryState, addAddressAssetsToSummary } from "./pipelines/portfolio/summary.mjs";
+import { extractPortfolioRiskFlags } from "./pipelines/portfolio/risk.mjs";
 
 const VALID_DOMAINS = ["token", "trade", "address"];
 
@@ -272,9 +274,82 @@ export async function searchAddressAssetsTask(input = {}) {
   return await searchAddressAssetsTaskWithEngine(input, getEngine());
 }
 
+function normalizeAddressItems(input = []) {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean);
+}
+
+export async function searchPortfolioTaskWithEngine(input = {}, engine, options = {}) {
+  const addresses = normalizeAddressItems(input?.addresses);
+  const timeoutMs = Number.isFinite(Number(input?.timeoutMs)) ? Number(input.timeoutMs) : 10000;
+  const withPrice = input?.withPrice !== false;
+
+  if (addresses.length === 0) {
+    return {
+      ok: false,
+      addresses: [],
+      byChain: {},
+      totalValueUsd: 0,
+      riskFlags: [],
+      error: "addresses 不能为空",
+    };
+  }
+
+  const runtimeEngine = engine ?? getEngine();
+  const state = createPortfolioSummaryState();
+  const riskFlags = [];
+  const addressResults = [];
+
+  for (const address of addresses) {
+    const row = await searchAddressAssetsTaskWithEngine(
+      {
+        query: address,
+        timeoutMs,
+        withPrice,
+      },
+      runtimeEngine,
+      options,
+    );
+
+    const assets = Array.isArray(row?.assets) ? row.assets : [];
+    const chain = normalizeChainFromCandidate(assets[0]);
+    addAddressAssetsToSummary(state, {
+      chain,
+      address,
+      assets,
+    });
+    riskFlags.push(...extractPortfolioRiskFlags({ address, assets }));
+    addressResults.push({
+      address,
+      ok: Boolean(row?.ok),
+      network: row?.network ?? null,
+      assetsCount: assets.length,
+      totalValueUsd: Number(row?.totalValueUsd ?? 0),
+      error: row?.error ?? null,
+    });
+  }
+
+  return {
+    ok: true,
+    addresses,
+    byChain: state.byChain,
+    totalValueUsd: roundValue(state.totalValueUsd),
+    riskFlags,
+    addressResults,
+  };
+}
+
+export async function searchPortfolioTask(input = {}) {
+  return await searchPortfolioTaskWithEngine(input, getEngine());
+}
+
 export default {
   searchTask,
   searchTaskWithEngine,
   searchAddressAssetsTask,
   searchAddressAssetsTaskWithEngine,
+  searchPortfolioTask,
+  searchPortfolioTaskWithEngine,
 };
