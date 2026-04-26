@@ -6,7 +6,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { searchTask } from "../../../tasks/search/index.mjs";
+import { searchTask, searchAddressAssetsTask } from "../../../tasks/search/index.mjs";
 
 // ─── 解析 test.data.md ──────────────────────────────────────────────────────
 
@@ -51,11 +51,16 @@ function fmt(r) {
 
 async function run(label, params) {
   process.stdout.write(`  ${label.padEnd(52)}`);
-  console.log(
-    params, " params"
-  )
   const r = await searchTask(params);
   console.log(fmt(r));
+}
+
+function pickBalance(asset = {}) {
+  const extra = asset?.extra && typeof asset.extra === "object" ? asset.extra : {};
+  const valuation = extra?.valuation && typeof extra.valuation === "object" ? extra.valuation : {};
+  if (typeof valuation.quantity === "number") return valuation.quantity;
+  if (typeof extra.balance === "string" || typeof extra.balance === "number") return Number(extra.balance);
+  return 0;
 }
 
 // ─── 主流程 ─────────────────────────────────────────────────────────────────
@@ -101,6 +106,36 @@ async function main() {
     const isBtc = /^(bc1|1|3)[a-zA-HJ-NP-Z0-9]{6,}/.test(addr) || /^04[0-9a-fA-F]{128}$/.test(addr);
     const network = isTrx ? "mainnet" : isBtc ? "btc" : "eth";
     await run(shortAddr(addr), { domain: "address", query: addr, network, timeoutMs: 15000 });
+  }
+
+  // ── 6. 地址资产估值（仅 search 任务层接口）────────────────────────────
+  console.log("\n=== 6. 地址资产估值（searchAddressAssetsTask）===");
+  for (const addr of d.addresses) {
+    const isTrx = /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(addr);
+    const isBtc = /^(bc1|1|3)[a-zA-HJ-NP-Z0-9]{6,}/.test(addr) || /^04[0-9a-fA-F]{128}$/.test(addr);
+    const network = isTrx ? "mainnet" : isBtc ? "btc" : "eth";
+
+    process.stdout.write(`  ${shortAddr(addr).padEnd(52)}`);
+    const result = await searchAddressAssetsTask({
+      query: addr,
+      network,
+      withPrice: true,
+      timeoutMs: 15000,
+    });
+
+    if (!result.ok) {
+      console.log(`FAIL  \"${result.error}\"`);
+      continue;
+    }
+
+    console.log(`ok  assets=${result.assets.length}  totalValueUsd=${result.totalValueUsd}`);
+    for (const asset of result.assets.slice(0, 3)) {
+      const valuation = asset?.extra?.valuation ?? {};
+      const quantity = pickBalance(asset);
+      console.log(
+        `      - ${asset.symbol ?? asset.title ?? "ASSET"}: qty=${quantity} priceUsd=${valuation.priceUsd ?? 0} valueUsd=${valuation.valueUsd ?? 0}`,
+      );
+    }
   }
 
   console.log("\n✅ 完成\n");

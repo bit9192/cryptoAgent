@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { searchTask, searchTaskWithEngine } from "../../../tasks/search/index.mjs";
+import {
+  searchTask,
+  searchTaskWithEngine,
+  searchAddressAssetsTaskWithEngine,
+} from "../../../tasks/search/index.mjs";
 
 // ─── Happy Path ───────────────────────────────────────────────────────────────
 
@@ -133,4 +137,75 @@ test("searchTaskWithEngine: 指定网络时不做跨网回退", async () => {
   assert.equal(result.ok, true);
   assert.deepEqual(result.candidates, []);
   assert.deepEqual(calls, ["bsc"]);
+});
+
+test("searchAddressAssetsTaskWithEngine: 只靠 search 接口可返回资产估值与总价值", async () => {
+  const engine = {
+    async resolveAddressContext() {
+      return {
+        ok: true,
+        items: [
+          {
+            chain: "trx",
+            availableNetworks: ["mainnet"],
+          },
+        ],
+      };
+    },
+    async search(input = {}) {
+      if (input.domain !== "address") return { ok: true, candidates: [] };
+      return {
+        ok: true,
+        candidates: [
+          {
+            domain: "address",
+            chain: "trx",
+            network: "mainnet",
+            symbol: "TRX",
+            tokenAddress: "native",
+            extra: {
+              protocol: "native",
+              balance: "2",
+            },
+          },
+          {
+            domain: "address",
+            chain: "trx",
+            network: "mainnet",
+            symbol: "USDT",
+            tokenAddress: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+            extra: {
+              protocol: "trc20",
+              contractAddress: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+              balance: "3",
+            },
+          },
+        ],
+      };
+    },
+  };
+
+  const result = await searchAddressAssetsTaskWithEngine(
+    {
+      query: "TGiadwLepcnXD8RMsT9ZrhaA4JL9A7be8h",
+      network: "mainnet",
+      withPrice: true,
+    },
+    engine,
+    {
+      priceBatchQuery: async () => ({
+        ok: true,
+        items: [
+          { ok: true, priceUsd: 0.2, source: "mock" },
+          { ok: true, priceUsd: 1.0, source: "mock" },
+        ],
+      }),
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.assets.length, 2);
+  assert.equal(result.assets[0].extra.valuation.valueUsd, 0.4);
+  assert.equal(result.assets[1].extra.valuation.valueUsd, 3);
+  assert.equal(result.totalValueUsd, 3.4);
 });
