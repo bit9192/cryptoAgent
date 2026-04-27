@@ -150,18 +150,7 @@ async function resolveAddressesForKey(key, requestedChains = [], wallet = null) 
       continue;
     }
 
-    // typed 模式：优先读缓存（数组中含 {address, type} 对象）
-    const cached = existing[chain];
-    if (
-      Array.isArray(cached) &&
-      cached.length > 0 &&
-      cached[0] && typeof cached[0] === "object" && "address" in cached[0] && "type" in cached[0]
-    ) {
-      result[chain] = cached;
-      continue;
-    }
-
-    // 没有缓存 → 调 getSigner 按 addressType 生成
+    // typed 模式：调 getSigner 按 addressType 生成
     if (wallet && typeof wallet.getSigner === "function") {
       try {
         const { signer } = await wallet.getSigner({ chain, keyId: key.keyId });
