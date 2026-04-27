@@ -66,15 +66,20 @@ test("unlockWallet: repeated unlock should refresh key source after lockAll", as
   const second = await unlockWallet(wallet, fileB, password);
   assert.equal(second.ok, true);
 
-  const secondState = await wallet.getSessionState({ keyId });
+  const secondKeyId = Object.keys(second.unlocked)[0];
+  assert.ok(secondKeyId);
+  assert.notEqual(secondKeyId, keyId);
+
+  const secondState = await wallet.getSessionState({ keyId: secondKeyId });
   assert.equal(Array.isArray(secondState.tree?.tree), true);
   assert.equal(secondState.tree.tree.some((row) => row.name === "bob"), true);
   assert.equal(secondState.tree.tree.some((row) => row.name === "alice"), false);
 
   const listed = await wallet.listKeys();
   assert.equal(listed.items.some((item) => item.name === "bob"), true);
-  assert.equal(listed.items.some((item) => item.name === "alice"), false);
-  assert.equal(listed.items[0].sourceFile, path.join("storage", "key", "b.enc.json"));
+  assert.equal(listed.items.some((item) => item.name === "alice"), true);
+  assert.equal(listed.items.filter((item) => item.sourceFile === path.join("storage", "key", "a.enc.json")).length, 1);
+  assert.equal(listed.items.filter((item) => item.sourceFile === path.join("storage", "key", "b.enc.json")).length, 1);
 });
 
 test("unlockWallet: multiple key unlock should rebuild tree only once on last key", async () => {

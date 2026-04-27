@@ -157,16 +157,21 @@ async function initRegistry(session) {
 function makeConfirmHandler(session) {
   return async (opts) => {
     session.interactionActive = true;
+    let usedPrompts = false;
     try {
     if (session.autoConfirm) {
       console.log(`  [confirm] 自动确认: ${opts.task ?? opts.type}`);
       return true;
     }
+    usedPrompts = true;
     const msg = opts.message ?? `确认执行 [${opts.task ?? opts.type}]?`;
     return askConfirm(msg, { initial: false });
     } finally {
       session.interactionActive = false;
-      session.skipNextLine = true;
+      // 仅在实际展示了 prompts 时才需要跳过残留换行
+      if (usedPrompts) {
+        session.skipNextLine = true;
+      }
     }
   };
 }
@@ -248,6 +253,16 @@ function printTopPanel(session) {
   console.log(renderLonTopPanel(session));
 }
 
+function sanitizeReplLine(line) {
+  const raw = String(line ?? "");
+  if (!raw) return "";
+  // 真实 ANSI 方向键等序列：ESC [ ... <letter>
+  const withoutAnsiEscapes = raw.replace(/\u001b\[[0-9;]*[A-Za-z]/g, "");
+  // 可视化方向键文本：^[[A / ^[[B / ...
+  const withoutCaretEscapes = withoutAnsiEscapes.replace(/\^\[\[[A-Za-z]/g, "");
+  return withoutCaretEscapes;
+}
+
 async function runTask(session, taskId, args, resumeToken) {
   const registry = session.registry;
   if (!registry) {
@@ -260,7 +275,6 @@ async function runTask(session, taskId, args, resumeToken) {
 
   console.log(`  [task] 正在执行: ${taskId}`);
   setPanelRunning(session.panel, taskId);
-
   const result = await execute(
     {
       task: taskId,
@@ -1432,10 +1446,16 @@ async function runRepl(session) {
   const modeLabel = session.mode === "dev" ? "dev" : "op";
   const network = session.network ? `@${session.network}` : "";
   const prompt = () => `lon[${modeLabel}${network}]> `;
+  const ensureRawMode = () => {
+    if (process.stdin.isTTY && typeof process.stdin.setRawMode === "function") {
+      try { process.stdin.setRawMode(true); } catch { /* ignore */ }
+    }
+  };
 
   printTopPanel(session);
 
   // 重新赋值动态 prompt（mode/network 可能中途变化）
+  ensureRawMode();
   rl.setPrompt(prompt());
   rl.prompt();
 
@@ -1444,15 +1464,28 @@ async function runRepl(session) {
       if (session.interactionActive) {
         return;
       }
-      if (session.skipNextLine) {
-        session.skipNextLine = false;
-        printTopPanel(session);
+      const normalizedLine = sanitizeReplLine(line);
+      const trimmedLine = normalizedLine.trim();
+      if (!trimmedLine && String(line ?? "").trim()) {
+        // 输入只包含方向键残留，直接忽略
+        ensureRawMode();
         rl.prompt();
         return;
       }
+      if (session.skipNextLine) {
+        session.skipNextLine = false;
+        if (!trimmedLine) {
+          // 仅跳过 prompts 交互后残留的空行（多余换行符）
+          printTopPanel(session);
+          ensureRawMode();
+          rl.prompt();
+          return;
+        }
+        // 有内容的命令不能吞掉，清除标记后继续正常处理
+      }
       rl.pause();
       try {
-        const cont = await dispatchCommand(line, session);
+        const cont = await dispatchCommand(normalizedLine, session);
         if (!cont) {
           rl.close();
           return;
@@ -1464,6 +1497,7 @@ async function runRepl(session) {
       printTopPanel(session);
       rl.setPrompt(prompt());
       rl.resume();
+      ensureRawMode();
       rl.prompt();
     });
 
@@ -1475,6 +1509,7 @@ async function runRepl(session) {
     rl.on("SIGINT", () => {
       process.stdout.write("\n");
       rl.setPrompt(prompt());
+      ensureRawMode();
       rl.prompt();
     });
   });

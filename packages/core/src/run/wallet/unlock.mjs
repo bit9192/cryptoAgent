@@ -32,6 +32,7 @@ async function unlockWallet(walletApp, filePath, password) {
 	]));
 	const lastUnlockIndex = keyIdsToUnlock.length - 1;
 
+	
 	// 解锁新增/重载的密钥
 	for (const [index, keyId] of keyIdsToUnlock.entries()) {
 		try {

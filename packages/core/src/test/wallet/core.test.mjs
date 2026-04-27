@@ -130,6 +130,19 @@ test("wallet 前六个接口: getKeyMeta / unlock / lock / lockAll", async () =>
   assert.equal(unlocked.ok, true);
   assert.equal(unlocked.keyId, keyId);
   assert.deepEqual(unlocked.scope, { chain: "evm", contracts: ["0xabc"] });
+  assert.equal(Array.isArray(unlocked.tree?.tree), true);
+  assert.equal(unlocked.tree?.action, "wallet.tree");
+  assert.equal(unlocked.tree?.counts?.accounts, 1);
+
+  const sessionState = await wallet.getSessionState({ keyId });
+  assert.equal(Array.isArray(sessionState.tree?.tree), true);
+  assert.equal(sessionState.tree?.action, "wallet.tree");
+
+  const directTree = await wallet.getTree();
+  assert.equal(directTree?.ok, true);
+  assert.equal(directTree?.action, "wallet.tree");
+  assert.equal(Array.isArray(directTree?.tree), true);
+  assert.equal(directTree?.counts?.accounts, 1);
 
   const metaAfterUnlock = await wallet.getKeyMeta({ keyId });
   assert.equal(metaAfterUnlock.item.status, "unlocked");
@@ -370,4 +383,54 @@ test("wallet.getSigner: 受 provider + session + capability 约束", async () =>
     () => signerRes.signer.signMessage(),
     /operation 不支持/i,
   );
+});
+
+test("wallet.getTree: 按 chains 补地址并回写缓存，避免重复结算", async () => {
+  const tmp = await mkTmpDir();
+  await writeEncryptedKeyDoc(
+    tmp,
+    "key/tree-cache.enc.json",
+    "wallet-pass-123",
+    [
+      "wallet-tree-cache",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+    ].join("\n"),
+  );
+
+  const wallet = createWallet({ baseDir: tmp });
+  const loaded = await wallet.loadKeyFile({ password: "wallet-pass-123" });
+  const keyId = loaded.addedKeyIds[0];
+
+  let getAddressCalls = 0;
+  await wallet.registerProvider({
+    provider: {
+      chain: "evm",
+      version: "1",
+      operations: ["getAddress"],
+      createSigner: ({ keyId: signerKeyId }) => ({
+        async getAddress() {
+          getAddressCalls += 1;
+          return `0x${String(signerKeyId).slice(0, 40).padEnd(40, "0")}`;
+        },
+      }),
+    },
+  });
+
+  await wallet.unlock({
+    keyId,
+    password: "wallet-pass-123",
+    ttlMs: 60_000,
+  });
+
+  const firstTree = await wallet.getTree({ chains: ["evm"] });
+  assert.equal(firstTree.ok, true);
+  const firstRows = Array.isArray(firstTree.tree) ? firstTree.tree : [];
+  const firstDeriveRows = firstRows.filter((row) => row.keyId === keyId && row.sourceType === "derive");
+  assert.ok(firstDeriveRows.length > 0);
+  assert.ok(firstDeriveRows.some((row) => String(row?.addresses?.evm ?? "").startsWith("0x")));
+  assert.equal(getAddressCalls, 1);
+
+  const secondTree = await wallet.getTree({ chains: ["evm"] });
+  assert.equal(secondTree.ok, true);
+  assert.equal(getAddressCalls, 1);
 });

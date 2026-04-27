@@ -234,11 +234,15 @@ async function unlockOneToCache(ctx) {
     };
   }
 
+  // 先注册 provider，再解锁：buildWalletTreeSnapshot 在 unlock 内部调用 getSigner 时需要 provider 已存在
+  await ensureDefaultProviders(wallet);
+
   const unlocked = await unlockWallet(wallet, selected.abs, password);
   if (unlocked?.tree && typeof unlocked.tree === "object") {
     session.tree = unlocked.tree;
   }
   const entries = Object.values(unlocked?.unlocked ?? {});
+
   for (const item of entries) {
     const keyId = String(item?.keyId ?? "").trim();
     if (!keyId) continue;
@@ -255,7 +259,6 @@ async function unlockOneToCache(ctx) {
   let derivedImported = 0;
   let deriveWarnings = [];
   if (typeof wallet.deriveConfiguredAddresses === "function") {
-    await ensureDefaultProviders(wallet);
     const derived = await wallet.deriveConfiguredAddresses({ strict: true });
     const items = Array.isArray(derived?.items) ? derived.items : [];
 

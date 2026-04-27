@@ -1,6 +1,4 @@
 
-import { extractData } from "../modules/data-engine/index.mjs";
-
 // ─── 工具函数 ───────────────────────────────────────────────
 
 function divider(title) {
@@ -56,128 +54,272 @@ function normalizeChainsFromRequest(chains) {
 function queryKeysWithDataEngine(rows = [], request = {}) {
   const selectors = request?.selectors ?? request?.keyFilters ?? {};
 
-  const keyRows = rows
-    .filter((row) => String(row?.sourceType ?? "") === "orig")
-    .map((row) => ({
-    ...row,
-    name: String(row?.name ?? ""),
-    nameLower: String(row?.name ?? "").toLowerCase(),
-  }));
-
-  const filters = [];
-  const keyId = String(selectors?.keyId ?? "").trim();
-  if (keyId) filters.push({ field: "keyId", op: "eq", value: keyId });
-
+  const keyIdFilter = String(selectors?.keyId ?? "").trim();
   const keyName = String(selectors?.name ?? selectors?.keyName ?? "").trim();
-  if (keyName) {
-    if (selectors?.nameExact) {
-      filters.push({ field: "name", op: "eq", value: keyName });
-    } else {
-      filters.push({ field: "nameLower", op: "contains", value: keyName.toLowerCase() });
-    }
-  }
+  const keyNameNeedle = keyName.toLowerCase();
+  const nameExact = Boolean(selectors?.nameExact);
+  const sourceNameFilter = String(selectors?.sourceName ?? "").trim();
+  const sourceNameNeedle = sourceNameFilter.toLowerCase();
+  const keyTypeFilter = String(selectors?.keyType ?? "").trim();
+  const sourceTypeFilter = String(selectors?.source ?? "").trim().toLowerCase();
 
-  const keyType = String(selectors?.keyType ?? "").trim();
-  if (keyType) filters.push({ field: "keyType", op: "eq", value: keyType });
+  return rows
+    .map((row) => ({
+      keyId: String(row?.keyId ?? "").trim(),
+      name: String(row?.name ?? "").trim(),
+      sourceName: row?.sourceName ?? null,
+      keyType: String(row?.keyType ?? "").trim() || null,
+      sourceType: String(row?.sourceType ?? "").trim() || null,
+      path: row?.path ?? null,
+      addresses: row?.addresses && typeof row.addresses === "object" ? row.addresses : {},
+    }))
+    .filter((item) => {
+      if (!item.keyId) return false;
+      if (keyIdFilter && item.keyId !== keyIdFilter) return false;
+      if (keyTypeFilter && String(item.keyType ?? "") !== keyTypeFilter) return false;
+      if (sourceTypeFilter && String(item.sourceType ?? "").toLowerCase() !== sourceTypeFilter) return false;
 
-  const sourceType = String(selectors?.source ?? "").trim().toLowerCase();
-  if (sourceType) filters.push({ field: "sourceType", op: "eq", value: sourceType });
+      if (keyName || sourceNameFilter) {
+        const nameLower = String(item.name ?? "").toLowerCase();
+        const snLower = String(item.sourceName ?? "").toLowerCase();
 
-  return extractData({
-    input: { keys: keyRows },
-    sourcePath: "$.keys[*]",
-    filters,
-  }).map(({ nameLower, ...rest }) => rest);
-}
+        let nameMatch = true;
+        let sourceNameMatch = true;
 
-function collectAddressesForKey(treeRows = [], keyId = "", requestedChains = []) {
-  const addrMap = {};
-  const chainFilter = requestedChains.length > 0
-    ? new Set(requestedChains.map((item) => item.chain))
-    : null;
+        if (keyName) {
+          if (nameExact) {
+            nameMatch = nameLower === keyNameNeedle;
+          } else {
+            nameMatch = nameLower.includes(keyNameNeedle);
+          }
+        }
 
-  for (const row of treeRows) {
-    if (String(row?.keyId ?? "") !== keyId) continue;
-    if (String(row?.sourceType ?? "") !== "derive") continue;
-    const addresses = row?.addresses && typeof row.addresses === "object" ? row.addresses : {};
+        if (sourceNameFilter) {
+          sourceNameMatch = snLower.includes(sourceNameNeedle);
+        }
 
-    for (const [chain, value] of Object.entries(addresses)) {
-      if (chainFilter && !chainFilter.has(chain)) continue;
-      if (!Array.isArray(addrMap[chain])) addrMap[chain] = [];
-      const items = Array.isArray(value) ? value : [value];
-      for (const addr of items) {
-        const text = String(addr ?? "").trim();
-        if (!text) continue;
-        if (!addrMap[chain].includes(text)) {
-          addrMap[chain].push(text);
+        // 两个条件都传了：取并集（满足一个即可）
+        // 只传了一个：只检查那一个
+        if (keyName && sourceNameFilter) {
+          if (!nameMatch && !sourceNameMatch) return false;
+        } else if (keyName) {
+          if (!nameMatch) return false;
+        } else if (sourceNameFilter) {
+          if (!sourceNameMatch) return false;
         }
       }
-    }
-  }
 
-  if (chainFilter) {
-    for (const chain of chainFilter) {
-      if (!Array.isArray(addrMap[chain])) {
-        addrMap[chain] = [];
-      }
-    }
-  }
-
-  return addrMap;
+      return true;
+    });
 }
 
-function pickWallet(request = {}, tree = {}) {
+async function resolveAddressesForKey(key, requestedChains = [], wallet = null) {
+  const existing = key?.addresses && typeof key.addresses === "object" ? key.addresses : {};
+  const result = {};
+  let addressesGenerated = false;  // Track if new addresses were generated
+
+  for (const { chain, addressTypes } of requestedChains) {
+    const hasTypedMode = Array.isArray(addressTypes) && addressTypes.length > 0;
+
+    if (!hasTypedMode) {
+      // 普通模式：直接用现有地址，没有则尝试生成
+      const cur = existing[chain];
+      const items = Array.isArray(cur) ? cur : cur ? [cur] : [];
+      const filtered = items.map((a) => String(a ?? "").trim()).filter(Boolean);
+
+      if (filtered.length > 0) {
+        result[chain] = filtered.length === 1 ? filtered[0] : filtered;
+        continue;
+      }
+
+      if (wallet && typeof wallet.getSigner === "function") {
+        try {
+          const { signer } = await wallet.getSigner({ chain, keyId: key.keyId });
+          if (signer && typeof signer.getAddress === "function") {
+            const addr = await signer.getAddress({});
+            const text = String(addr ?? "").trim();
+            const value = text || [];
+            // 写回 tree（key.addresses 与原始 tree row 共享引用）
+            if (text) {
+              existing[chain] = text;
+              addressesGenerated = true;  // Mark that we generated a new address
+            }
+            result[chain] = value;
+            continue;
+          }
+        } catch {
+          // getSigner 失败，留空
+        }
+      }
+
+      result[chain] = [];
+      continue;
+    }
+
+    // typed 模式：优先读缓存（数组中含 {address, type} 对象）
+    const cached = existing[chain];
+    if (
+      Array.isArray(cached) &&
+      cached.length > 0 &&
+      cached[0] && typeof cached[0] === "object" && "address" in cached[0] && "type" in cached[0]
+    ) {
+      result[chain] = cached;
+      continue;
+    }
+
+    // 没有缓存 → 调 getSigner 按 addressType 生成
+    if (wallet && typeof wallet.getSigner === "function") {
+      try {
+        const { signer } = await wallet.getSigner({ chain, keyId: key.keyId });
+        if (signer && typeof signer.getAddress === "function") {
+          const generated = [];
+          for (const addressType of addressTypes) {
+            try {
+              const addr = await signer.getAddress({ addressType });
+              const text = String(addr ?? "").trim();
+              if (text && !generated.some((item) => item.address === text && item.type === addressType)) {
+                generated.push({ address: text, type: addressType });
+              }
+            } catch {
+              // 跳过单个 addressType 失败
+            }
+          }
+          // 写回 tree 缓存
+          if (generated.length > 0) {
+            existing[chain] = generated;
+            addressesGenerated = true;  // Mark that we generated new addresses
+          }
+          result[chain] = generated;
+          continue;
+        }
+      } catch {
+        // getSigner 失败，留空
+      }
+    }
+
+    result[chain] = [];
+  }
+
+  return { addresses: result, addressesGenerated };
+}
+
+async function pickWallet(request = {}, tree = {}, wallet = null) {
   const scope = String(request?.scope ?? "single").trim().toLowerCase() || "single";
   const outputs = request.outputs ?? request.outps ?? {};
   const requestedChains = normalizeChainsFromRequest(outputs?.chains);
   const treeRows = Array.isArray(tree?.tree) ? tree.tree : [];
   const selectedKeys = queryKeysWithDataEngine(treeRows, request);
 
-  const results = selectedKeys.map((key) => ({
-    keyId: key.keyId,
-    name: key.name,
-    keyType: key.keyType,
-    sourceType: key.sourceType,
-    path: key.path ?? null,
-    addresses: collectAddressesForKey(treeRows, key.keyId, requestedChains),
-  }));
+  const keysToProcess = scope === "all" ? selectedKeys : selectedKeys.slice(0, 1);
 
-  if (scope === "all") return results;
-  return results.length > 0 ? [results[0]] : [];
+  let anyAddressesGenerated = false;
+
+  const results = await Promise.all(
+    keysToProcess.map(async (key) => {
+      const result = await resolveAddressesForKey(key, requestedChains, wallet);
+      const addresses = result.addresses;
+      if (result.addressesGenerated) {
+        anyAddressesGenerated = true;
+      }
+      return {
+        keyId: key.keyId,
+        name: key.name,
+        keyType: key.keyType,
+        sourceType: key.sourceType,
+        path: key.path ?? null,
+        addresses,
+      };
+    })
+  );
+
+  // Invalidate tree cache if any new addresses were generated
+  if (anyAddressesGenerated && wallet && typeof wallet.invalidateTreeCache === "function") {
+    wallet.invalidateTreeCache();
+  }
+
+  return results;
+}
+
+async function resolveWalletTree(options = {}) {
+  const wallet = options?.wallet;
+  if (!wallet) {
+    return null;
+  }
+
+  if (typeof wallet.getTree === "function") {
+    try {
+      const tree = await wallet.getTree();
+      if (tree && Array.isArray(tree?.tree)) {
+        return tree;
+      }
+    } catch {
+      // 兼容旧路径，失败时回退到 listKeys + getSessionState
+    }
+  }
+
+  if (typeof wallet.listKeys !== "function" || typeof wallet.getSessionState !== "function") {
+    return null;
+  }
+
+  try {
+    const listed = await wallet.listKeys({ enabled: true });
+    const items = Array.isArray(listed?.items) ? listed.items : [];
+    const unlocked = items.filter((item) => String(item?.status ?? "") === "unlocked");
+
+    for (const item of unlocked) {
+      const keyId = String(item?.keyId ?? "").trim();
+      if (!keyId) continue;
+      const state = await wallet.getSessionState({ keyId });
+      const tree = state?.tree;
+      if (tree && Array.isArray(tree?.tree)) {
+        return tree;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 async function testDebugPickAddressFromInputs(options) {
   divider("调试 B: 从 inputs 提取地址（含 key fallback）");
-  const tree = options?.wallet?.tree;
+
+  const tree = await resolveWalletTree(options);
   if (!tree || !Array.isArray(tree?.tree)) {
-    error("缺少 options.wallet.tree.tree，请先确保上游已提供 wallet tree");
+    error("未能从 wallet 会话读取到 tree，请先执行 wallet unlock");
     return;
   }
-
-  const pickedWallets = pickWallet(
+  
+  const pickedWallets = await pickWallet(
     {
       scope: "all",
       selectors: {
-        keyId: options?.inputs?.keyId,
-        name: String(options?.inputs?.name ?? "").trim() || "meer",
-        nameExact: Boolean(options?.inputs?.nameExact),
-        keyType: options?.inputs?.keyType,
-        source: options?.inputs?.source,
+        // keyId: options?.inputs?.keyId,
+        // name: String(options?.inputs?.name ?? "").trim(),
+        name: "meer",
+        sourceName: "meer",
+        // nameExact: Boolean(options?.inputs?.nameExact),
+        // keyType: options?.inputs?.keyType,
+        // source: options?.inputs?.source,
       },
       outps: {
         signer: true,
         chains: [
           "evm",
+          "trx",
           {
             chain: "btc",
-            addressTypes: Array.isArray(options?.inputs?.addressTypes)
-              ? options.inputs.addressTypes
-              : undefined,
+            addressTypes: ["p2wpkh", "p2tr"]
+            // addressTypes: Array.isArray(options?.inputs?.addressTypes)
+            //   ? options.inputs.addressTypes
+            //   : undefined,
           },
         ],
       },
     },
     tree,
+    options?.wallet,
   );
 
   info(`wallet.tree rows: ${Array.isArray(tree?.tree) ? tree.tree.length : 0}`);
@@ -189,11 +331,8 @@ async function testDebugPickAddressFromInputs(options) {
 
 export async function run(options) {
   console.log("\n🔧 Wallet-Engine 测试工具\n");
-    console.log(
-        options.wallet.tree
-    )
-    return
-  info(`options.wallet.tree rows: ${Array.isArray(options?.wallet?.tree?.tree) ? options.wallet.tree.tree.length : 0}`);
+  const tree = await resolveWalletTree(options);
+  info(`wallet.tree rows: ${Array.isArray(tree?.tree) ? tree.tree.length : 0}`);
   await testDebugPickAddressFromInputs(options);
 
   divider("所有测试完成");

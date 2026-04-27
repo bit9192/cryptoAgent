@@ -1,14 +1,33 @@
-import { createHash } from "node:crypto";
-import fs from "node:fs/promises";
 import path from "node:path";
-import bs58 from "bs58";
 import { HDNodeWallet, Wallet } from "ethers";
 
 import { loadKeyQueueFromStoredFile, revealStoredFileContent } from "../../modules/key/store.mjs";
 import { buildWalletTree } from "../../modules/wallet-tree/index.mjs";
+import {
+  normalizeStringList,
+  normalizeTags,
+  normalizeScope,
+  buildKeyId,
+  normalizeSecp256k1PrivateKey,
+  defaultDerivationPathByChain,
+  normalizePathList,
+  normalizeChainRequests,
+} from "./utils.mjs";
+import {
+  parseAddressConfigsFromText,
+  parseDirectiveParams,
+  expandDirective,
+  resolveWildcardPath,
+  expandPathRange,
+  validateBtcPurposeMatch,
+} from "./address-config.mjs";
+import { createProviderOps } from "./provider-ops.mjs";
+import {
+  ensureRequestedAddressesForRecord,
+  collectDerivedAddressesFromSession,
+} from "./tree-cache.mjs";
+import { createCatalogOps } from "./catalog-ops.mjs";
 
-const DEFAULT_LOAD_SOURCE = "key";
-const ENCRYPTED_FILE_SUFFIX = ".enc.json";
 const DEFAULT_UNLOCK_TTL_MS = 10 * 60 * 1000;
 
 // ──────────────────── 预定义开发用密钥 ────────────────────────
@@ -36,182 +55,16 @@ const DEV_KEYS = [
   },
 ];
 
-function normalizeStringList(input) {
-  if (input == null) {
-    return [];
-  }
-
-  if (Array.isArray(input)) {
-    return input
-      .flatMap((item) => normalizeStringList(item))
-      .filter(Boolean);
-  }
-
-  const value = String(input).trim();
-  return value ? [value] : [];
-}
-
-function normalizeTags(tags) {
-  return Array.from(new Set(normalizeStringList(tags)));
-}
-
-function normalizeScope(scope = {}) {
-  if (!scope || typeof scope !== "object") {
-    return {};
-  }
-
-  const normalized = {};
-  if (scope.chain) normalized.chain = String(scope.chain);
-  if (scope.address) normalized.address = String(scope.address);
-
-  const contracts = normalizeStringList(scope.contracts);
-  if (contracts.length > 0) normalized.contracts = contracts;
-
-  const selectors = normalizeStringList(scope.selectors);
-  if (selectors.length > 0) normalized.selectors = selectors;
-
-  return normalized;
-}
-
-function buildKeyId(entry) {
-  return createHash("sha256")
-    .update(`${entry.type}:${entry.secret}`)
-    .digest("hex")
-    .slice(0, 24);
-}
-
-function normalizeHexPrivateKey(raw) {
-  const value = String(raw ?? "").trim();
-  if (!value) {
-    throw new Error("privateKey 不能为空");
-  }
-  const normalized = value.startsWith("0x") ? value : `0x${value}`;
-  if (!/^0x[0-9a-fA-F]{64}$/.test(normalized)) {
-    throw new Error("privateKey 格式无效（需 64 位 hex）");
-  }
-  return normalized;
-}
-
-function base58CheckDecode(text) {
-  const raw = Buffer.from(bs58.decode(String(text ?? "").trim()));
-  if (raw.length < 5) {
-    throw new Error("WIF/Base58Check 长度无效");
-  }
-
-  const payload = raw.subarray(0, raw.length - 4);
-  const checksum = raw.subarray(raw.length - 4);
-  const expected = createHash("sha256")
-    .update(createHash("sha256").update(payload).digest())
-    .digest()
-    .subarray(0, 4);
-
-  if (!checksum.equals(expected)) {
-    throw new Error("WIF/Base58Check 校验失败");
-  }
-
-  return payload;
-}
-
-function normalizeSecp256k1PrivateKey(raw) {
-  const value = String(raw ?? "").trim();
-  if (!value) {
-    throw new Error("privateKey 不能为空");
-  }
-
-  // WIF (compressed/uncompressed)
-  if (/^[5KLc9][1-9A-HJ-NP-Za-km-z]{50,53}$/.test(value)) {
-    const payload = base58CheckDecode(value);
-    if (payload.length !== 33 && payload.length !== 34) {
-      throw new Error("WIF payload 长度无效");
-    }
-
-    const keyBytes = payload.length === 34 ? payload.subarray(1, 33) : payload.subarray(1);
-    return `0x${Buffer.from(keyBytes).toString("hex")}`;
-  }
-
-  return normalizeHexPrivateKey(value);
-}
-
-function normalizeBtcAddressType(input) {
-  const raw = String(input ?? "p2pkh").trim().toLowerCase();
-  if (raw === "legacy" || raw === "p2pkh") return "p2pkh";
-  if (raw === "nested" || raw === "p2sh-p2wpkh" || raw === "p2sh") return "p2sh-p2wpkh";
-  if (raw === "segwit" || raw === "p2wpkh" || raw === "bech32") return "p2wpkh";
-  return "p2pkh";
-}
-
-function defaultDerivationPathByChain(input = {}) {
-  const chain = String(input.chain ?? "").trim().toLowerCase();
-  const network = String(input.network ?? "mainnet").toLowerCase();
-
-  if (chain === "btc") {
-    const coinType = network === "testnet" ? 1 : 0;
-    const addressType = normalizeBtcAddressType(input.addressType);
-    if (addressType === "p2wpkh") return `m/84'/${coinType}'/0'/0/0`;
-    if (addressType === "p2sh-p2wpkh") return `m/49'/${coinType}'/0'/0/0`;
-    return `m/44'/${coinType}'/0'/0/0`;
-  }
-
-  if (chain === "trx") {
-    return "m/44'/195'/0'/0/0";
-  }
-
-  // evm and default secp256k1 chains
-  return "m/44'/60'/0'/0/0";
-}
-
-function normalizePathList(pathInput, pathsInput, fallbackPath) {
-  const out = [];
-  if (Array.isArray(pathsInput)) {
-    for (const item of pathsInput) {
-      const value = String(item ?? "").trim();
-      if (value) out.push(value);
-    }
-  }
-  const single = String(pathInput ?? "").trim();
-  if (single) out.push(single);
-
-  const deduped = Array.from(new Set(out));
-  if (deduped.length > 0) return deduped;
-  return [fallbackPath];
-}
-
-async function walkEncryptedFiles(dirPath) {
-  const entries = await fs.readdir(dirPath, { withFileTypes: true });
-  entries.sort((a, b) => a.name.localeCompare(b.name));
-
-  const files = [];
-  for (const entry of entries) {
-    const abs = path.join(dirPath, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...await walkEncryptedFiles(abs));
-      continue;
-    }
-
-    if (entry.isFile() && entry.name.endsWith(ENCRYPTED_FILE_SUFFIX)) {
-      files.push(abs);
-    }
-  }
-
-  return files;
-}
-
 export function createWallet(options = {}) {
   const baseDir = path.resolve(String(options.baseDir ?? process.cwd()));
   const keyCatalog = new Map();
   const sessions = new Map();
   const providerRegistry = new Map();
-
-  function toDisplayPath(targetPath) {
-    const rel = path.relative(baseDir, targetPath);
-    if (!rel || rel === "") {
-      return ".";
-    }
-    if (rel.startsWith("..") || path.isAbsolute(rel)) {
-      return targetPath;
-    }
-    return rel;
-  }
+  
+  // ──────────────────── Tree Snapshot Cache ────────────────────
+  let treeSnapshotCache = null; // Cache entire tree snapshot
+  let cacheInvalidated = true; // Start with invalid cache
+  const providerOps = createProviderOps(providerRegistry);
 
   function cleanupExpiredSession(keyId) {
     const session = sessions.get(keyId);
@@ -227,40 +80,22 @@ export function createWallet(options = {}) {
     return session;
   }
 
-  function currentStatusForRecord(record) {
-    if (!record.enabled) {
-      return "disabled";
-    }
-    return cleanupExpiredSession(record.keyId) ? "unlocked" : "loaded";
-  }
-
-  function buildMeta(record) {
-    return {
-      keyId: record.keyId,
-      name: record.name,
-      type: record.type,
-      source: record.source ?? "file",
-      sourceFile: record.sourceFile,
-      tags: [...record.tags],
-      enabled: record.enabled,
-      status: currentStatusForRecord(record),
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-    };
-  }
-
-  function getRecordOrThrow(keyId) {
-    const normalizedKeyId = String(keyId ?? "").trim();
-    if (!normalizedKeyId) {
-      throw new Error("keyId 不能为空");
-    }
-
-    const record = keyCatalog.get(normalizedKeyId);
-    if (!record) {
-      throw new Error(`未找到 key: ${normalizedKeyId}`);
-    }
-    return record;
-  }
+  const catalogOps = createCatalogOps({
+    baseDir,
+    keyCatalog,
+    cleanupExpiredSession,
+    normalizeStringList,
+    normalizeTags,
+    buildKeyId,
+    loadKeyQueueFromStoredFile,
+    DEV_KEYS,
+  });
+  const getRecordOrThrow = catalogOps.getRecordOrThrow;
+  const findSecretByKeyId = catalogOps.findSecretByKeyId;
+  const loadKeyFile = catalogOps.loadKeyFile;
+  const listKeys = catalogOps.listKeys;
+  const getKeyMeta = catalogOps.getKeyMeta;
+  const loadDevKeys = catalogOps.loadDevKeys;
 
   function getSessionOrThrow(keyId) {
     const session = cleanupExpiredSession(keyId);
@@ -268,30 +103,6 @@ export function createWallet(options = {}) {
       throw new Error(`key 未解锁或会话已过期: ${keyId}`);
     }
     return session;
-  }
-
-  async function findSecretByKeyId(record, password) {
-    if (!record?.sourceFileAbs) {
-      throw new Error(`key 缺少可读取的源文件: ${record?.keyId ?? "unknown"}`);
-    }
-
-    const parsed = await loadKeyQueueFromStoredFile({
-      storedFile: record.sourceFileAbs,
-      password,
-    });
-
-    for (const entry of parsed.entries) {
-      const entryKeyId = buildKeyId(entry);
-      if (entryKeyId === record.keyId) {
-        return {
-          type: entry.type,
-          value: entry.secret,
-          name: entry.name,
-        };
-      }
-    }
-
-    throw new Error(`未在源文件中找到 key: ${record.keyId}`);
   }
 
   async function getSessionState(input = {}) {
@@ -309,72 +120,9 @@ export function createWallet(options = {}) {
     };
   }
 
-  async function registerProvider(input = {}) {
-    const provider = input?.provider;
-    if (!provider || typeof provider !== "object") {
-      throw new Error("provider 不能为空");
-    }
-
-    const chain = String(provider.chain ?? "").trim();
-    if (!chain) {
-      throw new Error("provider.chain 不能为空");
-    }
-    if (typeof provider.createSigner !== "function") {
-      throw new Error(`provider.createSigner 必须是函数: ${chain}`);
-    }
-
-    const operations = Array.isArray(provider.operations)
-      ? Array.from(new Set(provider.operations.map((op) => String(op).trim()).filter(Boolean)))
-      : [];
-
-    const replaced = providerRegistry.has(chain);
-    if (replaced && !input.allowOverride) {
-      throw new Error(`provider 已存在: ${chain}`);
-    }
-
-    const normalizedProvider = {
-      ...provider,
-      chain,
-      operations,
-      supports: typeof provider.supports === "function"
-        ? provider.supports.bind(provider)
-        : (operation) => operations.includes(String(operation ?? "")),
-    };
-
-    providerRegistry.set(chain, normalizedProvider);
-    return {
-      ok: true,
-      chain,
-      replaced,
-    };
-  }
-
-  async function listChains() {
-    const items = [...providerRegistry.values()]
-      .map((provider) => ({
-        chain: provider.chain,
-        operations: [...provider.operations],
-      }))
-      .sort((a, b) => a.chain.localeCompare(b.chain));
-
-    return {
-      ok: true,
-      items,
-    };
-  }
-
-  async function supports(input = {}) {
-    const chain = String(input.chain ?? "").trim();
-    const operation = String(input.operation ?? "").trim();
-    const provider = providerRegistry.get(chain);
-
-    return {
-      ok: true,
-      chain,
-      operation,
-      supported: Boolean(provider && operation && provider.supports(operation)),
-    };
-  }
+  const registerProvider = providerOps.registerProvider;
+  const listChains = providerOps.listChains;
+  const supports = providerOps.supports;
 
   async function requireCapability(input = {}) {
     const keyId = String(input.keyId ?? "").trim();
@@ -597,178 +345,12 @@ export function createWallet(options = {}) {
     };
   }
 
-  async function collectStoredFiles(input = {}) {
-    const rawSources = [
-      ...normalizeStringList(input.file),
-      ...normalizeStringList(input.files),
-      ...normalizeStringList(input.path),
-      ...normalizeStringList(input.paths),
-      ...normalizeStringList(input.dir),
-      ...normalizeStringList(input.dirs),
-    ];
-    const sources = rawSources.length > 0 ? rawSources : [DEFAULT_LOAD_SOURCE];
-    const seen = new Set();
-    const files = [];
-
-    for (const source of sources) {
-      const abs = path.resolve(baseDir, source);
-      let stat;
-      try {
-        stat = await fs.stat(abs);
-      } catch {
-        throw new Error(`未找到 key 源路径: ${toDisplayPath(abs)}`);
-      }
-
-      if (stat.isDirectory()) {
-        const nested = await walkEncryptedFiles(abs);
-        for (const filePath of nested) {
-          if (!seen.has(filePath)) {
-            seen.add(filePath);
-            files.push(filePath);
-          }
-        }
-        continue;
-      }
-
-      if (stat.isFile()) {
-        if (!abs.endsWith(ENCRYPTED_FILE_SUFFIX)) {
-          throw new Error(`暂只支持加载 ${ENCRYPTED_FILE_SUFFIX} 文件: ${toDisplayPath(abs)}`);
-        }
-        if (!seen.has(abs)) {
-          seen.add(abs);
-          files.push(abs);
-        }
-        continue;
-      }
-
-      throw new Error(`不支持的 key 源路径: ${toDisplayPath(abs)}`);
-    }
-
-    if (files.length === 0) {
-      throw new Error(`未找到任何 ${ENCRYPTED_FILE_SUFFIX} 文件`);
-    }
-
-    files.sort((a, b) => a.localeCompare(b));
-    return files;
-  }
-
-  async function loadKeyFile(input = {}) {
-    const password = String(input.password ?? "").trim();
-    if (!password) {
-      throw new Error("password 不能为空");
-    }
-
-    const files = await collectStoredFiles(input);
-    const tags = normalizeTags(input.tags);
-    const reload = Boolean(input.reload);
-    const addedKeyIds = [];
-    const reloadedKeyIds = [];
-    const skippedKeyIds = [];
-    const warnings = [];
-    let loaded = 0;
-
-    for (const storedFile of files) {
-      const parsed = await loadKeyQueueFromStoredFile({ storedFile, password });
-      warnings.push(
-        ...parsed.errors.map((message) => `${toDisplayPath(storedFile)}: ${message}`),
-      );
-
-      for (const entry of parsed.entries) {
-        const keyId = buildKeyId(entry);
-        const now = new Date().toISOString();
-        const existing = keyCatalog.get(keyId);
-        const mergedTags = Array.from(new Set([...(existing?.tags ?? []), ...tags]));
-
-        if (existing && !reload) {
-          skippedKeyIds.push(keyId);
-          existing.tags = mergedTags;
-          existing.updatedAt = now;
-          continue;
-        }
-
-        keyCatalog.set(keyId, {
-          keyId,
-          name: entry.name,
-          type: entry.type,
-          sourceFile: toDisplayPath(storedFile),
-          sourceFileAbs: storedFile,
-          tags: mergedTags,
-          enabled: true,
-          createdAt: existing?.createdAt ?? now,
-          updatedAt: now,
-        });
-        loaded += 1;
-
-        if (!existing) {
-          addedKeyIds.push(keyId);
-        } else {
-          reloadedKeyIds.push(keyId);
-        }
-      }
-    }
-
-    const result = {
-      ok: true,
-      loaded,
-      addedKeyIds,
-      reloadedKeyIds: Array.from(new Set(reloadedKeyIds)),
-      skippedKeyIds: Array.from(new Set(skippedKeyIds)),
-      files: files.map((filePath) => toDisplayPath(filePath)),
-      warnings,
-    };
-
-    if (result.files.length === 1) {
-      result.file = result.files[0];
-    }
-
-    return result;
-  }
-
-  async function listKeys(filter = {}) {
-    const requiredTags = normalizeTags(filter.tags);
-    const sourceFile = filter.sourceFile ? String(filter.sourceFile) : undefined;
-
-    const items = [...keyCatalog.values()]
-      .map((record) => buildMeta(record))
-      .filter((item) => {
-        if (filter.type && item.type !== filter.type) {
-          return false;
-        }
-        if (typeof filter.enabled === "boolean" && item.enabled !== filter.enabled) {
-          return false;
-        }
-        if (sourceFile && item.sourceFile !== sourceFile) {
-          return false;
-        }
-        if (requiredTags.length > 0 && !requiredTags.every((tag) => item.tags.includes(tag))) {
-          return false;
-        }
-        return true;
-      })
-      .sort((a, b) => a.name.localeCompare(b.name) || a.keyId.localeCompare(b.keyId));
-
-    return {
-      ok: true,
-      items,
-      total: items.length,
-    };
-  }
-
-  async function getKeyMeta(input = {}) {
-    const record = getRecordOrThrow(input.keyId);
-    return {
-      ok: true,
-      item: buildMeta(record),
-    };
-  }
-
   async function unlock(input = {}) {
     const record = getRecordOrThrow(input.keyId);
     if (!record.enabled) {
       throw new Error(`key 已禁用: ${record.keyId}`);
     }
     const rebuildTree = input.rebuildTree !== false;
-
     // Dev keys 无需密码
     if (record.source === "dev") {
       const ttlMs = Number.isFinite(input.ttlMs) && Number(input.ttlMs) > 0
@@ -786,16 +368,16 @@ export function createWallet(options = {}) {
         expiresAtMs,
         reason: input.reason ? String(input.reason) : undefined,
         scope,
+        _configuredAddresses: [], // dev keys 无文件指令，地址为空
       });
 
       const session = sessions.get(record.keyId);
+      // Invalidate tree cache when unlocking new key
+      cacheInvalidated = true;
       let tree = null;
       if (rebuildTree) {
         tree = await buildWalletTreeSnapshot();
         session.tree = tree;
-        if (this && typeof this === "object") {
-          this.tree = tree;
-        }
       }
       return {
         ok: true,
@@ -841,15 +423,22 @@ export function createWallet(options = {}) {
     });
 
     const session = sessions.get(record.keyId);
+    // 只为本 key 派生地址并缓存，后续 buildWalletTreeSnapshot 读缓存而非重派生所有 key
+    if (providerRegistry.size > 0) {
+      try {
+        const singleDerived = await deriveConfiguredAddresses({ keyId: record.keyId, strict: false });
+        session._configuredAddresses = Array.isArray(singleDerived?.items) ? singleDerived.items : [];
+      } catch {
+        session._configuredAddresses = [];
+      }
+    }
     let tree = null;
+    // Invalidate tree cache when unlocking new key
+    cacheInvalidated = true;
     if (rebuildTree) {
       tree = await buildWalletTreeSnapshot();
       session.tree = tree;
-      if (this && typeof this === "object") {
-        this.tree = tree;
-      }
     }
-    
     return {
       ok: true,
       keyId: record.keyId,
@@ -863,6 +452,8 @@ export function createWallet(options = {}) {
   async function lock(input = {}) {
     const record = getRecordOrThrow(input.keyId);
     sessions.delete(record.keyId);
+    // Invalidate tree cache when locking a key
+    cacheInvalidated = true;
     return {
       ok: true,
       keyId: record.keyId,
@@ -873,288 +464,16 @@ export function createWallet(options = {}) {
   async function lockAll() {
     const count = sessions.size;
     sessions.clear();
+    // Invalidate tree cache when locking all keys
+    cacheInvalidated = true;
+    treeSnapshotCache = null;
     return {
       ok: true,
       count,
     };
   }
 
-  async function loadDevKeys(input = {}) {
-    // 从预定义的 DEV_KEYS 中筛选和导入开发用密钥
-    const selectedTags = normalizeTags(input.tags);
-    const reload = Boolean(input.reload);
-    const addedKeyIds = [];
-    const skippedKeyIds = [];
-    const loaded = 0;
-
-    // 如果提供了 names，只导入指定的开发密钥；否则导入所有
-    const selectedNames = normalizeStringList(input.names ?? input.name);
-    const useAllKeys = selectedNames.length === 0;
-
-    let addedCount = 0;
-    const now = new Date().toISOString();
-
-    for (const devKey of DEV_KEYS) {
-      // 过滤：如果指定了名称，则只加载匹配的
-      if (!useAllKeys && !selectedNames.includes(devKey.name)) {
-        continue;
-      }
-
-      const keyId = buildKeyId(devKey);
-      const existing = keyCatalog.get(keyId);
-      const mergedTags = Array.from(
-        new Set([...(existing?.tags ?? []), ...devKey.tags, ...selectedTags])
-      );
-
-      if (existing && !reload) {
-        skippedKeyIds.push(keyId);
-        existing.tags = mergedTags;
-        existing.updatedAt = now;
-        continue;
-      }
-
-      keyCatalog.set(keyId, {
-        keyId,
-        name: devKey.name,
-        type: devKey.type,
-        source: "dev",  // 标记为 dev 来源
-        sourceFile: "<dev>",
-        sourceFileAbs: null,
-        tags: mergedTags,
-        enabled: true,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-        // 存储原始密钥，以便后续 getSigner 等操作使用
-        _devSecret: devKey.secret,
-      });
-      addedCount += 1;
-
-      if (!existing) {
-        addedKeyIds.push(keyId);
-      }
-    }
-
-    return {
-      ok: true,
-      loaded: addedCount,
-      addedKeyIds,
-      skippedKeyIds: Array.from(new Set(skippedKeyIds)),
-      source: "dev",
-    };
-  }
-
   // ──────────────────── deriveConfiguredAddresses ────────────────────────────
-
-  /**
-   * 从原始密钥文档中提取指定 key 的 @address-config 指令行。
-   * 返回 Map<keyName, string[]>。
-   */
-  function parseAddressConfigsFromText(rawText) {
-    const rawLines = String(rawText ?? "")
-      .replace(/\r\n/g, "\n")
-      .split("\n");
-
-    function stripNoise(line) {
-      return line.replace(/^(>\s*)+/, "").trim();
-    }
-
-    function looksLikeSecret(s) {
-      if (/^(0x)?[a-fA-F0-9]{64}$/.test(s)) return true;
-      if (/^[5KL][1-9A-HJ-NP-Za-km-z]{50,51}$/.test(s)) return true;
-      const words = s.split(/\s+/).filter((w) => /^[a-zA-Z]+$/.test(w));
-      return words.length >= 12 && words.length <= 24;
-    }
-
-    const lines = rawLines.map((raw, idx) => ({ idx, trimmed: raw.trim() }));
-
-    const secretIndices = lines
-      .filter((l) => {
-        const s = stripNoise(l.trimmed);
-        return s && !l.trimmed.startsWith("#") && l.trimmed !== "" && looksLikeSecret(s);
-      })
-      .map((l) => l.idx);
-
-    const result = new Map();
-
-    for (let si = 0; si < secretIndices.length; si++) {
-      const secretIdx = secretIndices[si];
-      const nextSecretIdx = secretIndices[si + 1] ?? lines.length;
-
-      // 向上找名称
-      let name = null;
-      for (let i = secretIdx - 1; i >= 0; i--) {
-        const t = lines[i].trimmed;
-        if (t === "" || t.startsWith("#")) continue;
-        const s = stripNoise(t);
-        if (looksLikeSecret(s)) break;
-        name = t;
-        break;
-      }
-
-      const directives = [];
-      for (let i = secretIdx + 1; i < nextSecretIdx; i++) {
-        const t = lines[i].trimmed;
-        if (t.startsWith("@address-config")) {
-          directives.push(t);
-        }
-      }
-
-      if (name && directives.length > 0) {
-        result.set(name, directives);
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * 解析单条 @address-config 指令参数。
-   */
-  function parseDirectiveParams(line) {
-    const body = line.replace(/^@address-config\s*/, "").trim();
-    const params = {};
-    const regex = /(\w[\w-]*)=([\S]*)/g;
-    let m;
-    while ((m = regex.exec(body)) !== null) {
-      params[m[1]] = m[2];
-    }
-    return params;
-  }
-
-  /**
-   * 将 @address-config 指令展开为 { chain, addressType, pathPattern, name }[] 列表。
-   * chain/type 支持逗号分隔的多值。
-   */
-  function expandDirective(params) {
-    const rawChains = String(params.chain ?? "btc").split(",").map((s) => s.trim()).filter(Boolean);
-    const rawTypes = params.type ? String(params.type).split(",").map((s) => s.trim()).filter(Boolean) : [null];
-    const pathPattern = String(params.path ?? "").trim() || null;
-    const nameTemplate = String(params.name ?? "").trim() || null;
-
-    const expanded = [];
-    for (const chain of rawChains) {
-      for (const rawType of rawTypes) {
-        let addressType = null;
-        if (chain === "btc" && rawType) {
-          const t = String(rawType).trim().toLowerCase();
-          if (t === "p2wpkh" || t === "segwit" || t === "bech32") addressType = "p2wpkh";
-          else if (t === "p2sh-p2wpkh" || t === "p2sh" || t === "nested") addressType = "p2sh-p2wpkh";
-          else if (t === "p2tr" || t === "taproot") addressType = "p2tr";
-          else if (t === "p2pkh" || t === "legacy") addressType = "p2pkh";
-          else addressType = t; // keep as-is, will error when deriving
-        } else if (chain === "btc") {
-          addressType = "p2wpkh"; // default
-        } else {
-          addressType = null; // non-BTC doesn't use addressType
-        }
-
-        let name = nameTemplate;
-        if (name) {
-          name = name.replace(/\{type\}/g, addressType ?? "").replace(/\{chain\}/g, chain);
-        }
-
-        expanded.push({ chain, addressType, pathPattern, name });
-      }
-    }
-    return expanded;
-  }
-
-  /**
-   * 将通配符占位符替换为类型对应的实际值。
-   * 路径规则：m/purpose'/coin_type'/account'/change/index
-   * 支持：*' （带撇号）和 * （不带撇号）替换
-   */
-  function resolveWildcardPath(pathPattern, chain, addressType, network) {
-    if (!pathPattern) return null;
-    if (pathPattern === "*") {
-      return defaultDerivationPathByChain({ chain, addressType, network });
-    }
-    const isTestnet = String(network ?? "mainnet").toLowerCase() !== "mainnet";
-    const coinType = isTestnet ? "1" : "0";
-
-    let purposePrime;
-    if (chain === "btc") {
-      if (addressType === "p2wpkh") purposePrime = "84";
-      else if (addressType === "p2sh-p2wpkh") purposePrime = "49";
-      else if (addressType === "p2tr") purposePrime = "86";
-      else purposePrime = "44"; // p2pkh
-    } else if (chain === "trx") {
-      purposePrime = "44";
-    } else {
-      // evm
-      purposePrime = "44";
-    }
-
-    const segments = pathPattern.split("/");
-    const resolved = segments.map((seg, i) => {
-      // 处理带撇号的通配符 *'
-      if (seg === "*'") {
-        if (chain === "evm" || chain === "trx") {
-          if (i === 1) return `${purposePrime}'`;
-          if (i === 2) return chain === "evm" ? "60'" : "195'";
-          if (i === 3) return "0'";
-        } else {
-          // btc
-          if (i === 1) return `${purposePrime}'`;
-          if (i === 2) return `${coinType}'`;
-          if (i === 3) return "0'";
-        }
-      }
-      // 处理不带撇号的通配符 * （change 字段，默认 0 表示接收地址）
-      if (seg === "*") {
-        if (i === 4) return "0";  // change/receive: 0 for receive
-      }
-      return seg;
-    });
-    return resolved.join("/");
-  }
-
-  /**
-   * 将含范围 [start,end] 的路径展开为多条路径。
-   * 同时生成对应的 name 后缀列表。
-   * 返回 [{ path, nameSuffix }]
-   */
-  function expandPathRange(resolvedPath, baseName) {
-    const rangeMatch = resolvedPath.match(/^(.*)\[(\d+),(\d+)\](.*)$/);
-    if (!rangeMatch) {
-      return [{ path: resolvedPath, name: baseName }];
-    }
-
-    const prefix = rangeMatch[1];
-    const start = parseInt(rangeMatch[2], 10);
-    const end = parseInt(rangeMatch[3], 10);
-    const suffix = rangeMatch[4];
-
-    if (start > end) return [];
-
-    const items = [];
-    for (let i = start; i <= end; i++) {
-      items.push({
-        path: `${prefix}${i}${suffix}`,
-        name: baseName ? `${baseName}-${i}` : null,
-      });
-    }
-    return items;
-  }
-
-  /**
-   * 验证 BTC type 与 path purpose 是否匹配。
-   * 返回错误消息字符串，或 null（无误）。
-   */
-  function validateBtcPurposeMatch(addressType, resolvedPath) {
-    if (!resolvedPath) return null;
-    const m = resolvedPath.match(/^m\/(\d+)'/);
-    if (!m) return null;
-
-    const purpose = parseInt(m[1], 10);
-    const expected = { p2wpkh: 84, "p2sh-p2wpkh": 49, p2tr: 86, p2pkh: 44 };
-    const expectedPurpose = expected[addressType];
-
-    if (expectedPurpose !== undefined && purpose !== expectedPurpose) {
-      return `type/path 不匹配: ${addressType} 期望 purpose ${expectedPurpose}', 实际为 ${purpose}'`;
-    }
-    return null;
-  }
 
   /**
    * 为单个 key record 派生 @address-config 地址列表。
@@ -1272,7 +591,17 @@ export function createWallet(options = {}) {
         const session = cleanupExpiredSession(record.keyId);
         if (!session || !session.password) continue;
 
-        // 获取原始内容，解析指令
+        // 优先使用 unlock 时预缓存的派生地址，避免对已解锁 key 重复读文件
+        if (Array.isArray(session._configuredAddresses)) {
+          const items = session._configuredAddresses;
+          if (items.length > 0) {
+            allResults.push({ keyId: record.keyId, keyName: record.name, items, warnings: [] });
+            allItems.push(...items);
+          }
+          continue;
+        }
+
+        // 无缓存时走文件派生（并写入缓存供后续调用复用）
         let directivesMap;
         try {
           const { content } = await revealStoredFileContent({
@@ -1285,9 +614,13 @@ export function createWallet(options = {}) {
         }
 
         const directives = directivesMap.get(record.name) ?? [];
-        if (directives.length === 0) continue;
+        if (directives.length === 0) {
+          session._configuredAddresses = [];
+          continue;
+        }
 
         const { items, warnings } = await deriveForRecord(record, directives, strict);
+        session._configuredAddresses = items; // 缓存供后续复用
         allResults.push({ keyId: record.keyId, keyName: record.name, items, warnings });
         allItems.push(...items);
         allWarnings.push(...warnings);
@@ -1333,33 +666,47 @@ export function createWallet(options = {}) {
     };
   }
 
-  async function buildWalletTreeSnapshot() {
-    const keys = [...keyCatalog.values()]
-      .filter((record) => Boolean(cleanupExpiredSession(record.keyId)))
-      .map((record) => ({
-        keyId: record.keyId,
-        keyName: record.name,
-        keyType: record.type,
-      }));
+  async function buildWalletTreeSnapshot(input = {}) {
+    const unlockedRecords = [...keyCatalog.values()]
+      .filter((record) => Boolean(cleanupExpiredSession(record.keyId)));
+    const chainRequests = normalizeChainRequests(input?.chains ?? input?.ensureChains);
 
-    let addresses = [];
-    let warnings = [];
+    const keys = unlockedRecords.map((record) => ({
+      keyId: record.keyId,
+      keyName: record.name,
+      keyType: record.type,
+    }));
 
-    try {
-      const derived = await deriveConfiguredAddresses({ strict: false });
-      addresses = Array.isArray(derived?.items)
-        ? derived.items.map((item) => ({
-          keyId: String(item?.keyId ?? "").trim(),
-          chain: String(item?.chain ?? "").trim().toLowerCase(),
-          address: String(item?.address ?? "").trim(),
-          name: String(item?.name ?? "").trim() || null,
-          path: String(item?.path ?? "").trim() || null,
-          sourceType: "derive",
-        }))
-        : [];
-      warnings = Array.isArray(derived?.warnings) ? derived.warnings : [];
-    } catch (error) {
-      warnings = [String(error?.message ?? error)];
+    const addresses = [];
+    const warnings = [];
+
+    for (const record of unlockedRecords) {
+      const session = cleanupExpiredSession(record.keyId);
+      if (!session) continue;
+
+      if (!Array.isArray(session._configuredAddresses) && record.source !== "dev" && record.sourceFileAbs && session.password) {
+        // 无缓存时（如直接调用 wallet.unlock() 未经 task 层）按单 key 派生并缓存
+        try {
+          const derived = await deriveConfiguredAddresses({ keyId: record.keyId, strict: false });
+          const items = Array.isArray(derived?.items) ? derived.items : [];
+          session._configuredAddresses = items;
+          if (Array.isArray(derived?.warnings)) warnings.push(...derived.warnings);
+        } catch (error) {
+          warnings.push(String(error?.message ?? error));
+        }
+      }
+
+      if (chainRequests.length > 0) {
+        const ensured = await ensureRequestedAddressesForRecord(record, session, chainRequests, {
+          hasProvider: (chain) => providerRegistry.has(chain),
+          getSigner,
+        });
+        if (Array.isArray(ensured?.warnings) && ensured.warnings.length > 0) {
+          warnings.push(...ensured.warnings);
+        }
+      }
+
+      addresses.push(...collectDerivedAddressesFromSession(session));
     }
 
     const built = buildWalletTree({
@@ -1376,6 +723,32 @@ export function createWallet(options = {}) {
     };
   }
 
+  async function getTree(input = {}) {
+    // Use cache if available and no parameters (for now, simple caching strategy)
+    const hasParams = (input?.chains?.length > 0) || (input?.ensureChains?.length > 0);
+    
+    if (!hasParams && !cacheInvalidated && treeSnapshotCache) {
+      // Return cached result
+      return treeSnapshotCache;
+    }
+    
+    // Build tree snapshot
+    const result = await buildWalletTreeSnapshot(input);
+    
+    // Cache it if no parameters
+    if (!hasParams) {
+      treeSnapshotCache = result;
+      cacheInvalidated = false;
+    }
+    
+    return result;
+  }
+
+  function invalidateTreeCache() {
+    cacheInvalidated = true;
+    treeSnapshotCache = null;
+  }
+
   return {
     loadKeyFile,
     loadDevKeys,
@@ -1390,6 +763,8 @@ export function createWallet(options = {}) {
     supports,
     getSigner,
     deriveConfiguredAddresses,
+    getTree,
+    invalidateTreeCache,
   };
 }
 

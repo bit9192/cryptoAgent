@@ -156,6 +156,7 @@ export function buildWalletTree(input = {}) {
     .map((row) => ({
       keyId: row.keyId,
       name: row.name,
+      sourceName: row.sourceType === "derive" ? (origRowsByKeyId.get(row.keyId)?.name ?? null) : null,
       keyType: row.keyType,
       sourceType: row.sourceType,
       path: row.path,
