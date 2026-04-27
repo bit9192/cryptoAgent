@@ -132,30 +132,48 @@ export function createTrxProvider(options = {}) {
         providerVersion: version,
         capabilities: [...operations],
         async getAddress(getAddressOptions = {}) {
-          if (hasWithSecret) {
+           if (hasWithSecret) {
             const rawPaths = Array.isArray(getAddressOptions.paths)
               ? getAddressOptions.paths
               : getAddressOptions.path
                 ? [getAddressOptions.path]
                 : [DEFAULT_TRX_PATH];
-            const addresses = await walletContext.withUnlockedSecret(
-              { keyId, chain: "trx", operation: "getAddress", target: null },
-              async (secret) => rawPaths.map((path) => {
-                // 检查缓存
-                if (path in addressCache) {
-                  return { path, address: addressCache[path] };
-                }
-                
-                // 计算地址
-                const privateKeyHex = derivePrivateKeyFromSecret(secret, path);
-                const address = deriveTrxAddress(privateKeyHex);
-                
-                // 写入缓存
-                addressCache[path] = address;
-                
-                return { path, address };
-              }),
-            );
+           
+             // 优先检查缓存：如果所有 paths 都在缓存中，直接返回
+             const allInCache = rawPaths.every((path) => path in addressCache);
+             if (allInCache) {
+               const cachedAddresses = rawPaths.map((path) => ({
+                 path,
+                 address: addressCache[path],
+               }));
+             
+               await walletContext.audit?.({ at: new Date().toISOString(), keyId, chain: "trx", operation: "getAddress", status: "ok" });
+             
+               if (cachedAddresses.length === 1 && getAddressOptions.returnAll !== true) {
+                 return cachedAddresses[0].address;
+               }
+               return { address: cachedAddresses[0]?.address, addresses: cachedAddresses };
+             }
+           
+             // 缓存未命中：调用 executor 获取地址
+             const addresses = await walletContext.withUnlockedSecret(
+               { keyId, chain: "trx", operation: "getAddress", target: null },
+               async (secret) => rawPaths.map((path) => {
+                 // 再次检查缓存（防止并发）
+                 if (path in addressCache) {
+                   return { path, address: addressCache[path] };
+                 }
+               
+                 // 计算地址
+                 const privateKeyHex = derivePrivateKeyFromSecret(secret, path);
+                 const address = deriveTrxAddress(privateKeyHex);
+               
+                 // 写入缓存
+                 addressCache[path] = address;
+               
+                 return { path, address };
+               }),
+             );
 
             await walletContext.audit?.({ at: new Date().toISOString(), keyId, chain: "trx", operation: "getAddress", status: "ok" });
 
