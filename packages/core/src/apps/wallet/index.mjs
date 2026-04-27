@@ -5,6 +5,7 @@ import bs58 from "bs58";
 import { HDNodeWallet, Wallet } from "ethers";
 
 import { loadKeyQueueFromStoredFile, revealStoredFileContent } from "../../modules/key/store.mjs";
+import { buildWalletTree } from "../../modules/wallet-tree/index.mjs";
 
 const DEFAULT_LOAD_SOURCE = "key";
 const ENCRYPTED_FILE_SUFFIX = ".enc.json";
@@ -304,6 +305,7 @@ export function createWallet(options = {}) {
       unlockedAt: session?.unlockedAt,
       expiresAt: session?.expiresAt,
       scope: session?.scope,
+      tree: session?.tree,
     };
   }
 
@@ -660,6 +662,7 @@ export function createWallet(options = {}) {
     const tags = normalizeTags(input.tags);
     const reload = Boolean(input.reload);
     const addedKeyIds = [];
+    const reloadedKeyIds = [];
     const skippedKeyIds = [];
     const warnings = [];
     let loaded = 0;
@@ -698,6 +701,8 @@ export function createWallet(options = {}) {
 
         if (!existing) {
           addedKeyIds.push(keyId);
+        } else {
+          reloadedKeyIds.push(keyId);
         }
       }
     }
@@ -706,6 +711,7 @@ export function createWallet(options = {}) {
       ok: true,
       loaded,
       addedKeyIds,
+      reloadedKeyIds: Array.from(new Set(reloadedKeyIds)),
       skippedKeyIds: Array.from(new Set(skippedKeyIds)),
       files: files.map((filePath) => toDisplayPath(filePath)),
       warnings,
@@ -756,32 +762,12 @@ export function createWallet(options = {}) {
     };
   }
 
-  function normalizeWalletTreeObject(value) {
-    if (value && typeof value === "object" && Array.isArray(value.tree)) {
-      return value;
-    }
-    return null;
-  }
-
-  async function resolveWalletTreeForUnlock(input = {}) {
-    const fromInput = normalizeWalletTreeObject(input?.tree);
-    if (fromInput) {
-      return fromInput;
-    }
-
-    const fromCurrent = normalizeWalletTreeObject(this?.tree);
-    if (fromCurrent) {
-      return fromCurrent;
-    }
-
-    return await buildWalletTreeSnapshot();
-  }
-
   async function unlock(input = {}) {
     const record = getRecordOrThrow(input.keyId);
     if (!record.enabled) {
       throw new Error(`key 已禁用: ${record.keyId}`);
     }
+    const rebuildTree = input.rebuildTree !== false;
 
     // Dev keys 无需密码
     if (record.source === "dev") {
@@ -803,9 +789,13 @@ export function createWallet(options = {}) {
       });
 
       const session = sessions.get(record.keyId);
-      const tree = await resolveWalletTreeForUnlock.call(this, input);
-      if (this && typeof this === "object") {
-        this.tree = tree;
+      let tree = null;
+      if (rebuildTree) {
+        tree = await buildWalletTreeSnapshot();
+        session.tree = tree;
+        if (this && typeof this === "object") {
+          this.tree = tree;
+        }
       }
       return {
         ok: true,
@@ -851,9 +841,13 @@ export function createWallet(options = {}) {
     });
 
     const session = sessions.get(record.keyId);
-    const tree = await resolveWalletTreeForUnlock.call(this, input);
-    if (this && typeof this === "object") {
-      this.tree = tree;
+    let tree = null;
+    if (rebuildTree) {
+      tree = await buildWalletTreeSnapshot();
+      session.tree = tree;
+      if (this && typeof this === "object") {
+        this.tree = tree;
+      }
     }
     
     return {
@@ -1341,26 +1335,44 @@ export function createWallet(options = {}) {
 
   async function buildWalletTreeSnapshot() {
     const keys = [...keyCatalog.values()]
+      .filter((record) => Boolean(cleanupExpiredSession(record.keyId)))
       .map((record) => ({
         keyId: record.keyId,
-        name: record.name,
+        keyName: record.name,
         keyType: record.type,
-        sourceType: "orig",
-        path: null,
-        addresses: {},
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name) || a.keyId.localeCompare(b.keyId));
+      }));
+
+    let addresses = [];
+    let warnings = [];
+
+    try {
+      const derived = await deriveConfiguredAddresses({ strict: false });
+      addresses = Array.isArray(derived?.items)
+        ? derived.items.map((item) => ({
+          keyId: String(item?.keyId ?? "").trim(),
+          chain: String(item?.chain ?? "").trim().toLowerCase(),
+          address: String(item?.address ?? "").trim(),
+          name: String(item?.name ?? "").trim() || null,
+          path: String(item?.path ?? "").trim() || null,
+          sourceType: "derive",
+        }))
+        : [];
+      warnings = Array.isArray(derived?.warnings) ? derived.warnings : [];
+    } catch (error) {
+      warnings = [String(error?.message ?? error)];
+    }
+
+    const built = buildWalletTree({
+      keys,
+      addresses,
+    });
 
     return {
       ok: true,
       action: "wallet.tree",
-      tree: keys,
-      counts: {
-        accounts: keys.length,
-        chains: 0,
-        addresses: 0,
-      },
-      warnings: [],
+      tree: built.tree,
+      counts: built.counts,
+      warnings: [...(Array.isArray(built.warnings) ? built.warnings : []), ...warnings],
     };
   }
 

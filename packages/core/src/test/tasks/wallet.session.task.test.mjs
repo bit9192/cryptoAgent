@@ -124,7 +124,7 @@ test("wallet:session wallet.unlock requires interactive flow", async () => {
 
   const res = await task.run(createCtx({ action: "wallet.unlock" }, wallet));
   assert.equal(res.ok, false);
-  assert.match(String(res.message ?? ""), /不支持交互选择/);
+  assert.match(String(res.message ?? ""), /(不支持交互选择|未发现可解锁的钱包文件)/);
 });
 
 test("wallet:session wallet.unlock uses select + password and upserts key cache", async () => {
@@ -158,6 +158,28 @@ test("wallet:session wallet.unlock uses select + password and upserts key cache"
           unlockedAt: "2026-01-01T00:00:00.000Z",
           expiresAt: null,
           scope: "session",
+          tree: {
+            ok: true,
+            action: "wallet.tree",
+            tree: [
+              {
+                keyId: "k-unlock-1",
+                name: "demo-key",
+                keyType: "mnemonic",
+                sourceType: "orig",
+                path: null,
+                addresses: {
+                  evm: "0x1111111111111111111111111111111111111111",
+                },
+              },
+            ],
+            counts: {
+              accounts: 1,
+              chains: 1,
+              addresses: 1,
+            },
+            warnings: [],
+          },
         };
       },
       async getKeyMeta() {
@@ -214,44 +236,84 @@ test("wallet:session wallet.unlock uses select + password and upserts key cache"
     assert.equal(res.data.counts.addresses, 1);
     assert.equal(res.data.keys[0].keyId, "k-unlock-1");
     assert.equal(res.data.addresses[0].address, "0x1111111111111111111111111111111111111111");
+    assert.equal(Array.isArray(res.data.tree?.tree), true);
+
+    const treeRes = await task.run(createCtx({ action: "wallet.tree" }, wallet));
+    assert.equal(treeRes.ok, true);
+    assert.equal(treeRes.counts.accounts, 1);
+    assert.equal(treeRes.counts.addresses, 1);
+    assert.equal(treeRes.tree[0].keyId, "k-unlock-1");
   } finally {
     process.chdir(cwd);
     await fs.rm(root, { recursive: true, force: true });
   }
 });
 
-test("wallet:session wallet.tree builds minimal tree from cached session", async () => {
+test("wallet:session wallet.unlock skips password when wallet is already unlocked", async () => {
   await task.run(createCtx({ action: "wallet.clear" }, {}));
-  const wallet = {
-    async listKeys() {
-      return {
-        items: [
-          { keyId: "k1", name: "alpha", type: "mnemonic", source: "file", sourceFile: "storage/key/a.enc.json", status: "unlocked" },
-          { keyId: "k2", name: "beta", type: "privateKey", source: "file", sourceFile: "storage/key/b.enc.json", status: "unlocked" },
-        ],
-      };
-    },
-    async deriveConfiguredAddresses() {
-      return {
-        items: [
-          { keyId: "k1", chain: "evm", address: "0xabc", name: "e1", path: "m/44'/60'/0'/0/0", addressType: null },
-          { keyId: "k1", chain: "btc", address: "bc1qabc", name: "b1", path: "m/84'/0'/0'/0/0", addressType: "p2wpkh" },
-          { keyId: "k2", chain: "trx", address: "TRXabc", name: "t1", path: "m/44'/195'/0'/0/0", addressType: null },
-        ],
-        warnings: [],
-      };
-    },
-  };
+  const cwd = process.cwd();
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "wallet-unlock-skip-"));
+  const keyDir = path.join(root, "storage", "key");
+  const walletFile = path.join(keyDir, "demo.enc.json");
 
-  const derived = await task.run(createCtx({ action: "wallet.deriveConfigured" }, wallet));
-  assert.equal(derived.ok, true);
+  await fs.mkdir(keyDir, { recursive: true });
+  await fs.writeFile(walletFile, "{}", "utf8");
 
-  const treeRes = await task.run(createCtx({ action: "wallet.tree" }, wallet));
+  process.chdir(root);
+  try {
+    let passwordPromptCount = 0;
+    const wallet = {
+      async listKeys() {
+        return {
+          items: [
+            {
+              keyId: "k-unlock-1",
+              name: "demo-key",
+              type: "mnemonic",
+              source: "file",
+              sourceFile: "storage/key/demo.enc.json",
+              status: "unlocked",
+            },
+          ],
+        };
+      },
+    };
+
+    const ctx = {
+      input: () => ({ action: "wallet.unlock" }),
+      wallet,
+      async interact(opts) {
+        if (opts?.type === "wallet.unlock.select") {
+          return { payload: { fileAbs: walletFile } };
+        }
+        if (opts?.type === "wallet.password.input") {
+          passwordPromptCount += 1;
+          return { payload: { password: "123456" } };
+        }
+        return { payload: {} };
+      },
+    };
+
+    const res = await task.run(ctx);
+    assert.equal(res.ok, true);
+    assert.equal(res.action, "wallet.unlock");
+    assert.equal(res.message, "钱包已解锁，跳过重复解锁");
+    assert.equal(passwordPromptCount, 0);
+  } finally {
+    process.chdir(cwd);
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("wallet:session wallet.tree uses session.tree and returns empty when absent", async () => {
+  await task.run(createCtx({ action: "wallet.clear" }, {}));
+  const treeRes = await task.run(createCtx({ action: "wallet.tree" }, {}));
   assert.equal(treeRes.ok, true);
   assert.equal(treeRes.action, "wallet.tree");
-  assert.equal(treeRes.counts.accounts, 2);
-  assert.equal(treeRes.counts.addresses, 3);
+  assert.equal(treeRes.counts.accounts, 0);
+  assert.equal(treeRes.counts.addresses, 0);
   assert.equal(Array.isArray(treeRes.tree), true);
+  assert.equal(treeRes.warnings[0], "session.tree 为空");
 });
 
 test("wallet:session wallet.inputs.set/show/clear works with scope data", async () => {

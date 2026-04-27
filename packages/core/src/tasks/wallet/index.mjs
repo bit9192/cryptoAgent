@@ -15,7 +15,6 @@ import {
   upsertAddress,
   upsertKey,
 } from "./session-cache.mjs";
-import { buildWalletTree } from "../../modules/wallet-tree/index.mjs";
 import {
   clearInputs,
   patchInputs,
@@ -173,6 +172,39 @@ async function unlockOneToCache(ctx) {
     };
   }
 
+  // 已解锁钱包直接复用当前会话，避免重复输入密码与重复重建开销。
+  if (selected.unlocked) {
+    const state = await wallet.listKeys({ enabled: true });
+    const unlockedItems = asArray(state?.items)
+      .filter((item) => String(item?.status ?? "") === "unlocked")
+      .filter((item) => String(item?.source ?? "") !== "dev")
+      .filter((item) => {
+        const src = String(item?.sourceFile ?? "").trim();
+        return src === selected.rel || path.resolve(process.cwd(), src) === selected.abs;
+      });
+
+    for (const item of unlockedItems) {
+      const keyMeta = normalizeUnlockedKey(item);
+      if (!keyMeta.keyId) continue;
+      upsertKey(session, keyMeta);
+    }
+
+    return {
+      ok: true,
+      action: "wallet.unlock",
+      selected: {
+        shortName: selected.shortName,
+        rel: selected.rel,
+        abs: selected.abs,
+      },
+      totalUnlocked: unlockedItems.length,
+      derivedImported: 0,
+      warnings: [],
+      message: "钱包已解锁，跳过重复解锁",
+      data: snapshotSession(session),
+    };
+  }
+
   const pickedPassword = await ctx.interact({
     type: "wallet.password.input",
     message: "请输入解锁密码",
@@ -203,6 +235,9 @@ async function unlockOneToCache(ctx) {
   }
 
   const unlocked = await unlockWallet(wallet, selected.abs, password);
+  if (unlocked?.tree && typeof unlocked.tree === "object") {
+    session.tree = unlocked.tree;
+  }
   const entries = Object.values(unlocked?.unlocked ?? {});
   for (const item of entries) {
     const keyId = String(item?.keyId ?? "").trim();
@@ -325,16 +360,31 @@ async function deriveConfiguredToCache(ctx) {
 
 async function buildTreeFromSession() {
   const session = getDefaultSession();
-  const snap = snapshotSession(session);
-  const tree = buildWalletTree({
-    keys: snap.keys,
-    addresses: snap.addresses,
-  });
+  const tree = session?.tree;
+  if (!tree || typeof tree !== "object" || !Array.isArray(tree.tree)) {
+    return {
+      ok: true,
+      action: "wallet.tree",
+      tree: [],
+      counts: {
+        accounts: 0,
+        chains: 0,
+        addresses: 0,
+      },
+      warnings: ["session.tree 为空"],
+    };
+  }
 
   return {
     ok: true,
     action: "wallet.tree",
-    ...tree,
+    tree: tree.tree,
+    counts: tree.counts ?? {
+      accounts: 0,
+      chains: 0,
+      addresses: 0,
+    },
+    warnings: Array.isArray(tree.warnings) ? tree.warnings : [],
   };
 }
 

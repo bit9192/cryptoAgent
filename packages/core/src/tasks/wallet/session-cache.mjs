@@ -19,6 +19,7 @@ function addressKeyOf(item) {
 function createEmptySession(sessionId) {
   return {
     sessionId,
+    tree: null,
     keys: new Map(),
     addresses: new Map(),
     indexes: {
@@ -159,6 +160,7 @@ export function removeAddress(session, selector = {}) {
 export function snapshotSession(session) {
   return {
     sessionId: session.sessionId,
+    tree: session.tree ?? null,
     keys: Array.from(session.keys.values()),
     addresses: Array.from(session.addresses.values()),
     stats: { ...session.stats },

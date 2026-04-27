@@ -5,6 +5,7 @@ async function unlockWallet(walletApp, filePath, password) {
 	const loadResult = await walletApp.loadKeyFile({
 		file: filePath,
 		password,
+		reload: true,
 	});
 
 	if (!loadResult.ok) {
@@ -22,39 +23,34 @@ async function unlockWallet(walletApp, filePath, password) {
 
 	const unlockedKeys = new Map();
 	const warnings = [];
+	let latestTree = null;
 
-	// 解锁新增的密钥
-	for (const keyId of (loadResult.addedKeyIds ?? [])) {
+	const keyIdsToUnlock = Array.from(new Set([
+		...(loadResult.addedKeyIds ?? []),
+		...(loadResult.reloadedKeyIds ?? []),
+		...(loadResult.skippedKeyIds ?? []),
+	]));
+	const lastUnlockIndex = keyIdsToUnlock.length - 1;
+
+	// 解锁新增/重载的密钥
+	for (const [index, keyId] of keyIdsToUnlock.entries()) {
 		try {
 			const unlockResult = await walletApp.unlock({
 				keyId,
 				password,
 				ttlMs: 0,
+				rebuildTree: index === lastUnlockIndex,
 			});
 			if (unlockResult.ok) {
 				unlockedKeys.set(keyId, unlockResult);
+				if (unlockResult.tree && typeof unlockResult.tree === "object") {
+					latestTree = unlockResult.tree;
+				}
 			} else {
 				warnings.push(`解锁 key ${keyId} 失败`);
 			}
 		} catch (error) {
 			warnings.push(`解锁 key ${keyId} 异常: ${error?.message ?? error}`);
-		}
-	}
-
-	// 已存在的密钥也尝试建立 session
-	for (const keyId of (loadResult.skippedKeyIds ?? [])) {
-		if (unlockedKeys.has(keyId)) continue;
-		try {
-			const unlockResult = await walletApp.unlock({
-				keyId,
-				password,
-				ttlMs: 0,
-			});
-			if (unlockResult.ok) {
-				unlockedKeys.set(keyId, unlockResult);
-			}
-		} catch {
-			// 已存在 key 解锁失败不中断
 		}
 	}
 
@@ -68,6 +64,7 @@ async function unlockWallet(walletApp, filePath, password) {
 		keyList: slots.keyList,
 		totalUnlocked: unlockedKeys.size,
 		unlocked: Object.fromEntries(entries.map((e) => [e.keyId, e])),
+		tree: latestTree,
 		warnings,
 	};
 }
@@ -78,18 +75,24 @@ async function unlockDev(walletApp) {
 		...(devLoaded?.addedKeyIds ?? []),
 		...(devLoaded?.skippedKeyIds ?? []),
 	];
+	const lastUnlockIndex = devKeyIds.length - 1;
 
 	const unlockedKeys = new Map();
 	const warnings = [];
+	let latestTree = null;
 
-	for (const keyId of devKeyIds) {
+	for (const [index, keyId] of devKeyIds.entries()) {
 		try {
 			const unlockResult = await walletApp.unlock({
 				keyId,
 				ttlMs: 0,
+				rebuildTree: index === lastUnlockIndex,
 			});
 			if (unlockResult?.ok) {
 				unlockedKeys.set(keyId, unlockResult);
+				if (unlockResult.tree && typeof unlockResult.tree === "object") {
+					latestTree = unlockResult.tree;
+				}
 			}
 		} catch (error) {
 			warnings.push(`解锁 dev key ${keyId} 失败: ${error?.message ?? error}`);
@@ -106,6 +109,7 @@ async function unlockDev(walletApp) {
 		devKeyList: slots.devKeyList,
 		totalUnlocked: unlockedKeys.size,
 		unlocked: Object.fromEntries(entries.map((e) => [e.keyId, e])),
+		tree: latestTree,
 		warnings,
 	};
 }
