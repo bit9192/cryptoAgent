@@ -37,6 +37,7 @@ function normalizeUnlockedKey(item) {
   return {
     keyId: String(item?.keyId ?? "").trim(),
     keyName: String(item?.name ?? item?.keyName ?? "").trim(),
+    keyType: String(item?.type ?? item?.keyType ?? "").trim() || null,
     source: String(item?.source ?? "").trim() || "file",
     sourceFile: String(item?.sourceFile ?? "").trim() || null,
     status: "unlocked",
@@ -209,6 +210,7 @@ async function unlockOneToCache(ctx) {
     upsertKey(session, {
       keyId,
       keyName: String(item?.name ?? keyId).trim() || keyId,
+      keyType: String(item?.type ?? item?.keyType ?? "").trim() || null,
       source: String(item?.source ?? "file").trim() || "file",
       sourceFile: String(item?.sourceFile ?? selected.rel ?? selected.abs).trim() || null,
       status: "unlocked",
@@ -481,6 +483,7 @@ export const walletSessionActionObject = Object.freeze({
           keys: snap.keys.map((k) => ({
             keyId: k.keyId,
             keyName: k.keyName,
+            keyType: k.keyType ?? null,
             source: k.source,
             status: k.status,
           })),
@@ -509,6 +512,7 @@ export const walletSessionActionObject = Object.freeze({
         keys: filtered.keys.map((k) => ({
           keyId: k.keyId,
           keyName: k.keyName,
+          keyType: k.keyType ?? null,
           source: k.source,
           status: k.status,
         })),

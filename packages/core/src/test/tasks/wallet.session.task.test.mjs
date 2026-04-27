@@ -226,8 +226,8 @@ test("wallet:session wallet.tree builds minimal tree from cached session", async
     async listKeys() {
       return {
         items: [
-          { keyId: "k1", name: "alpha", source: "file", sourceFile: "storage/key/a.enc.json", status: "unlocked" },
-          { keyId: "k2", name: "beta", source: "file", sourceFile: "storage/key/b.enc.json", status: "unlocked" },
+          { keyId: "k1", name: "alpha", type: "mnemonic", source: "file", sourceFile: "storage/key/a.enc.json", status: "unlocked" },
+          { keyId: "k2", name: "beta", type: "privateKey", source: "file", sourceFile: "storage/key/b.enc.json", status: "unlocked" },
         ],
       };
     },
@@ -358,8 +358,8 @@ test("wallet:session wallet.status supports resolver-based filtering with useInp
     async listKeys() {
       return {
         items: [
-          { keyId: "k1", name: "alpha", source: "file", sourceFile: "storage/key/a.enc.json", status: "unlocked" },
-          { keyId: "k2", name: "beta", source: "file", sourceFile: "storage/key/b.enc.json", status: "unlocked" },
+          { keyId: "k1", name: "alpha", type: "mnemonic", source: "file", sourceFile: "storage/key/a.enc.json", status: "unlocked" },
+          { keyId: "k2", name: "beta", type: "privateKey", source: "file", sourceFile: "storage/key/b.enc.json", status: "unlocked" },
         ],
       };
     },
@@ -379,6 +379,7 @@ test("wallet:session wallet.status supports resolver-based filtering with useInp
   const plain = await task.run(createCtx({ action: "wallet.status" }, wallet));
   assert.equal(plain.counts.keys, 2);
   assert.equal(plain.counts.addresses, 2);
+  assert.equal(plain.keys.find((item) => item.keyId === "k1")?.keyType, "mnemonic");
 
   await task.run(createCtx({
     action: "wallet.inputs.set",
@@ -391,6 +392,7 @@ test("wallet:session wallet.status supports resolver-based filtering with useInp
   const filtered = await task.run(createCtx({ action: "wallet.status", useInputs: true }, wallet));
   assert.equal(filtered.counts.keys, 1);
   assert.equal(filtered.counts.addresses, 1);
+  assert.equal(filtered.keys[0].keyType, "mnemonic");
   assert.equal(filtered.addresses[0].chain, "evm");
   assert.equal(filtered.inputScope, "wallet");
   assert.equal(filtered.inputResolved.chain, "evm");

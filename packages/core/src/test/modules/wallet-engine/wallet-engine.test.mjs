@@ -3,8 +3,12 @@ import assert from "node:assert/strict";
 
 import {
   retrieveWalletCandidates,
+  retrieveWalletKeyCandidates,
   generateAddressFromCandidates,
   generateSignerFromCandidates,
+  pickAddressQueryFromInputs,
+  prepareWalletCandidates,
+  pickWallet,
   resolveSearchAddressRequest,
   resolveSignerRefs,
 } from "../../../modules/wallet-engine/index.mjs";
@@ -12,6 +16,11 @@ import { searchTaskWithEngine } from "../../../tasks/search/index.mjs";
 
 function makeWalletStatus() {
   return {
+    keys: [
+      { keyId: "k1", keyName: "alpha", keyType: "mnemonic", source: "file", status: "unlocked" },
+      { keyId: "k2", keyName: "beta", keyType: "privateKey", source: "file", status: "unlocked" },
+      { keyId: "k3", keyName: "dev-hd", keyType: "mnemonic", source: "dev", status: "unlocked" },
+    ],
     addresses: [
       { keyId: "k1", keyName: "alpha", chain: "evm", address: "0x1111111111111111111111111111111111111111", name: "main" },
       { keyId: "k1", keyName: "alpha", chain: "evm", address: "0x2222222222222222222222222222222222222222", name: "alt" },
@@ -21,6 +30,49 @@ function makeWalletStatus() {
     ],
   };
 }
+
+test("retrieve keys: 按 name 模糊匹配主 key", () => {
+  const keys = retrieveWalletKeyCandidates(
+    { name: "alpha", nameExact: false },
+    makeWalletStatus(),
+  );
+
+  assert.equal(keys.length, 1);
+  assert.equal(keys[0].keyId, "k1");
+  assert.equal(keys[0].keyType, "mnemonic");
+});
+
+test("pick address: 无 address 直取时可 fallback 到 key->address", () => {
+  const picked = pickAddressQueryFromInputs(
+    [{ name: "beta" }],
+    {
+      walletStatus: makeWalletStatus(),
+      keyFilters: { name: "beta", nameExact: true },
+    },
+  );
+
+  assert.equal(picked.ok, true);
+  assert.equal(picked.source, "wallet-status");
+  assert.equal(picked.query, "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf");
+  assert.equal(picked.key.keyId, "k2");
+});
+
+test("pick address: key 命中但无地址时返回 NO_ADDRESS_FOR_KEY", () => {
+  const status = makeWalletStatus();
+  status.addresses = status.addresses.filter((item) => item.keyId !== "k2");
+
+  const picked = pickAddressQueryFromInputs(
+    [{ name: "beta" }],
+    {
+      walletStatus: status,
+      keyFilters: { name: "beta", nameExact: true },
+    },
+  );
+
+  assert.equal(picked.ok, false);
+  assert.equal(picked.errorCode, "NO_ADDRESS_FOR_KEY");
+  assert.equal(picked.key.keyId, "k2");
+});
 
 function makeWalletStatusWithSigners() {
   return {
@@ -71,6 +123,51 @@ function makeWalletStatusWithSigners() {
         path: "m/44'/60'/0'/0/1",
         signerRef: "evm:k3:m1",
         signerType: "hd-signer",
+      },
+    ],
+  };
+}
+
+function makeWalletStatusForPickWallet() {
+  return {
+    keys: [
+      { keyId: "k1", keyName: "alpha", keyType: "mnemonic", source: "file", status: "unlocked" },
+      { keyId: "k2", keyName: "beta", keyType: "mnemonic", source: "file", status: "unlocked" },
+    ],
+    addresses: [
+      {
+        keyId: "k1",
+        keyName: "alpha",
+        chain: "evm",
+        address: "0x1111111111111111111111111111111111111111",
+        path: "m/44'/60'/0'/0/0",
+        index: 0,
+        signerRef: "evm:k1:0",
+        signerType: "ethers-signer",
+        name: "main",
+      },
+      {
+        keyId: "k1",
+        keyName: "alpha",
+        chain: "btc",
+        address: "bc1qmain000000000000000000000000000000000",
+        addressType: "p2wpkh",
+        path: "m/84'/0'/0'/0/0",
+        index: 0,
+        signerRef: "btc:k1:0",
+        signerType: "btc-signer",
+        name: "btc-main",
+      },
+      {
+        keyId: "k2",
+        keyName: "beta",
+        chain: "evm",
+        address: "0x2222222222222222222222222222222222222222",
+        path: "m/44'/60'/0'/0/0",
+        index: 0,
+        signerRef: "evm:k2:0",
+        signerType: "ethers-signer",
+        name: "beta-main",
       },
     ],
   };
@@ -495,4 +592,197 @@ test("security: signer 输出无助记词字段", () => {
   assert.ok(!JSON.stringify(result).includes("mnemonic"));
   assert.ok(!JSON.stringify(result).includes("privateKey"));
   assert.ok(!JSON.stringify(result).includes("password"));
+});
+
+// ============================================================
+// WE-6: key 平铺地址记录输出 (pickWallet)
+// ============================================================
+
+test("pickWallet: 按 key 平铺输出地址记录且每条都带 signerRef", () => {
+  const picked = pickWallet(
+    {
+      scope: "all",
+      selectors: { keyId: "k1" },
+      outputs: {
+        signer: true,
+        chains: ["evm"],
+      },
+    },
+    makeWalletStatusForPickWallet(),
+  );
+
+  assert.equal(picked.length, 1);
+  assert.equal(picked[0].key.keyId, "k1");
+  assert.ok(Array.isArray(picked[0].addresses));
+  assert.equal(picked[0].addresses.length, 1);
+  assert.equal(picked[0].addresses[0].chain, "evm");
+  assert.equal(picked[0].addresses[0].signerRef, "evm:k1:0");
+  assert.equal(picked[0].signer.ref, "evm:k1:0");
+});
+
+test("pickWallet: 冲突时 existing-first 且派生自动跳号", () => {
+  const status = makeWalletStatusForPickWallet();
+
+  const picked = pickWallet(
+    {
+      scope: "all",
+      selectors: { keyId: "k1" },
+      outputs: {
+        signer: true,
+        deriveCount: 2,
+        deriveStartIndex: 0,
+        chains: ["evm"],
+        deriveAddress: ({ index }) => {
+          if (index === 0) {
+            return {
+              address: "0x1111111111111111111111111111111111111111",
+              signerRef: "evm:k1:0",
+              index,
+            };
+          }
+          return {
+            address: "0x9999999999999999999999999999999999999999",
+            signerRef: `evm:k1:${index}`,
+            index,
+          };
+        },
+      },
+    },
+    status,
+  );
+
+  const evmRows = picked[0].addresses.filter((row) => row.chain === "evm");
+  assert.equal(evmRows.length, 2);
+  assert.ok(evmRows.some((row) => row.address === "0x1111111111111111111111111111111111111111"));
+  assert.ok(evmRows.some((row) => row.address === "0x9999999999999999999999999999999999999999"));
+  assert.ok(evmRows.some((row) => row.index === 1));
+});
+
+test("prepareWalletCandidates: 无效 derive 返回会被忽略", () => {
+  const candidates = prepareWalletCandidates(
+    {
+      selectors: { keyId: "k2" },
+      outputs: {
+        signer: true,
+        deriveCount: 2,
+        chains: ["evm"],
+        deriveAddress: () => ({ address: "" }),
+      },
+    },
+    makeWalletStatusForPickWallet(),
+  );
+
+  assert.equal(candidates.length, 1);
+  const evmRows = candidates[0].addresses.filter((row) => row.chain === "evm");
+  assert.equal(evmRows.length, 1);
+  assert.equal(evmRows[0].address, "0x2222222222222222222222222222222222222222");
+});
+
+test("pickWallet: scope 非法时按 single 兜底", () => {
+  const picked = pickWallet(
+    {
+      scope: "unknown",
+      outputs: { chains: ["evm"] },
+    },
+    makeWalletStatusForPickWallet(),
+  );
+
+  assert.equal(picked.length, 1);
+});
+
+test("pickWallet: keyId 无地址时可按 keyName 回退关联地址", () => {
+  const status = {
+    keys: [
+      { keyId: "k-main", keyName: "main", keyType: "mnemonic", source: "file", status: "unlocked" },
+    ],
+    addresses: [
+      {
+        keyId: "k-child",
+        keyName: "main",
+        chain: "evm",
+        address: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        signerRef: "evm:k-child:0",
+        signerType: "ethers-signer",
+      },
+    ],
+  };
+
+  const picked = pickWallet(
+    {
+      scope: "all",
+      selectors: { keyId: "k-main", nameExact: true },
+      outputs: { signer: true, chains: ["evm"] },
+    },
+    status,
+  );
+
+  assert.equal(picked.length, 1);
+  assert.equal(picked[0].key.keyId, "k-main");
+  assert.equal(picked[0].addresses.length, 1);
+  assert.equal(picked[0].addresses[0].address, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  assert.equal(picked[0].signer.ref, "evm:k-child:0");
+});
+
+test("pickWallet: keys 未命中时可按 addresses.name 回退命中 keyId", () => {
+  const status = {
+    keys: [
+      { keyId: "k-main", keyName: "main", keyType: "mnemonic", source: "file", status: "unlocked" },
+      { keyId: "k-other", keyName: "other", keyType: "mnemonic", source: "file", status: "unlocked" },
+    ],
+    addresses: [
+      {
+        keyId: "k-main",
+        chain: "evm",
+        address: "0x1111111111111111111111111111111111111111",
+        name: "is-16",
+        signerRef: "evm:k-main:16",
+        signerType: "ethers-signer",
+      },
+      {
+        keyId: "k-other",
+        chain: "evm",
+        address: "0x2222222222222222222222222222222222222222",
+        name: "ha-19",
+        signerRef: "evm:k-other:19",
+        signerType: "ethers-signer",
+      },
+    ],
+  };
+
+  const picked = pickWallet(
+    {
+      scope: "all",
+      selectors: { name: "is", nameExact: false },
+      outputs: { signer: true, chains: ["evm"] },
+    },
+    status,
+  );
+
+  assert.equal(picked.length, 1);
+  assert.equal(picked[0].key.keyId, "k-main");
+  assert.equal(picked[0].addresses.length, 1);
+  assert.equal(picked[0].addresses[0].name, "is-16");
+});
+
+test("pickWallet: outputs.flatten=true 时返回扁平 addresses 行结构", () => {
+  const picked = pickWallet(
+    {
+      scope: "all",
+      selectors: { keyId: "k1" },
+      outputs: {
+        flatten: true,
+        signer: true,
+        chains: ["evm"],
+      },
+    },
+    makeWalletStatusForPickWallet(),
+  );
+
+  assert.ok(Array.isArray(picked));
+  assert.equal(picked.length, 1);
+  assert.equal(picked[0].keyId, "k1");
+  assert.equal(picked[0].keyName, "alpha");
+  assert.equal(picked[0].chain, "evm");
+  assert.equal(picked[0].address, "0x1111111111111111111111111111111111111111");
+  assert.equal(picked[0].signerRef, "evm:k1:0");
 });

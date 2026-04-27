@@ -1,0 +1,265 @@
+{
+  "ok": true,
+  "action": "wallet.status",
+  "keys": [
+    {
+      "keyId": "48b8a4146fbe69e958991463",
+      "keyName": "main",
+      "keyType": "mnemonic",
+      "source": "file",
+      "status": "unlocked"
+    },
+    {
+      "keyId": "1fbf96a55037a7187c7b39d5",
+      "keyName": "qiangfee",
+      "keyType": "privateKey",
+      "source": "file",
+      "status": "unlocked"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "keyName": "meer",
+      "keyType": "mnemonic",
+      "source": "file",
+      "status": "unlocked"
+    }
+  ],
+  "addresses": [
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x331acBa230B9ef4844DBBb8B69E89a4717111675",
+      "name": "s-0",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/0"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x4F3AaF4f125693e889C8c7c4ffBb346381ef0846",
+      "name": "s-1",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/1"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x9d670eceDDf375dF6C8D8A360a34EB976F1C871c",
+      "name": "s-2",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/2"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "trx",
+      "address": "TFt2xe1Qcr4xMT4fY3tPK1yjTPraLqpeHn",
+      "name": "s-trx",
+      "addressType": null,
+      "path": "m/44'/195'/0'/0/3"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0xA5128D730B753F7866c09406c49F21bE9b84748d",
+      "name": "m-4",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/4"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x4A81D3E3e78907bCd70824492F03543C295c84A4",
+      "name": "m-5",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/5"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0xE801daC095afA17a39251853d11a9A0Ee515035C",
+      "name": "m-6",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/6"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0xFBDE3b790B9616fA70592397903254d9f74dBd55",
+      "name": "m-7",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/7"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x275F7Dc81C4Edd51D4dD72b56d06a08840a3c684",
+      "name": "u",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/9"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x622D6af405c1053dad934d4296C4df286e8C1616",
+      "name": "h",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/10"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x542E1Bf46Aa1C127a76e87168993D2BCA7d8Ac2f",
+      "name": "x",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/12"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0xEd45cDabAA1Ee9669c212F59CEdde6Ee9B01D427",
+      "name": "h1",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/13"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x672BeFEf7FBEEA89FD9D257e2b46e0df1aF02408",
+      "name": "s-m",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/14"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x9ACE1A688D42CCA0E63065b3fbD96D7fe874710d",
+      "name": "is-15",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/15"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0xB999BD38Ed8DdDd8Af0645096096968a070EDd7C",
+      "name": "is-16",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/16"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0xA7a48Bb5837A62945AC2b7f56b35532913b90056",
+      "name": "is-17",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/17"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0xDF44283c8c9d197B13651825886A2597F93acA44",
+      "name": "ha-18",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/18"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x2922982F834CcDC4752cb8fF7106519289B0857f",
+      "name": "ha-19",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/19"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x33a1c6A1840a700B7050Df46fDA83Bc32F2f4F2a",
+      "name": "ha-20",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/20"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x247116Ca3E8002942CFc12596e9d945E8AF89457",
+      "name": "ha-21",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/21"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0xaE26A56f1fB0FC4B1e123492d184652E72B8a3f4",
+      "name": "ha-22",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/22"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x00edeC091a29B1A94dd39a299197aE1bCB05B03B",
+      "name": "xd",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/23"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x8D11cD2b396F6a8d803e31a39BF8feA92A374135",
+      "name": "mdo-24",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/24"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x71480244702ed08863248C0499D9D5C2A778FF8B",
+      "name": "mdo-25",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/25"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x5777E6E2709A56Fc292d7ad9F3CE378e5673AA93",
+      "name": "mdo-26",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/26"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0xb8B48a18C227e47589F8aF189DcD3b7F09448105",
+      "name": "mdo-27",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/27"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x004535DAae1F3cC77b924a2A479B7016888220De",
+      "name": "fxss",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/28"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "evm",
+      "address": "0x2F3FA87a622dfFCFD69224a51095B538DbF61aA3",
+      "name": "m-c",
+      "addressType": null,
+      "path": "m/44'/60'/0'/0/29"
+    },
+    {
+      "keyId": "d99ca4349d767d978bc981ca",
+      "chain": "trx",
+      "address": "TPpUvmk8i57SZnzK3biWENRGZ8wXZDaL8u",
+      "name": "s-trx",
+      "addressType": null,
+      "path": "m/44'/195'/0'/0/30"
+    }
+  ],
+  "counts": {
+    "keys": 3,
+    "addresses": 29
+  }
+}

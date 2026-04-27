@@ -187,3 +187,63 @@
 - 错误消息：`{ code: "NO_MATCH", message: "未匹配到可用...", meta: { keyId: null } }`
 - **检查**：keyId 在 meta 中返回 null 或脱敏值
 
+---
+
+# WE-5 调试接口样本
+
+## Key 检索样本
+
+### WK-1：按 name 检索主 key
+- 输入：`retrieveWalletKeyCandidates({ name: "alpha", nameExact: false }, walletStatus)`
+- 期望：返回主 key `k1`，包含 `keyType/source/status`
+
+### WK-2：按 keyType + status 检索
+- 输入：`retrieveWalletKeyCandidates({ keyType: "mnemonic", status: "unlocked" }, walletStatus)`
+- 期望：返回所有已解锁助记词 key
+
+## 地址提取样本
+
+### WA-1：inputs 无 address，走 key fallback 反查地址
+- 输入：`pickAddressQueryFromInputs([{ name: "beta" }], { walletStatus, keyFilters: { name: "beta", nameExact: true } })`
+- 期望：`ok=true`，`source="wallet-status"`，`query` 为 k2 地址
+
+### WA-2：key 命中但未配置地址
+- 输入：同 WA-1，但 walletStatus 中移除 k2 的 addresses
+- 期望：`ok=false`，`errorCode="NO_ADDRESS_FOR_KEY"`
+
+---
+
+# WE-6 key 平铺地址记录样本（pickWallet）
+
+## Happy Cases
+
+### W6-H1：按 key 输出地址记录（每条含 signerRef）
+- 输入：`pickWallet({ scope: "all", selectors: { keyId: "k1" }, outputs: { signer: true, chains: ["evm"] } }, walletStatus)`
+- 期望：返回 key 列表；`addresses` 为对象数组，且每条都包含 `address + signerRef + signerType`。
+
+### W6-H2：按 BTC addressTypes 过滤
+- 输入：`pickWallet({ scope: "all", outputs: { chains: [{ chain: "btc", addressTypes: ["p2wpkh"] }] } }, walletStatus)`
+- 期望：仅返回 `addressType=p2wpkh` 的 BTC 记录。
+
+## Edge Cases
+
+### W6-E1：existing-first + 冲突跳号
+- 输入：
+   - `walletStatus` 已存在某 key 的 `evm` 地址（视为 index=0 已占用）
+   - `outputs.deriveAddress` 在 index=0 返回冲突地址，在 index=1 返回新地址
+   - `outputs.deriveCount=2`
+- 期望：
+   - 原有地址保留
+   - 派生地址跳过冲突后使用下一个可用 index
+   - 不覆盖、不重复
+
+## Invalid Cases
+
+### W6-I1：deriveAddress 返回无效结果
+- 输入：`outputs.deriveAddress` 返回空地址/null
+- 期望：忽略无效派生结果；最终结果只保留可用 existing 记录（或空）。
+
+### W6-I2：scope 非法值
+- 输入：`scope="unknown"`
+- 期望：按 `single` 兜底处理，不抛异常。
+

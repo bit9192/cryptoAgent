@@ -86,6 +86,253 @@ function toAddressCandidate(item = {}) {
   };
 }
 
+function toKeyCandidate(item = {}) {
+  const keyId = normalizeText(item?.keyId);
+  if (!keyId) return null;
+  return {
+    keyId,
+    keyName: normalizeText(item?.keyName || item?.name) || null,
+    keyType: normalizeText(item?.keyType || item?.type) || null,
+    source: normalizeText(item?.source) || null,
+    status: normalizeText(item?.status) || null,
+  };
+}
+
+function normalizeNonEmptyString(value) {
+  const text = normalizeText(value);
+  return text || null;
+}
+
+function normalizePositiveInteger(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) {
+    return null;
+  }
+  return Math.floor(num);
+}
+
+function pickFirstRawValue(input = {}, from = []) {
+  for (const key of from) {
+    if (!Object.prototype.hasOwnProperty.call(input, key)) continue;
+    const raw = input[key];
+    if (raw == null) continue;
+    if (typeof raw === "string" && raw.trim() === "") continue;
+    return raw;
+  }
+  return null;
+}
+
+function getFieldNormalizer(name) {
+  if (name === "nonEmptyString") {
+    return normalizeNonEmptyString;
+  }
+  if (name === "positiveNumber") {
+    return normalizePositiveInteger;
+  }
+  return (value) => value;
+}
+
+function mapByRule(input = {}, rule = {}) {
+  const fields = rule?.fields && typeof rule.fields === "object" ? rule.fields : {};
+  const mapped = {};
+
+  for (const [fieldName, fieldRule] of Object.entries(fields)) {
+    const from = Array.isArray(fieldRule?.from) ? fieldRule.from : [fieldName];
+    const raw = pickFirstRawValue(input, from);
+    const normalize = getFieldNormalizer(fieldRule?.normalize);
+    const normalized = raw == null ? null : normalize(raw);
+
+    if (normalized == null) {
+      if (fieldRule?.required) {
+        return null;
+      }
+      continue;
+    }
+
+    mapped[fieldName] = normalized;
+  }
+
+  return mapped;
+}
+
+function mergeKeyFiltersFromInputs(candidates = []) {
+  const merged = {
+    keyId: null,
+    name: null,
+    keyName: null,
+  };
+
+  for (const item of candidates) {
+    if (!item || typeof item !== "object") continue;
+
+    if (!merged.keyId) {
+      merged.keyId = normalizeText(item.keyId) || null;
+    }
+    if (!merged.name) {
+      merged.name = normalizeText(item.name) || null;
+    }
+    if (!merged.keyName) {
+      merged.keyName = normalizeText(item.keyName) || null;
+    }
+
+    const targets = asArray(item.targets);
+    for (const target of targets) {
+      if (!merged.keyId) {
+        merged.keyId = normalizeText(target?.keyId) || null;
+      }
+      if (!merged.name) {
+        merged.name = normalizeText(target?.name) || null;
+      }
+      if (!merged.keyName) {
+        merged.keyName = normalizeText(target?.keyName) || null;
+      }
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * 从 wallet.status.keys 中检索 key 候选。
+ * 支持 keyId / name / keyName / keyType / source / status 过滤。
+ */
+export function retrieveWalletKeyCandidates(filters = {}, walletStatus = {}) {
+  const keys = asArray(walletStatus?.keys)
+    .map((item) => toKeyCandidate(item))
+    .filter(Boolean);
+
+  const keyId = normalizeText(filters?.keyId);
+  const keyType = normalizeLower(filters?.keyType || filters?.type);
+  const source = normalizeLower(filters?.source);
+  const status = normalizeLower(filters?.status);
+  const name = normalizeText(filters?.name || filters?.keyName);
+  const nameExact = Boolean(filters?.nameExact);
+
+  let candidates = keys;
+  if (keyId) {
+    candidates = candidates.filter((k) => k.keyId === keyId);
+  }
+  if (keyType) {
+    candidates = candidates.filter((k) => normalizeLower(k.keyType) === keyType);
+  }
+  if (source) {
+    candidates = candidates.filter((k) => normalizeLower(k.source) === source);
+  }
+  if (status) {
+    candidates = candidates.filter((k) => normalizeLower(k.status) === status);
+  }
+  if (name) {
+    const needle = normalizeLower(name);
+    if (nameExact) {
+      candidates = candidates.filter((k) => normalizeLower(k.keyName) === needle);
+    } else {
+      candidates = candidates.filter((k) => normalizeLower(k.keyName).includes(needle));
+    }
+  }
+
+  candidates.sort((a, b) => a.keyId.localeCompare(b.keyId));
+  return candidates;
+}
+
+/**
+ * 通过输入候选提取 address 查询参数。
+ * 优先直接提取 query/address；无地址时退化为 key 检索并反查地址。
+ */
+export function pickAddressQueryFromInputs(inputs = [], options = {}) {
+  const candidates = Array.isArray(inputs) ? inputs : [];
+  const rule = options?.rule && typeof options.rule === "object"
+    ? options.rule
+    : {
+      strategy: "first-valid",
+      fields: {
+        query: { from: ["query", "address"], required: true, normalize: "nonEmptyString" },
+        network: { from: ["network", "chain"], required: false, normalize: "nonEmptyString" },
+        limit: { from: ["limit"], required: false, normalize: "positiveNumber" },
+        timeoutMs: { from: ["timeoutMs"], required: false, normalize: "positiveNumber" },
+      },
+    };
+
+  if ((rule?.strategy ?? "first-valid") !== "first-valid") {
+    throw createResolveError("UNSUPPORTED_PICK_STRATEGY", "暂不支持的提取策略");
+  }
+
+  for (const item of candidates) {
+    const mapped = mapByRule(item, rule);
+    if (mapped && mapped.query) {
+      return {
+        ok: true,
+        source: "inputs",
+        ...mapped,
+      };
+    }
+  }
+
+  const walletStatus = options?.walletStatus && typeof options.walletStatus === "object"
+    ? options.walletStatus
+    : {};
+  const inputKeyFilters = mergeKeyFiltersFromInputs(candidates);
+  const keyFilters = {
+    ...inputKeyFilters,
+    ...(options?.keyFilters && typeof options.keyFilters === "object" ? options.keyFilters : {}),
+  };
+
+  const keyCandidates = retrieveWalletKeyCandidates(keyFilters, walletStatus);
+  if (keyCandidates.length === 0) {
+    return {
+      ok: false,
+      errorCode: "NO_KEY_MATCH",
+      message: "未匹配到 key，无法反查地址",
+      keyFilters,
+    };
+  }
+
+  if (keyCandidates.length > 1) {
+    return {
+      ok: false,
+      errorCode: "MULTIPLE_KEY_MATCH",
+      message: "命中多个 key，请补充 keyId 或更精确的 name",
+      keyFilters,
+      keyCandidates,
+    };
+  }
+
+  const selectedKey = keyCandidates[0];
+  const addressCandidates = retrieveWalletCandidates({
+    keyId: selectedKey.keyId,
+    chain: normalizeLower(options?.chain || options?.network) || "",
+  }, walletStatus);
+
+  if (addressCandidates.length === 0) {
+    return {
+      ok: false,
+      errorCode: "NO_ADDRESS_FOR_KEY",
+      message: "key 已命中，但尚未配置地址",
+      key: selectedKey,
+      hint: "请先执行 wallet derive 或配置地址后再重试",
+    };
+  }
+
+  if (addressCandidates.length > 1) {
+    return {
+      ok: false,
+      errorCode: "MULTIPLE_ADDRESS_MATCH",
+      message: "key 下存在多个地址，请补充 chain/name 约束",
+      key: selectedKey,
+      addressCandidates,
+    };
+  }
+
+  const picked = addressCandidates[0];
+  return {
+    ok: true,
+    source: "wallet-status",
+    query: picked.address,
+    network: picked.chain || null,
+    key: selectedKey,
+    address: picked,
+  };
+}
+
 /**
  * 检索阶段：从 wallet 状态中按过滤条件检索候选地址
  *
@@ -270,6 +517,434 @@ export function generateSignerFromCandidates(candidates = [], requirement = {}) 
   checkNoSensitiveFields(result);
 
   return result;
+}
+
+function normalizeChainRequests(chains) {
+  if (!Array.isArray(chains) || chains.length === 0) {
+    return [];
+  }
+
+  const normalized = [];
+  for (const item of chains) {
+    if (typeof item === "string") {
+      const chain = normalizeLower(item);
+      if (chain) {
+        normalized.push({ chain, addressTypes: null });
+      }
+      continue;
+    }
+
+    if (item && typeof item === "object") {
+      const chain = normalizeLower(item?.chain);
+      if (!chain) continue;
+      const addressTypes = Array.isArray(item?.addressTypes)
+        ? item.addressTypes.map((v) => normalizeLower(v)).filter(Boolean)
+        : null;
+      normalized.push({ chain, addressTypes });
+    }
+  }
+
+  return normalized;
+}
+
+function inferIndexFromPath(pathValue) {
+  const path = normalizeText(pathValue);
+  if (!path) return null;
+  const parts = path.split("/");
+  const last = parts[parts.length - 1];
+  const n = Number(last);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+function normalizeAddressForCompare(chain, address) {
+  const text = normalizeText(address);
+  if (!text) return "";
+  const c = normalizeLower(chain);
+  if (c === "evm") {
+    return text.toLowerCase();
+  }
+  return text;
+}
+
+function buildOccupiedAddressSet(addresses = []) {
+  const occupied = new Set();
+  for (const row of addresses) {
+    const chain = normalizeLower(row?.chain);
+    const address = normalizeAddressForCompare(chain, row?.address);
+    if (chain && address) {
+      occupied.add(`${chain}:${address}`);
+    }
+  }
+  return occupied;
+}
+
+function collectUsedIndices(rows = []) {
+  const used = new Set();
+  for (const row of rows) {
+    const direct = Number(row?.index);
+    const inferred = inferIndexFromPath(row?.path);
+    const index = Number.isInteger(direct) && direct >= 0 ? direct : inferred;
+    if (Number.isInteger(index) && index >= 0) {
+      used.add(index);
+    }
+  }
+  return used;
+}
+
+function resolveSignerTypeByChain(chain, fallback = null) {
+  if (fallback) return fallback;
+  const c = normalizeLower(chain);
+  if (c === "evm") return "ethers-signer";
+  if (c === "trx") return "tronweb-signer";
+  if (c === "btc") return "btc-signer";
+  return null;
+}
+
+function toWalletAddressRecord(item = {}, keyMeta = {}, fallback = {}) {
+  const chain = normalizeLower(item?.chain || fallback?.chain);
+  const indexRaw = Number(item?.index);
+  const index = Number.isInteger(indexRaw) && indexRaw >= 0
+    ? indexRaw
+    : inferIndexFromPath(item?.path ?? fallback?.path);
+  const keyId = normalizeText(item?.keyId || keyMeta?.keyId || fallback?.keyId) || null;
+  const signerSuffix = (index ?? normalizeText(item?.name)) || "addr";
+  const signerRef = normalizeText(item?.signerRef || fallback?.signerRef)
+    || (keyId && chain ? `${chain}:${keyId}:${signerSuffix}` : null);
+
+  return {
+    chain,
+    address: normalizeText(item?.address || fallback?.address) || null,
+    addressType: normalizeLower(item?.addressType || item?.type || fallback?.addressType) || null,
+    signerRef,
+    signerType: resolveSignerTypeByChain(chain, normalizeText(item?.signerType || fallback?.signerType) || null),
+    index,
+    path: normalizeText(item?.path || fallback?.path) || null,
+    source: normalizeLower(item?.source || fallback?.source) || "existing",
+    name: normalizeText(item?.name || fallback?.name || keyMeta?.name || keyMeta?.keyName) || null,
+    keyId,
+  };
+}
+
+function hasKeySelectorFilter(selectors = {}) {
+  return [
+    selectors?.keyId,
+    selectors?.name,
+    selectors?.keyName,
+    selectors?.keyType,
+    selectors?.type,
+    selectors?.source,
+    selectors?.status,
+  ].some((v) => normalizeText(v));
+}
+
+function collectKeyIdsByAddressName(selectors = {}, addresses = []) {
+  const targetName = normalizeText(selectors?.name || selectors?.keyName);
+  if (!targetName) return [];
+
+  const target = normalizeLower(targetName);
+  const nameExact = Boolean(selectors?.nameExact);
+  const ids = new Set();
+
+  for (const row of asArray(addresses)) {
+    const keyId = normalizeText(row?.keyId);
+    if (!keyId) continue;
+
+    const candidate = normalizeLower(row?.keyName || row?.name);
+    if (!candidate) continue;
+
+    const matched = nameExact ? candidate === target : candidate.includes(target);
+    if (matched) {
+      ids.add(keyId);
+    }
+  }
+
+  return Array.from(ids);
+}
+
+function deriveMissingRecords({
+  keyId,
+  keyMeta,
+  chain,
+  addressType = null,
+  needed = 1,
+  occupiedAddressSet,
+  usedIndexSet,
+  startIndex = 0,
+  maxAttempts = 128,
+  deriveAddress,
+}) {
+  if (typeof deriveAddress !== "function" || needed <= 0) {
+    return [];
+  }
+
+  const records = [];
+  let cursor = Math.max(0, Number(startIndex) || 0);
+  let attempts = 0;
+
+  while (records.length < needed && attempts < maxAttempts) {
+    attempts += 1;
+
+    if (usedIndexSet.has(cursor)) {
+      cursor += 1;
+      continue;
+    }
+
+    let raw;
+    try {
+      raw = deriveAddress({
+        keyId,
+        key: keyMeta,
+        chain,
+        addressType,
+        index: cursor,
+      });
+    } catch {
+      cursor += 1;
+      continue;
+    }
+
+    const row = typeof raw === "string"
+      ? {
+        keyId,
+        chain,
+        addressType,
+        address: raw,
+        index: cursor,
+        source: "derived",
+      }
+      : {
+        keyId,
+        chain,
+        addressType,
+        index: cursor,
+        source: "derived",
+        ...(raw && typeof raw === "object" ? raw : {}),
+      };
+
+    const candidate = toWalletAddressRecord(row, keyMeta, {
+      source: "derived",
+      chain,
+      addressType,
+      keyId,
+      index: cursor,
+    });
+
+    if (!candidate.address || !candidate.chain) {
+      cursor += 1;
+      continue;
+    }
+
+    const compareAddress = normalizeAddressForCompare(candidate.chain, candidate.address);
+    const compareKey = `${candidate.chain}:${compareAddress}`;
+    if (!compareAddress || occupiedAddressSet.has(compareKey)) {
+      cursor += 1;
+      continue;
+    }
+
+    occupiedAddressSet.add(compareKey);
+    usedIndexSet.add(candidate.index ?? cursor);
+    records.push(candidate);
+    cursor += 1;
+  }
+
+  return records;
+}
+
+export function prepareWalletCandidates(request = {}, walletStatus = {}) {
+  const outputs = request?.outputs && typeof request.outputs === "object"
+    ? request.outputs
+    : request?.outps && typeof request.outps === "object"
+      ? request.outps
+      : {};
+  const selectors = request?.selectors && typeof request.selectors === "object"
+    ? request.selectors
+    : request?.keyFilters && typeof request.keyFilters === "object"
+      ? request.keyFilters
+      : {};
+
+  const deriveEnabled = outputs?.derive !== false;
+  const deriveAddress = typeof outputs?.deriveAddress === "function" ? outputs.deriveAddress : null;
+  const deriveCountRaw = Number(outputs?.deriveCount ?? outputs?.derive?.count ?? 1);
+  const deriveCount = Number.isInteger(deriveCountRaw) && deriveCountRaw > 0 ? deriveCountRaw : 1;
+  const deriveStartIndexRaw = Number(outputs?.deriveStartIndex ?? outputs?.derive?.startIndex ?? 0);
+  const deriveStartIndex = Number.isInteger(deriveStartIndexRaw) && deriveStartIndexRaw >= 0 ? deriveStartIndexRaw : 0;
+
+  const keys = asArray(walletStatus?.keys);
+  const addresses = asArray(walletStatus?.addresses);
+  const occupiedAddressSet = buildOccupiedAddressSet(addresses);
+
+  const selectedKeys = retrieveWalletKeyCandidates(selectors, walletStatus);
+  const hasSelector = hasKeySelectorFilter(selectors);
+  const keyIdSelector = normalizeText(selectors?.keyId);
+  const selectedKeyIds = selectedKeys.map((k) => k.keyId).filter(Boolean);
+  const addressNameMatchedKeyIds = selectedKeyIds.length === 0
+    && !keyIdSelector
+    ? collectKeyIdsByAddressName(selectors, addresses)
+    : [];
+
+  const targetKeyIds = hasSelector
+    ? (selectedKeyIds.length > 0 ? selectedKeyIds : addressNameMatchedKeyIds)
+    : Array.from(new Set(addresses.map((row) => normalizeText(row?.keyId)).filter(Boolean)));
+
+  const requestedChains = normalizeChainRequests(outputs?.chains);
+
+  return targetKeyIds.map((keyId) => {
+    const keyMeta = selectedKeys.find((k) => k.keyId === keyId)
+      ?? keys.find((k) => normalizeText(k?.keyId) === keyId)
+      ?? { keyId };
+
+    const keyName = normalizeText(keyMeta?.keyName || keyMeta?.name);
+    let keyRows = addresses.filter((row) => normalizeText(row?.keyId) === keyId);
+    // Some wallet snapshots keep address rows under keyName-linked records.
+    // Keep existing-first behavior, but fallback to keyName mapping when keyId has no rows.
+    if (keyRows.length === 0 && keyName) {
+      keyRows = addresses.filter(
+        (row) => normalizeText(row?.keyName || row?.name) === keyName,
+      );
+    }
+    const usedIndexSet = collectUsedIndices(keyRows);
+
+    const chainRequests = requestedChains.length > 0
+      ? requestedChains
+      : Array.from(new Set(
+        keyRows.map((row) => normalizeLower(row?.chain)).filter(Boolean),
+      )).map((chain) => ({ chain, addressTypes: null }));
+
+    const addressRecords = [];
+    for (const req of chainRequests) {
+      const chain = normalizeLower(req?.chain);
+      if (!chain) continue;
+
+      const rowsByChain = keyRows.filter((row) => normalizeLower(row?.chain) === chain);
+
+      if (chain === "btc") {
+        const existingTypes = Array.from(new Set(
+          rowsByChain.map((row) => normalizeLower(row?.addressType || row?.type || "default")).filter(Boolean),
+        ));
+        const effectiveTypes = Array.isArray(req?.addressTypes) && req.addressTypes.length > 0
+          ? req.addressTypes
+          : existingTypes.length > 0
+            ? existingTypes
+            : ["p2wpkh"];
+
+        for (const type of effectiveTypes) {
+          const rowsByType = rowsByChain.filter(
+            (row) => normalizeLower(row?.addressType || row?.type || "default") === type,
+          );
+          const current = rowsByType.map((row) => toWalletAddressRecord(row, keyMeta, { source: "existing" }));
+          addressRecords.push(...current);
+
+          if (deriveEnabled && deriveAddress && current.length < deriveCount) {
+            const missing = deriveCount - current.length;
+            const derived = deriveMissingRecords({
+              keyId,
+              keyMeta,
+              chain,
+              addressType: type,
+              needed: missing,
+              occupiedAddressSet,
+              usedIndexSet,
+              startIndex: deriveStartIndex,
+              deriveAddress,
+            });
+            addressRecords.push(...derived);
+          }
+        }
+        continue;
+      }
+
+      const current = rowsByChain.map((row) => toWalletAddressRecord(row, keyMeta, { source: "existing" }));
+      addressRecords.push(...current);
+
+      if (deriveEnabled && deriveAddress && current.length < deriveCount) {
+        const missing = deriveCount - current.length;
+        const derived = deriveMissingRecords({
+          keyId,
+          keyMeta,
+          chain,
+          addressType: null,
+          needed: missing,
+          occupiedAddressSet,
+          usedIndexSet,
+          startIndex: deriveStartIndex,
+          deriveAddress,
+        });
+        addressRecords.push(...derived);
+      }
+    }
+
+    const stableRecords = addressRecords
+      .filter((row) => row?.chain && row?.address)
+      .sort((a, b) => {
+        if (a.chain !== b.chain) return a.chain.localeCompare(b.chain);
+        const ai = Number.isInteger(a.index) ? a.index : Number.MAX_SAFE_INTEGER;
+        const bi = Number.isInteger(b.index) ? b.index : Number.MAX_SAFE_INTEGER;
+        if (ai !== bi) return ai - bi;
+        return a.address.localeCompare(b.address);
+      });
+
+    const signer = outputs?.signer
+      ? stableRecords.length > 0
+        ? { ref: stableRecords[0].signerRef, type: stableRecords[0].signerType }
+        : null
+      : null;
+
+    return {
+      name: normalizeText(keyMeta?.name || keyMeta?.keyName) || null,
+      key: {
+        keyId: normalizeText(keyMeta?.keyId || keyId) || null,
+        keyName: normalizeText(keyMeta?.keyName || keyMeta?.name) || null,
+        keyType: normalizeText(keyMeta?.keyType || keyMeta?.type) || null,
+        source: normalizeText(keyMeta?.source) || null,
+        status: normalizeText(keyMeta?.status) || null,
+      },
+      signer,
+      addresses: stableRecords,
+    };
+  });
+}
+
+function flattenWalletCandidates(candidates = []) {
+  const rows = [];
+
+  for (const item of asArray(candidates)) {
+    const key = item?.key && typeof item.key === "object" ? item.key : {};
+    const addresses = asArray(item?.addresses);
+
+    for (const addr of addresses) {
+      const normalized = addr && typeof addr === "object" ? addr : {};
+      rows.push({
+        ...normalized,
+        keyId: normalizeText(normalized?.keyId || key?.keyId) || null,
+        keyName: normalizeText(key?.keyName || item?.name) || null,
+        keyType: normalizeText(key?.keyType) || null,
+        keySource: normalizeText(key?.source) || null,
+        keyStatus: normalizeText(key?.status) || null,
+        signerRef: normalizeText(normalized?.signerRef || item?.signer?.ref) || null,
+        signerType: normalizeText(normalized?.signerType || item?.signer?.type) || null,
+      });
+    }
+  }
+
+  return rows;
+}
+
+export function pickWallet(request = {}, walletStatus = {}) {
+  const scope = normalizeLower(request?.scope) || "single";
+  const outputs = request?.outputs && typeof request.outputs === "object"
+    ? request.outputs
+    : request?.outps && typeof request.outps === "object"
+      ? request.outps
+      : {};
+  const flatten = outputs?.flatten === true;
+
+  const groupedCandidates = prepareWalletCandidates(request, walletStatus);
+  const candidates = flatten ? flattenWalletCandidates(groupedCandidates) : groupedCandidates;
+
+  if (scope === "all") {
+    return candidates;
+  }
+  return candidates.length > 0 ? [candidates[0]] : [];
 }
 
 function buildResolvedInput(input = {}) {

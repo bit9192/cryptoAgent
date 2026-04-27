@@ -258,6 +258,27 @@
    - search 任务正常接收并处理
    
 2. ✅ 回归测试无新增失败
+
+### Slice WE-6：Key 平铺地址记录输出（pickWallet）
+
+本次只做：
+
+1. 在 `wallet-engine` 中实现 `pickWallet(request, walletStatus)`。
+2. 输出按 key 平铺，每个 key 下为 `addresses` 记录数组（每条含 `address + signerRef + signerType + index/path`）。
+3. 增加 `prepareWalletCandidates(request, walletStatus)` 作为内部/调试可复用构建函数。
+4. 支持按 `scope + selectors + outputs.chains` 过滤。
+5. 支持冲突回避策略：`existing-first`，派生地址冲突时自动跳号。
+
+本次不做：
+
+1. 不做任务层接线（task/cli 行为保持不变）。
+2. 不做真实链派生实现，仅支持通过 `request.outputs.deriveAddress` 注入派生函数。
+
+验收标准：
+
+1. `pickWallet()` 返回结构中每条地址都可直接反查 signer（不再是字符串数组）。
+2. 冲突场景下不会覆盖现有地址，且可跳过被占用 index。
+3. `wallet-engine.test.mjs` 增加 happy/edge/invalid 覆盖并全部通过。
    - 所有 56 个测试通过（27+11+18）
 
 ## 总结
@@ -284,6 +305,27 @@
 2. HD 钱包派生策略：根据 path 选择子钱包
 3. 错误处理增强：脱敏错误消息
 4. 性能优化：缓存候选列表
+
+## Slice WE-5（当前切片）
+
+目标：为调试场景拆出两个独立接口，先调 keys，再调 address。
+
+本次只做：
+1. 新增 `retrieveWalletKeyCandidates(filters, walletStatus)`，从 `wallet.status.keys` 检索 key。
+2. 新增 `pickAddressQueryFromInputs(inputs, options)`，先规则提取地址，失败后 key fallback 反查地址。
+3. key 命中但无地址时返回稳定错误码 `NO_ADDRESS_FOR_KEY`。
+4. 在 run/test.mjs 增加两个独立调试入口：`调试 A: keys 检索`、`调试 B: 地址提取`。
+5. 在 run/test.mjs 中把 `wallet.status` 注入 `options.walletStatus`，统一调试来源。
+
+本次不做：
+1. wallet tree 主 key 挂载改造。
+2. 助记词派生链路改造。
+3. 交易类写操作流程改造。
+
+验收标准：
+1. 可按 name/keyId/keyType/source/status 独立调试 key 检索。
+2. 无地址时不静默失败，明确返回 `NO_ADDRESS_FOR_KEY`。
+3. 增加单测覆盖 key 检索、key fallback、无地址错误码。
 
 ## 5. 开发门禁（执行前检查）
 

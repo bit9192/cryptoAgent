@@ -564,6 +564,108 @@ export async function searchAddressAssetsTask(input = {}) {
   return await searchAddressAssetsTaskWithEngine(input, getEngine());
 }
 
+function normalizeAddressAssetsBatchItems(input = {}) {
+  const rows = Array.isArray(input?.items) ? input.items : [];
+  return rows.map((item, index) => {
+    const query = normalizeString(item?.query ?? item?.address);
+    const network = normalizeString(item?.network) || null;
+    const limit = Number.isFinite(Number(item?.limit))
+      ? Number(item.limit)
+      : (Number.isFinite(Number(input?.limit)) ? Number(input.limit) : 200);
+    const timeoutMs = Number.isFinite(Number(item?.timeoutMs))
+      ? Number(item.timeoutMs)
+      : (Number.isFinite(Number(input?.timeoutMs)) ? Number(input.timeoutMs) : 10000);
+
+    if (!query) {
+      throw new TypeError(`items[${index}].query 不能为空`);
+    }
+
+    return {
+      index,
+      query,
+      network,
+      limit,
+      timeoutMs,
+    };
+  });
+}
+
+export async function searchAddressAssetsBatchTaskWithEngine(input = {}, engine, options = {}) {
+  let rows = [];
+  try {
+    rows = normalizeAddressAssetsBatchItems(input);
+  } catch (error) {
+    return {
+      ok: false,
+      items: [],
+      summary: { total: 0, success: 0, failed: 0 },
+      error: error?.message ?? String(error),
+    };
+  }
+
+  if (rows.length === 0) {
+    return {
+      ok: false,
+      items: [],
+      summary: { total: 0, success: 0, failed: 0 },
+      error: "items 不能为空",
+    };
+  }
+
+  const runtimeEngine = engine ?? getEngine();
+  const output = await Promise.all(rows.map(async (row) => {
+    try {
+      const result = await searchAddressAssetsTaskWithEngine(
+        {
+          query: row.query,
+          ...(row.network ? { network: row.network } : {}),
+          limit: row.limit,
+          timeoutMs: row.timeoutMs,
+        },
+        runtimeEngine,
+        options,
+      );
+
+      return {
+        index: row.index,
+        ...result,
+      };
+    } catch (error) {
+      return {
+        index: row.index,
+        ok: false,
+        query: row.query,
+        network: row.network,
+        assets: [],
+        totalValueUsd: 0,
+        error: error?.message ?? String(error),
+      };
+    }
+  }));
+
+  const items = output
+    .slice()
+    .sort((a, b) => a.index - b.index)
+    .map(({ index, ...rest }) => rest);
+
+  const success = items.filter((item) => item?.ok).length;
+  const failed = items.length - success;
+
+  return {
+    ok: failed === 0,
+    items,
+    summary: {
+      total: items.length,
+      success,
+      failed,
+    },
+  };
+}
+
+export async function searchAddressAssetsBatchTask(input = {}, options = {}) {
+  return await searchAddressAssetsBatchTaskWithEngine(input, getEngine(), options);
+}
+
 export async function searchAddressValuationTaskWithEngine(input = {}, engine, options = {}) {
   return await searchAddressAssetsTaskWithEngine(
     input,
@@ -839,6 +941,8 @@ export default {
   searchAddressTokenBalancesBatchTaskWithEngine,
   searchAddressAssetsTask,
   searchAddressAssetsTaskWithEngine,
+  searchAddressAssetsBatchTask,
+  searchAddressAssetsBatchTaskWithEngine,
   searchAddressValuationTask,
   searchAddressValuationTaskWithEngine,
   searchPortfolioTask,

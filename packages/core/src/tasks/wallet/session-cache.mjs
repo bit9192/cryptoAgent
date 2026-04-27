@@ -76,6 +76,7 @@ export function upsertKey(session, keyMeta) {
   const next = {
     keyId,
     keyName: String(keyMeta?.keyName ?? "").trim() || keyId,
+    keyType: String(keyMeta?.keyType ?? keyMeta?.type ?? "").trim() || null,
     source: String(keyMeta?.source ?? "").trim() || "file",
     sourceFile: String(keyMeta?.sourceFile ?? "").trim() || null,
     status: String(keyMeta?.status ?? "unlocked").trim() || "unlocked",
