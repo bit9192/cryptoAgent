@@ -98,3 +98,46 @@
 - [ ] S-W-2a：细粒度缓存失效（per-session 级缓存）
 - [ ] S-W-2b：缓存键支持 chains 参数（按参数哈希)
 - [ ] S-W-2c：registerProvider 时全局失效
+
+## 新增切片：S-W-3 钱包级 getAddress 缓存（跨 signer 实例）
+
+### 背景
+
+当前 provider 内 addressCache 挂载在 signer 闭包内。`wallet.getSigner()` 每次都会新建 signer，导致同一 keyId/chain 下重复调用 `signer.getAddress()` 无法复用上一次缓存。
+
+### 本次目标（只做一个切片）
+
+在 `wallet` 层新增地址缓存，并在 `getSigner()` 返回时包装 `signer.getAddress`：
+
+1. 缓存键采用 `keyId + chain + path + addressType`
+2. `signer.getAddress()` 先查 wallet 级缓存，命中则直接返回
+3. 未命中则调用 provider 的 `getAddress`，并将结果回写 wallet 级缓存
+4. `lock(keyId)` 时清除该 key 的 wallet 级地址缓存
+5. `lockAll()` 时清除全部 wallet 级地址缓存
+
+### 验收标准
+
+1. 同一 `keyId + chain + path/addressType`，跨多次 `wallet.getSigner()` 仍能命中缓存
+2. 不同 path 或不同 addressType 不串缓存
+3. lock/lockAll 后缓存正确失效
+4. 现有 provider-getaddress-cache 测试继续通过
+
+## 新增切片：S-W-4 pickWallet 迁移对比（保留旧逻辑）
+
+### 背景
+
+`src/run/test.mjs` 内含本地 `pickWallet` 逻辑，当前仅用于调试。为支持迁移，需要在 wallet 模块提供新接口，并在 run/test 中同参双跑对比输出一致性。
+
+### 本次目标（只做一个切片）
+
+1. 在 wallet 模块新增 `pickWallet` 接口（从 tree + request 生成地址结果）
+2. 保留 `src/run/test.mjs` 现有本地 `pickWallet` 实现，不删除
+3. 在 run/test 增加迁移对比：旧接口与新接口使用同一参数执行
+4. 对比结果一致时打印一致标记；不一致时打印差异并抛错
+
+### 验收标准
+
+1. `wallet.pickWallet` 可通过 `options.wallet.pickWallet` 调用
+2. run/test 输出包含迁移一致性检查结果
+3. 旧逻辑输出与新接口输出在同参数下完全一致
+4. 不修改业务入参结构（继续兼容 outputs/outps）

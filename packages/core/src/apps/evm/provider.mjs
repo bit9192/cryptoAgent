@@ -119,6 +119,36 @@ export function createEvmProvider(options = {}) {
         providerVersion: version,
         capabilities: [...operations],
         async getAddress(getAddressOptions = {}) {
+          const rawPaths = Array.isArray(getAddressOptions.paths)
+            ? getAddressOptions.paths
+            : getAddressOptions.path
+              ? [getAddressOptions.path]
+              : null;
+
+          // 优先检查缓存：仅在调用方显式提供 path(s) 时生效
+          if (rawPaths && rawPaths.length > 0) {
+            const allInCache = rawPaths.every((p) => p in addressCache);
+            if (allInCache) {
+              const addresses = rawPaths.map((p) => ({ path: p, address: addressCache[p] }));
+
+              await walletContext.audit?.({
+                at: new Date().toISOString(),
+                keyId,
+                chain: "evm",
+                operation: "getAddress",
+                status: "ok",
+              });
+
+              if (addresses.length === 1 && getAddressOptions.returnAll !== true) {
+                return addresses[0].address;
+              }
+              return {
+                address: addresses[0]?.address,
+                addresses,
+              };
+            }
+          }
+
           const material = await walletContext.deriveKeyMaterial({
             operation: "getAddress",
             ...getAddressOptions,

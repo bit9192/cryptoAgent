@@ -232,9 +232,26 @@ export function createBtcProvider(options = {}) {
           const rawPaths = Array.isArray(opts.paths) ? opts.paths
             : opts.path ? [opts.path]
             : null;
+          const paths = rawPaths ?? [defaultDerivationPath(addressType, networkName)];
+
+          // 优先检查缓存：如果所有路径都命中，直接返回
+          const allInCache = paths.every((p) => {
+            const cacheKey = `${addressType}:${p}`;
+            return cacheKey in addressCache;
+          });
+          if (allInCache) {
+            const items = paths.map((p) => {
+              const cacheKey = `${addressType}:${p}`;
+              return { path: p, address: addressCache[cacheKey] };
+            });
+
+            await auditOk("getAddress");
+
+            if (items.length === 1 && !opts.returnAll) return items[0].address;
+            return { address: items[0]?.address, addresses: items, addressType, network: networkName };
+          }
 
           const items = await withSecret("getAddress", null, (secret) => {
-            const paths = rawPaths ?? [defaultDerivationPath(addressType, networkName)];
             return paths.map((p) => {
               // 构建缓存键
               const cacheKey = `${addressType}:${p}`;

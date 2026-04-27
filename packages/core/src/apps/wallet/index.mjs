@@ -27,6 +27,7 @@ import {
   collectDerivedAddressesFromSession,
 } from "./tree-cache.mjs";
 import { createCatalogOps } from "./catalog-ops.mjs";
+import { createPickWalletOps } from "./pick-wallet.mjs";
 
 const DEFAULT_UNLOCK_TTL_MS = 10 * 60 * 1000;
 
@@ -60,6 +61,9 @@ export function createWallet(options = {}) {
   const keyCatalog = new Map();
   const sessions = new Map();
   const providerRegistry = new Map();
+  // Wallet-level getAddress cache, shared across signer instances.
+  // bucket key: "keyId:chain" -> Map<"path:addressType", address>
+  const signerAddressCache = new Map();
   
   // ──────────────────── Tree Snapshot Cache ────────────────────
   let treeSnapshotCache = null; // Cache entire tree snapshot
@@ -123,6 +127,41 @@ export function createWallet(options = {}) {
   const registerProvider = providerOps.registerProvider;
   const listChains = providerOps.listChains;
   const supports = providerOps.supports;
+
+  function getAddressCacheBucket(keyId, chain) {
+    const bucketId = `${keyId}:${chain}`;
+    let bucket = signerAddressCache.get(bucketId);
+    if (!bucket) {
+      bucket = new Map();
+      signerAddressCache.set(bucketId, bucket);
+    }
+    return bucket;
+  }
+
+  function clearAddressCacheForKey(keyId) {
+    const prefix = `${keyId}:`;
+    for (const bucketId of signerAddressCache.keys()) {
+      if (bucketId.startsWith(prefix)) {
+        signerAddressCache.delete(bucketId);
+      }
+    }
+  }
+
+  function normalizeAddressPaths(getAddressOptions = {}) {
+    if (Array.isArray(getAddressOptions.paths) && getAddressOptions.paths.length > 0) {
+      return getAddressOptions.paths.map((p) => String(p));
+    }
+    if (getAddressOptions.path !== undefined && getAddressOptions.path !== null) {
+      return [String(getAddressOptions.path)];
+    }
+    return ["__default__"];
+  }
+
+  function buildAddressCacheKey(path, addressType) {
+    const p = String(path ?? "__default__");
+    const t = String(addressType ?? "__default__");
+    return `${p}:${t}`;
+  }
 
   async function requireCapability(input = {}) {
     const keyId = String(input.keyId ?? "").trim();
@@ -339,10 +378,76 @@ export function createWallet(options = {}) {
       options: input.options,
     });
 
+    if (signer && typeof signer.getAddress === "function") {
+      const originalGetAddress = signer.getAddress.bind(signer);
+      const bucket = getAddressCacheBucket(keyId, chain);
+
+      signer.getAddress = async (getAddressOptions = {}) => {
+        const opts = (getAddressOptions && typeof getAddressOptions === "object")
+          ? getAddressOptions
+          : {};
+        const paths = normalizeAddressPaths(opts);
+        const addressType = opts.addressType ?? "__default__";
+
+        // Fast path: all requested paths hit wallet-level cache.
+        const allInCache = paths.every((p) => bucket.has(buildAddressCacheKey(p, addressType)));
+        if (allInCache) {
+          const cachedItems = paths.map((p) => ({
+            path: p === "__default__" ? null : p,
+            address: bucket.get(buildAddressCacheKey(p, addressType)),
+          }));
+          if (cachedItems.length === 1 && opts.returnAll !== true) {
+            return cachedItems[0].address;
+          }
+          return {
+            address: cachedItems[0]?.address,
+            addresses: cachedItems,
+          };
+        }
+
+        const resolved = await originalGetAddress(opts);
+
+        if (typeof resolved === "string") {
+          const key = buildAddressCacheKey(paths[0], addressType);
+          bucket.set(key, resolved);
+          return resolved;
+        }
+
+        if (resolved && typeof resolved === "object") {
+          if (Array.isArray(resolved.addresses)) {
+            for (const item of resolved.addresses) {
+              const p = item?.path === null || item?.path === undefined ? "__default__" : String(item.path);
+              const address = String(item?.address ?? "").trim();
+              if (!address) continue;
+              const key = buildAddressCacheKey(p, addressType);
+              bucket.set(key, address);
+            }
+          }
+          if (typeof resolved.address === "string") {
+            const key = buildAddressCacheKey(paths[0], addressType);
+            bucket.set(key, resolved.address);
+          }
+        }
+
+        return resolved;
+      };
+    }
+
     return {
       ok: true,
       signer,
     };
+  }
+
+  const pickWalletOps = createPickWalletOps({
+    getSigner: async ({ chain, keyId }) => {
+      const { signer } = await getSigner({ chain, keyId });
+      return signer;
+    },
+  });
+
+  async function pickWallet(request = {}, tree = {}) {
+    return pickWalletOps.pickWallet(request, tree);
   }
 
   async function unlock(input = {}) {
@@ -351,6 +456,8 @@ export function createWallet(options = {}) {
       throw new Error(`key 已禁用: ${record.keyId}`);
     }
     const rebuildTree = input.rebuildTree !== false;
+    // Re-unlock should reset wallet-level address cache for this key.
+    clearAddressCacheForKey(record.keyId);
     // Dev keys 无需密码
     if (record.source === "dev") {
       const ttlMs = Number.isFinite(input.ttlMs) && Number(input.ttlMs) > 0
@@ -452,6 +559,7 @@ export function createWallet(options = {}) {
   async function lock(input = {}) {
     const record = getRecordOrThrow(input.keyId);
     sessions.delete(record.keyId);
+    clearAddressCacheForKey(record.keyId);
     // Invalidate tree cache when locking a key
     cacheInvalidated = true;
     return {
@@ -464,6 +572,7 @@ export function createWallet(options = {}) {
   async function lockAll() {
     const count = sessions.size;
     sessions.clear();
+    signerAddressCache.clear();
     // Invalidate tree cache when locking all keys
     cacheInvalidated = true;
     treeSnapshotCache = null;
@@ -762,6 +871,7 @@ export function createWallet(options = {}) {
     listChains,
     supports,
     getSigner,
+    pickWallet,
     deriveConfiguredAddresses,
     getTree,
     invalidateTreeCache,

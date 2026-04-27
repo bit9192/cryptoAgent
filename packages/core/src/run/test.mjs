@@ -23,190 +23,6 @@ function toJsonSafe(value) {
   );
 }
 
-function normalizeChainsFromRequest(chains) {
-  if (!Array.isArray(chains) || chains.length === 0) {
-    return [];
-  }
-
-  const normalized = [];
-  for (const item of chains) {
-    if (typeof item === "string") {
-      const chain = String(item).trim().toLowerCase();
-      if (chain) {
-        normalized.push({ chain, addressTypes: null });
-      }
-      continue;
-    }
-
-    if (item && typeof item === "object") {
-      const chain = String(item.chain ?? "").trim().toLowerCase();
-      if (!chain) continue;
-      const addressTypes = Array.isArray(item.addressTypes)
-        ? item.addressTypes.map((v) => String(v).trim().toLowerCase()).filter(Boolean)
-        : null;
-      normalized.push({ chain, addressTypes });
-    }
-  }
-
-  return normalized;
-}
-
-function queryKeysWithDataEngine(rows = [], request = {}) {
-  const selectors = request?.selectors ?? request?.keyFilters ?? {};
-
-  const keyIdFilter = String(selectors?.keyId ?? "").trim();
-  const keyName = String(selectors?.name ?? selectors?.keyName ?? "").trim();
-  const keyNameNeedle = keyName.toLowerCase();
-  const nameExact = Boolean(selectors?.nameExact);
-  const sourceNameFilter = String(selectors?.sourceName ?? "").trim();
-  const sourceNameNeedle = sourceNameFilter.toLowerCase();
-  const keyTypeFilter = String(selectors?.keyType ?? "").trim();
-  const sourceTypeFilter = String(selectors?.source ?? "").trim().toLowerCase();
-
-  return rows
-    .map((row) => ({
-      keyId: String(row?.keyId ?? "").trim(),
-      name: String(row?.name ?? "").trim(),
-      sourceName: row?.sourceName ?? null,
-      keyType: String(row?.keyType ?? "").trim() || null,
-      sourceType: String(row?.sourceType ?? "").trim() || null,
-      path: row?.path ?? null,
-      addresses: row?.addresses && typeof row.addresses === "object" ? row.addresses : {},
-    }))
-    .filter((item) => {
-      if (!item.keyId) return false;
-      if (keyIdFilter && item.keyId !== keyIdFilter) return false;
-      if (keyTypeFilter && String(item.keyType ?? "") !== keyTypeFilter) return false;
-      if (sourceTypeFilter && String(item.sourceType ?? "").toLowerCase() !== sourceTypeFilter) return false;
-
-      if (keyName || sourceNameFilter) {
-        const nameLower = String(item.name ?? "").toLowerCase();
-        const snLower = String(item.sourceName ?? "").toLowerCase();
-
-        let nameMatch = true;
-        let sourceNameMatch = true;
-
-        if (keyName) {
-          if (nameExact) {
-            nameMatch = nameLower === keyNameNeedle;
-          } else {
-            nameMatch = nameLower.includes(keyNameNeedle);
-          }
-        }
-
-        if (sourceNameFilter) {
-          sourceNameMatch = snLower.includes(sourceNameNeedle);
-        }
-
-        // 两个条件都传了：取并集（满足一个即可）
-        // 只传了一个：只检查那一个
-        if (keyName && sourceNameFilter) {
-          if (!nameMatch && !sourceNameMatch) return false;
-        } else if (keyName) {
-          if (!nameMatch) return false;
-        } else if (sourceNameFilter) {
-          if (!sourceNameMatch) return false;
-        }
-      }
-
-      return true;
-    });
-}
-
-async function resolveAddressesForKey(key, requestedChains = [], wallet = null) {
-  const existing = key?.addresses && typeof key.addresses === "object" ? key.addresses : {};
-  const result = {};
-
-  for (const { chain, addressTypes } of requestedChains) {
-    const hasTypedMode = Array.isArray(addressTypes) && addressTypes.length > 0;
-
-    if (!hasTypedMode) {
-      // 普通模式：直接用现有地址，没有则尝试生成
-      const cur = existing[chain];
-      const items = Array.isArray(cur) ? cur : cur ? [cur] : [];
-      const filtered = items.map((a) => String(a ?? "").trim()).filter(Boolean);
-
-      if (filtered.length > 0) {
-        result[chain] = filtered.length === 1 ? filtered[0] : filtered;
-        continue;
-      }
-
-      if (wallet && typeof wallet.getSigner === "function") {
-        try {
-          const { signer } = await wallet.getSigner({ chain, keyId: key.keyId });
-          if (signer && typeof signer.getAddress === "function") {
-            const addr = await signer.getAddress({});
-            const text = String(addr ?? "").trim();
-            const value = text || [];
-            result[chain] = value;
-            continue;
-          }
-        } catch {
-          // getSigner 失败，留空
-        }
-      }
-
-      result[chain] = [];
-      continue;
-    }
-
-    // typed 模式：调 getSigner 按 addressType 生成
-    if (wallet && typeof wallet.getSigner === "function") {
-      try {
-        const { signer } = await wallet.getSigner({ chain, keyId: key.keyId });
-        if (signer && typeof signer.getAddress === "function") {
-          const generated = [];
-          for (const addressType of addressTypes) {
-            try {
-              const addr = await signer.getAddress({ addressType });
-              const text = String(addr ?? "").trim();
-              if (text && !generated.some((item) => item.address === text && item.type === addressType)) {
-                generated.push({ address: text, type: addressType });
-              }
-            } catch {
-              // 跳过单个 addressType 失败
-            }
-          }
-          result[chain] = generated;
-          continue;
-        }
-      } catch {
-        // getSigner 失败，留空
-      }
-    }
-
-    result[chain] = [];
-  }
-
-  return result;
-}
-
-async function pickWallet(request = {}, tree = {}, wallet = null) {
-  const scope = String(request?.scope ?? "single").trim().toLowerCase() || "single";
-  const outputs = request.outputs ?? request.outps ?? {};
-  const requestedChains = normalizeChainsFromRequest(outputs?.chains);
-  const treeRows = Array.isArray(tree?.tree) ? tree.tree : [];
-  const selectedKeys = queryKeysWithDataEngine(treeRows, request);
-
-  const keysToProcess = scope === "all" ? selectedKeys : selectedKeys.slice(0, 1);
-
-  const results = await Promise.all(
-    keysToProcess.map(async (key) => {
-      const addresses = await resolveAddressesForKey(key, requestedChains, wallet);
-      return {
-        keyId: key.keyId,
-        name: key.name,
-        keyType: key.keyType,
-        sourceType: key.sourceType,
-        path: key.path ?? null,
-        addresses,
-      };
-    })
-  );
-
-  return results;
-}
-
 async function resolveWalletTree(options = {}) {
   const wallet = options?.wallet;
   if (!wallet) {
@@ -258,36 +74,39 @@ async function testDebugPickAddressFromInputs(options) {
     return;
   }
   
-  const pickedWallets = await pickWallet(
-    {
-      scope: "all",
-      selectors: {
-        // keyId: options?.inputs?.keyId,
-        // name: String(options?.inputs?.name ?? "").trim(),
-        name: "meer",
-        sourceName: "meer",
-        // nameExact: Boolean(options?.inputs?.nameExact),
-        // keyType: options?.inputs?.keyType,
-        // source: options?.inputs?.source,
-      },
-      outps: {
-        signer: true,
-        chains: [
-          "evm",
-          "trx",
-          {
-            chain: "btc",
-            addressTypes: ["p2wpkh", "p2tr"]
-            // addressTypes: Array.isArray(options?.inputs?.addressTypes)
-            //   ? options.inputs.addressTypes
-            //   : undefined,
-          },
-        ],
-      },
+  const pickRequest = {
+    scope: "all",
+    selectors: {
+      // keyId: options?.inputs?.keyId,
+      // name: String(options?.inputs?.name ?? "").trim(),
+      name: "m",
+    //   sourceName: "k",
+      // nameExact: Boolean(options?.inputs?.nameExact),
+      // keyType: options?.inputs?.keyType,
+      // source: options?.inputs?.source,
     },
-    tree,
-    options?.wallet,
-  );
+    outps: {
+      signer: true,
+      chains: [
+        "evm",
+        "trx",
+        {
+          chain: "btc",
+          addressTypes: ["p2wpkh", "p2tr"],
+          // addressTypes: Array.isArray(options?.inputs?.addressTypes)
+          //   ? options.inputs.addressTypes
+          //   : undefined,
+        },
+      ],
+    },
+  };
+
+  if (!options?.wallet || typeof options.wallet.pickWallet !== "function") {
+    throw new Error("wallet.pickWallet 不可用");
+  }
+
+  const pickedWallets = await options.wallet.pickWallet(pickRequest, tree);
+  info("pickWallet migration parity: REMOVED (direct wallet.pickWallet)");
 
   info(`wallet.tree rows: ${Array.isArray(tree?.tree) ? tree.tree.length : 0}`);
   info(`pickWallet rows: ${pickedWallets.length}`);

@@ -60,3 +60,78 @@
 - 期望：第 1 次 ~50-200ms，第 2-10 次 ~1-5ms（缓存命中）
 - 验证：缓存命中速度至少快 10 倍
 
+---
+
+## 测试场景：wallet 级 signer.getAddress 缓存（S-W-3）
+
+### Happy Path
+
+#### H1：跨 getSigner 实例命中缓存
+- 操作：同一 keyId/chain/path 调用两次 `wallet.getSigner().signer.getAddress()`
+- 期望：第二次命中 wallet 级缓存，不触发 provider 实际计算
+- 验证：provider getAddress 调用计数保持不变
+
+#### H2：同 keyId 同 chain 不同 path 不命中
+- 操作：path0、path1 分别调用 getAddress
+- 期望：两次都走 provider 计算
+- 验证：调用计数 +2
+
+#### H3：BTC 同 path 不同 addressType 不命中
+- 操作：同一路径分别请求 p2wpkh、p2tr
+- 期望：按 addressType 分桶缓存
+- 验证：调用计数 +2
+
+### Edge Cases
+
+#### E1：lock(keyId) 后缓存失效
+- 操作：命中缓存后 lock，再 unlock，再同参数 getAddress
+- 期望：重新计算一次
+- 验证：provider 调用计数增加
+
+#### E2：lockAll() 后缓存失效
+- 操作：命中缓存后 lockAll，再 unlock，再同参数 getAddress
+- 期望：重新计算一次
+- 验证：provider 调用计数增加
+
+### Invalid Cases
+
+#### I1：provider 返回非字符串地址对象时仍可回写缓存
+- 操作：provider 返回 `{ address, addresses }`
+- 期望：wallet 缓存可从对象结构提取并回写
+- 验证：同参数二次调用命中缓存
+
+---
+
+## 测试场景：S-W-4 pickWallet 迁移一致性（旧接口 vs wallet 新接口）
+
+### Happy Path
+
+#### H1：同参双跑结果一致
+- 操作：旧 `pickWallet` 与新 `wallet.pickWallet` 使用同一 request/tree/wallet 调用
+- 期望：输出结果深度一致
+- 验证：`JSON.stringify(legacy) === JSON.stringify(modern)`
+
+### Edge Cases
+
+#### E1：scope=single 与 scope=all 一致性
+- 操作：分别以 single/all 调用旧/新接口
+- 期望：各自模式下旧新输出一致
+- 验证：两组比较均通过
+
+#### E2：typed 地址模式（BTC addressTypes）一致性
+- 操作：chains 中传 BTC 多 addressTypes
+- 期望：旧新输出地址类型与顺序一致
+- 验证：对象数组逐项一致
+
+### Invalid Cases
+
+#### I1：wallet 不支持新接口时优雅降级
+- 操作：`options.wallet.pickWallet` 不存在
+- 期望：保留旧逻辑输出，不抛错
+- 验证：旧逻辑结果仍打印
+
+#### I2：新旧输出不一致时可见失败信息
+- 操作：人为制造不一致
+- 期望：打印旧/新结果并抛错
+- 验证：终端可明确定位迁移不一致
+
