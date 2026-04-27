@@ -8,7 +8,9 @@
 import { 
   retrieveWalletCandidates, 
   generateAddressFromCandidates, 
-  generateSignerFromCandidates 
+  generateSignerFromCandidates,
+  resolveSearchAddressRequest,
+  resolveSignerRefs,
 } from "../../packages/core/src/modules/wallet-engine/index.mjs";
 import { showInputs } from "../../packages/core/src/modules/inputs/index.mjs";
 
@@ -32,26 +34,10 @@ function info(msg) {
   console.log(`ℹ️  ${msg}`);
 }
 
-// ─── 测试 1：查看当前 inputs ───────────────────────────────────
-
-async function testShowInputs(inputs) {
-  divider("测试 1: 查看当前 inputs");
-  
-  if (inputs) {
-    success("从 run() 上下文中找到 inputs");
-    console.log(JSON.stringify(inputs, null, 2));
-  } else {
-    info("当前没有设置 inputs，可以先运行：");
-    info("  wallet inputs.set wallet --data '{\"address\":\"0x...\",\"chain\":\"evm\"}'");
-  }
-}
-
-// ─── 测试 2：创建 mock 钱包状态 ───────────────────────────────
+// ─── 创建 mock 钱包状态 ───────────────────────────────────────
 
 function createMockWalletStatus() {
-  divider("测试 2: 创建 mock 钱包状态");
-  
-  const walletStatus = {
+  return {
     sessionId: "default",
     addresses: [
       // k1 EVM 地址
@@ -88,17 +74,14 @@ function createMockWalletStatus() {
       },
     ],
   };
-  
-  success("Mock 钱包状态已创建");
-  console.log(JSON.stringify(walletStatus, null, 2));
-  
-  return walletStatus;
 }
 
-// ─── 测试 3: 检索候选地址（按名称）───────────────────────────
+// ────────────────────────────────────────────────────────────────
+// 核心 API 测试（低级接口）
+// ────────────────────────────────────────────────────────────────
 
 async function testRetrieveByName(walletStatus) {
-  divider("测试 3: 检索候选地址（按名称 'main'）");
+  divider("测试 1: 检索候选地址（按名称）");
   
   try {
     const candidates = retrieveWalletCandidates(
@@ -116,10 +99,8 @@ async function testRetrieveByName(walletStatus) {
   }
 }
 
-// ─── 测试 4: 生成地址（single 模式）───────────────────────────
-
 async function testGenerateAddressSingle(candidates) {
-  divider("测试 4: 从候选生成地址（single 模式）");
+  divider("测试 2: 生成单个地址（single 模式）");
   
   if (candidates.length === 0) {
     error("没有候选可用");
@@ -142,45 +123,10 @@ async function testGenerateAddressSingle(candidates) {
   }
 }
 
-// ─── 测试 5: 生成地址（multi 模式）───────────────────────────
-
-async function testGenerateAddressMulti(walletStatus) {
-  divider("测试 5: 生成多个地址（multi 模式）");
-  
-  try {
-    // 先检索所有 k1 的候选
-    const candidates = retrieveWalletCandidates(
-      { keyId: "k1" },
-      walletStatus
-    );
-    
-    if (candidates.length === 0) {
-      error("没有候选可用");
-      return null;
-    }
-    
-    const result = generateAddressFromCandidates(
-      candidates,
-      { cardinality: "multi" }
-    );
-    
-    success(`生成 ${result.addresses.length} 个地址`);
-    console.log(JSON.stringify(result, null, 2));
-    
-    return result;
-  } catch (err) {
-    error(`${err.message}`);
-    return null;
-  }
-}
-
-// ─── 测试 6: 生成 Signer（single 模式）───────────────────────
-
 async function testGenerateSignerSingle(walletStatus) {
-  divider("测试 6: 生成 Signer（single 模式）");
+  divider("测试 3: 生成单个 Signer（single 模式）");
   
   try {
-    // 检索 k1 的 EVM signer
     const candidates = retrieveWalletCandidates(
       { keyId: "k1", chain: "evm", name: "main", nameExact: true },
       walletStatus
@@ -208,61 +154,282 @@ async function testGenerateSignerSingle(walletStatus) {
   }
 }
 
-// ─── 测试 7: 检索条件组合 ─────────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+// 下游接口测试（高级接口）
+// ────────────────────────────────────────────────────────────────
 
-async function testRetrieveCombinations(walletStatus) {
-  divider("测试 7: 检索条件组合测试");
+async function testDownstreamSearch(walletStatus) {
+  divider("下游接口 1: Search（查询资产）");
   
-  const cases = [
-    { label: "按 keyId", filters: { keyId: "k2" } },
-    { label: "按 chain", filters: { chain: "evm" } },
-    { label: "按 keyId + chain", filters: { keyId: "k1", chain: "evm" } },
-    { label: "模糊名称搜索", filters: { name: "alt", nameExact: false } },
-    { label: "获取全部", filters: { mode: "all" } },
-  ];
+  info("场景：用户运行 si token --network eth，输入中包含 keyId=\"k1\", chain=\"evm\"");
   
-  for (const { label, filters } of cases) {
-    try {
-      const candidates = retrieveWalletCandidates(filters, walletStatus);
-      info(`${label}: 找到 ${candidates.length} 个候选`);
-    } catch (err) {
-      error(`${label}: ${err.message}`);
+  try {
+    const result = resolveSearchAddressRequest({
+      // 用户设置的输入（比如 wallet inputs.set）
+      inputs: {
+        keyId: "k1",
+        chain: "evm",
+      },
+      // 钱包状态
+      walletStatus,
+      // 输出要求
+      requirement: {
+        kind: "address",
+        cardinality: "single",
+      },
+    });
+    
+    if (result.ok) {
+      success("地址解析成功");
+      info(`📍 查询地址: ${result.query}`);
+      info(`🔗 链网络: ${result.chain}`);
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      error(`解析失败: ${result.error}`);
     }
+  } catch (err) {
+    error(`${err.message}`);
+  }
+}
+
+async function testDownstreamSend(walletStatus) {
+  divider("下游接口 2: Send（发送交易）");
+  
+  info("场景：用户要发送交易，需要特定 chain 的 signer");
+  
+  try {
+    const result = resolveSignerRefs({
+      // 用户指定：使用 k1 的 EVM signer
+      inputs: {
+        keyId: "k1",
+        chain: "evm",
+      },
+      walletStatus,
+      requirement: {
+        kind: "signer",
+        cardinality: "single",
+      },
+    });
+    
+    if (result.ok) {
+      success("Signer 解析成功");
+      info(`✍️  signerRef: ${result.signerRefs?.[0]}`);
+      info(`🔐 signerType: ${result.signerTypes?.[0]}`);
+      info(`📍 地址: ${result.addresses?.[0]}`);
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      error(`解析失败: ${result.error}`);
+    }
+  } catch (err) {
+    error(`${err.message}`);
+  }
+}
+
+async function testDownstreamMultiAddress(walletStatus) {
+  divider("下游接口 3: MultiAddress（批量查询）");
+  
+  info("场景：查询同一个 keyId 下的所有地址");
+  
+  try {
+    const result = resolveSearchAddressRequest({
+      inputs: {
+        keyId: "k1",  // 可能有多个地址
+      },
+      walletStatus,
+      requirement: {
+        kind: "address",
+        cardinality: "multi",  // 需要多个结果
+      },
+    });
+    
+    if (result.ok) {
+      success(`地址解析成功 (${result.addresses.length} 个)`);
+      for (const addr of result.addresses) {
+        console.log(`  - ${addr.address} (${addr.chain})`);
+      }
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      error(`解析失败: ${result.error}`);
+    }
+  } catch (err) {
+    error(`${err.message}`);
+  }
+}
+
+async function testDownstreamCrossChain(walletStatus) {
+  divider("下游接口 4: CrossChain（跨链操作）");
+  
+  info("场景：用户要在 TRX 链上操作，需要 k2 的 signer");
+  
+  try {
+    const result = resolveSignerRefs({
+      inputs: {
+        keyId: "k2",
+        chain: "trx",
+      },
+      walletStatus,
+      requirement: {
+        kind: "signer",
+        cardinality: "single",
+      },
+    });
+    
+    if (result.ok) {
+      success("跨链 Signer 解析成功");
+      info(`✍️  signerRef: ${result.signerRefs?.[0]}`);
+      info(`🔗 链网络: ${result.chain}`);
+      info(`📍 地址: ${result.addresses?.[0]}`);
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      error(`解析失败: ${result.error}`);
+    }
+  } catch (err) {
+    error(`${err.message}`);
+  }
+}
+
+async function testDownstreamNamedWallet(walletStatus) {
+  divider("下游接口 5: NamedWallet（按名称查询）");
+  
+  info("场景：用户只知道钱包名称 'alt'，不知道 keyId");
+  
+  try {
+    const result = resolveSearchAddressRequest({
+      inputs: {
+        name: "alt",  // 按名称查询
+        nameExact: false,  // 模糊匹配
+      },
+      walletStatus,
+      requirement: {
+        kind: "address",
+        cardinality: "single",
+      },
+    });
+    
+    if (result.ok) {
+      success("地址解析成功（按名称）");
+      info(`📍 查询地址: ${result.query}`);
+      info(`📝 名称: ${result.addresses?.[0]?.name}`);
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      error(`解析失败: ${result.error}`);
+    }
+  } catch (err) {
+    error(`${err.message}`);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// 错误场景测试
+// ──────────────────────────────────────────────────────────────
+
+async function testErrorScenarios(walletStatus) {
+  divider("错误处理：多候选冲突");
+  
+  info("场景 1: 使用不足的过滤条件导致多候选");
+  
+  try {
+    // 只指定 keyId，但 k1 有 2 个 EVM 地址
+    const result = resolveSearchAddressRequest({
+      inputs: {
+        keyId: "k1",
+        chain: "evm",
+        // 缺少 name 过滤，会导致 2 个候选
+      },
+      walletStatus,
+      requirement: {
+        kind: "address",
+        cardinality: "single",  // 期望 1 个
+      },
+    });
+    
+    if (result.ok) {
+      success("意外成功");
+    } else {
+      error(`预期的错误: ${result.error.code}`);
+      info(`错误信息: ${result.error.message}`);
+    }
+  } catch (err) {
+    info(`捕获异常: ${err.code}`);
+    info(`异常信息: ${err.message}`);
+  }
+  
+  info("\n场景 2: 无匹配结果");
+  
+  try {
+    const result = resolveSearchAddressRequest({
+      inputs: {
+        name: "nonexistent",  // 不存在的名称
+      },
+      walletStatus,
+      requirement: {
+        kind: "address",
+        cardinality: "single",
+      },
+    });
+    
+    if (result.ok) {
+      success("意外成功");
+    } else {
+      error(`预期的错误: ${result.error.code}`);
+      info(`错误信息: ${result.error.message}`);
+    }
+  } catch (err) {
+    info(`捕获异常: ${err.code}`);
+    info(`异常信息: ${err.message}`);
   }
 }
 
 // ─── 主程序 ───────────────────────────────────────────────────
 
 export async function run(options = {}) {
-  console.log("\n🔧 Wallet-Engine 测试工具\n");
+  console.log("\n🔧 Wallet-Engine 完整测试套件\n");
   
   // 提取 inputs（如果有的话）
   const inputs = options.inputs;
   
-  // 测试 1：查看 inputs
-  await testShowInputs(inputs);
+  if (inputs) {
+    divider("📍 当前 Inputs");
+    console.log(JSON.stringify(inputs, null, 2));
+  } else {
+    divider("ℹ️ 提示");
+    info("没有设置 inputs，可以运行：");
+    info("  wallet inputs.set wallet --data '{...}'");
+  }
   
-  // 创建 mock 钱包状态（后续测试用）
+  // 创建 mock 钱包状态
   const walletStatus = createMockWalletStatus();
   
-  // 测试 2：按名称检索
+  // ── 低级 API 测试
+  console.log("\n\n" + "═".repeat(60));
+  console.log("部分 1️⃣ : 核心 API（低级接口）");
+  console.log("═".repeat(60));
+  
   const candidates1 = await testRetrieveByName(walletStatus);
-  
-  // 测试 3：生成单个地址
   await testGenerateAddressSingle(candidates1);
-  
-  // 测试 4：生成多个地址
-  await testGenerateAddressMulti(walletStatus);
-  
-  // 测试 5：生成 Signer
   await testGenerateSignerSingle(walletStatus);
   
-  // 测试 6：检索条件组合
-  await testRetrieveCombinations(walletStatus);
+  // ── 高级接口测试
+  console.log("\n\n" + "═".repeat(60));
+  console.log("部分 2️⃣ : 下游接口测试（高级）");
+  console.log("═".repeat(60));
+  
+  await testDownstreamSearch(walletStatus);
+  await testDownstreamSend(walletStatus);
+  await testDownstreamMultiAddress(walletStatus);
+  await testDownstreamCrossChain(walletStatus);
+  await testDownstreamNamedWallet(walletStatus);
+  
+  // ── 错误处理测试
+  console.log("\n\n" + "═".repeat(60));
+  console.log("部分 3️⃣ : 错误处理");
+  console.log("═".repeat(60));
+  
+  await testErrorScenarios(walletStatus);
   
   divider("所有测试完成");
-  console.log("\n💡 提示：\n");
-  console.log("  1. 测试中使用了 mock 钱包状态");
-  console.log("  2. 如果你已设置 wallet inputs，可以修改测试代码来使用真实数据");
-  console.log("  3. 在 REPL 中运行: run test 来执行这个脚本\n");
+  console.log("\n💡 下一步：\n");
+  console.log("  1. 查看下游接口文档了解各个场景的参数要求");
+  console.log("  2. 修改测试中的 inputs 来验证不同的过滤条件");
+  console.log("  3. 运行 run test 来快速迭代和调试\n");
 }
