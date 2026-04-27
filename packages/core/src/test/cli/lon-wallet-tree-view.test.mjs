@@ -11,16 +11,27 @@ test("lon wallet-tree view: 输出结构化计数摘要", () => {
     tree: [
       {
         keyId: "k1",
-        keyName: "alpha",
-        chains: [
-          { chain: "evm", addresses: [{}, {}] },
-          { chain: "btc", addresses: [{}] },
-        ],
+        name: "alpha",
+        keyType: "mnemonic",
+        sourceType: "orig",
+        path: null,
+        addresses: {},
+      },
+      {
+        keyId: "k1",
+        name: "alpha-0",
+        keyType: "private",
+        sourceType: "derive",
+        path: "m/44'/60'/0'/0/0",
+        addresses: { evm: "0xabc", btc: ["bc1q1"] },
       },
       {
         keyId: "k2",
-        keyName: "beta",
-        chains: [{ chain: "trx", addresses: [{}] }],
+        name: "beta",
+        keyType: "orig",
+        sourceType: "orig",
+        path: null,
+        addresses: { trx: "TRXabc" },
       },
     ],
   });
@@ -34,7 +45,9 @@ test("lon wallet-tree view: 输出结构化计数摘要", () => {
     warnings: 1,
   });
   assert.equal(summary.accounts.length, 2);
-  assert.equal(summary.accounts[0].addresses, 3);
+  assert.equal(summary.accounts[0].rows, 2);
+  assert.equal(summary.accounts[0].addresses, 2);
+  assert.deepEqual(summary.accounts[0].chains, ["btc", "evm"]);
   assert.equal(summary.accounts[1].addresses, 1);
 });
 

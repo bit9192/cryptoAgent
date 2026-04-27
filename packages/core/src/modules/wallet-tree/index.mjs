@@ -2,22 +2,67 @@ function asArray(value) {
   return Array.isArray(value) ? value : null;
 }
 
-function sortAccounts(a, b) {
-  const byName = String(a.keyName ?? "").localeCompare(String(b.keyName ?? ""));
-  if (byName !== 0) return byName;
-  return String(a.keyId ?? "").localeCompare(String(b.keyId ?? ""));
-}
-
-function sortAddresses(a, b) {
-  const byName = String(a.name ?? "").localeCompare(String(b.name ?? ""));
-  if (byName !== 0) return byName;
-  const byPath = String(a.path ?? "").localeCompare(String(b.path ?? ""));
-  if (byPath !== 0) return byPath;
-  return String(a.address ?? "").localeCompare(String(b.address ?? ""));
-}
-
 function safeText(value) {
   return String(value ?? "").trim();
+}
+
+function normalizeSourceType(value) {
+  const source = safeText(value).toLowerCase();
+  if (!source) return "derive";
+  if (source === "file" || source === "orig") return "orig";
+  return "derive";
+}
+
+function pushChainAddress(addresses, chain, address) {
+  const c = safeText(chain).toLowerCase();
+  const a = safeText(address);
+  if (!c || !a) return;
+
+  if (c === "btc") {
+    const list = Array.isArray(addresses.btc) ? addresses.btc : [];
+    if (!list.includes(a)) list.push(a);
+    addresses.btc = list;
+    return;
+  }
+
+  const current = addresses[c];
+  if (current == null) {
+    addresses[c] = a;
+    return;
+  }
+  if (Array.isArray(current)) {
+    if (!current.includes(a)) current.push(a);
+    return;
+  }
+  if (current !== a) {
+    addresses[c] = [current, a];
+  }
+}
+
+function countRowAddresses(addresses = {}) {
+  let total = 0;
+  for (const value of Object.values(addresses)) {
+    if (Array.isArray(value)) {
+      total += value.length;
+      continue;
+    }
+    if (safeText(value)) total += 1;
+  }
+  return total;
+}
+
+function sortRows(a, b) {
+  const byKey = String(a.keyId ?? "").localeCompare(String(b.keyId ?? ""));
+  if (byKey !== 0) return byKey;
+
+  const rank = (sourceType) => (String(sourceType ?? "") === "orig" ? 0 : 1);
+  const bySource = rank(a.sourceType) - rank(b.sourceType);
+  if (bySource !== 0) return bySource;
+
+  const byName = String(a.name ?? "").localeCompare(String(b.name ?? ""));
+  if (byName !== 0) return byName;
+
+  return String(a.path ?? "").localeCompare(String(b.path ?? ""));
 }
 
 export function buildWalletTree(input = {}) {
@@ -35,7 +80,9 @@ export function buildWalletTree(input = {}) {
   }
 
   const warnings = [];
-  const accountMap = new Map();
+  const keyMetaById = new Map();
+  const origRowsByKeyId = new Map();
+  const deriveRows = new Map();
 
   for (const key of keys) {
     const keyId = safeText(key?.keyId);
@@ -45,12 +92,20 @@ export function buildWalletTree(input = {}) {
     }
 
     const keyName = safeText(key?.keyName) || keyId;
-    if (!accountMap.has(keyId)) {
-      accountMap.set(keyId, {
-        id: `account:${keyId}`,
+    const keyType = safeText(key?.keyType ?? key?.type) || null;
+    keyMetaById.set(keyId, {
+      keyName,
+      keyType,
+    });
+
+    if (!origRowsByKeyId.has(keyId)) {
+      origRowsByKeyId.set(keyId, {
         keyId,
-        keyName,
-        chains: new Map(),
+        name: keyName,
+        keyType,
+        sourceType: "orig",
+        path: null,
+        addresses: {},
       });
     }
   }
@@ -64,69 +119,67 @@ export function buildWalletTree(input = {}) {
       continue;
     }
 
-    if (!accountMap.has(keyId)) {
-      accountMap.set(keyId, {
-        id: `account:${keyId}`,
+    if (!origRowsByKeyId.has(keyId)) {
+      const keyMeta = keyMetaById.get(keyId) ?? null;
+      origRowsByKeyId.set(keyId, {
         keyId,
-        keyName: keyId,
-        chains: new Map(),
+        name: String(keyMeta?.keyName ?? keyId),
+        keyType: keyMeta?.keyType ?? null,
+        sourceType: "orig",
+        path: null,
+        addresses: {},
       });
     }
 
-    const account = accountMap.get(keyId);
-    if (!account.chains.has(chain)) {
-      account.chains.set(chain, {
-        id: `chain:${keyId}:${chain}`,
-        chain,
-        addresses: [],
-      });
-    }
-
-    const chainNode = account.chains.get(chain);
     const path = safeText(item?.path) || null;
-    const name = safeText(item?.name) || null;
-    const addressType = safeText(item?.addressType) || null;
-    const addressId = safeText(item?.addressId) || `${keyId}:${chain}:${address}:${path ?? "-"}:${name ?? "-"}`;
-    chainNode.addresses.push({
-      id: `address:${addressId}`,
-      address,
-      name,
-      path,
-      addressType,
-    });
+    const keyMeta = keyMetaById.get(keyId) ?? null;
+    const rowName = safeText(item?.name) || String(keyMeta?.keyName ?? keyId);
+    const sourceType = normalizeSourceType(item?.sourceType);
+    const deriveKey = `${keyId}::${rowName}::${path ?? ""}::${sourceType}`;
+    if (!deriveRows.has(deriveKey)) {
+      deriveRows.set(deriveKey, {
+        keyId,
+        name: rowName,
+        keyType: sourceType === "derive" ? "private" : (keyMeta?.keyType ?? null),
+        sourceType,
+        path,
+        addresses: {},
+      });
+    }
+
+    const row = deriveRows.get(deriveKey);
+    pushChainAddress(row.addresses, chain, address);
   }
 
-  const accounts = Array.from(accountMap.values())
-    .sort(sortAccounts)
-    .map((account) => {
-      const chains = Array.from(account.chains.values())
-        .sort((a, b) => a.chain.localeCompare(b.chain))
-        .map((chainNode) => ({
-          id: chainNode.id,
-          chain: chainNode.chain,
-          addresses: chainNode.addresses.sort(sortAddresses),
-        }));
+  const tree = [...Array.from(origRowsByKeyId.values()), ...Array.from(deriveRows.values())]
+    .sort(sortRows)
+    .map((row) => ({
+      keyId: row.keyId,
+      name: row.name,
+      keyType: row.keyType,
+      sourceType: row.sourceType,
+      path: row.path,
+      addresses: row.addresses,
+    }));
 
-      return {
-        id: account.id,
-        keyId: account.keyId,
-        keyName: account.keyName,
-        chains,
-      };
-    });
+  const allChains = new Set();
+  let totalAddresses = 0;
+  for (const row of tree) {
+    for (const chain of Object.keys(row.addresses ?? {})) {
+      allChains.add(chain);
+    }
+    totalAddresses += countRowAddresses(row.addresses);
+  }
 
   const counts = {
-    accounts: accounts.length,
-    chains: accounts.reduce((sum, account) => sum + account.chains.length, 0),
-    addresses: accounts.reduce(
-      (sum, account) => sum + account.chains.reduce((x, chainNode) => x + chainNode.addresses.length, 0),
-      0,
-    ),
+    accounts: origRowsByKeyId.size,
+    chains: allChains.size,
+    addresses: totalAddresses,
   };
 
   return {
     ok: true,
-    tree: accounts,
+    tree,
     counts,
     warnings,
   };

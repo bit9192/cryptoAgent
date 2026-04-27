@@ -25,10 +25,10 @@ test("wallet-tree: 空会话返回空树", () => {
   assert.equal(result.tree.length, 0);
 });
 
-test("wallet-tree: 单账户可生成 account/chain/address 结构", () => {
+test("wallet-tree: 单账户可生成 orig + derive 扁平结构", () => {
   const result = buildWalletTree({
     keys: [
-      { keyId: "k1", keyName: "main", privateKey: "secret-never-output" },
+      { keyId: "k1", keyName: "main", keyType: "mnemonic", privateKey: "secret-never-output" },
     ],
     addresses: [
       { keyId: "k1", chain: "evm", address: "0xabc", path: "m/44", name: "a1" },
@@ -39,27 +39,38 @@ test("wallet-tree: 单账户可生成 account/chain/address 结构", () => {
   assert.equal(result.counts.accounts, 1);
   assert.equal(result.counts.chains, 2);
   assert.equal(result.counts.addresses, 2);
-  assert.equal(result.tree[0].keyId, "k1");
-  assert.equal(result.tree[0].chains[0].chain, "btc");
-  assert.equal(result.tree[0].chains[1].chain, "evm");
+
+  const orig = result.tree.find((row) => row.keyId === "k1" && row.sourceType === "orig");
+  assert.equal(orig?.name, "main");
+  assert.equal(orig?.keyType, "mnemonic");
+  assert.deepEqual(orig?.addresses, {});
+
+  const evmDerived = result.tree.find((row) => row.keyId === "k1" && row.name === "a1");
+  assert.equal(evmDerived?.sourceType, "derive");
+  assert.equal(evmDerived?.keyType, "private");
+  assert.equal(evmDerived?.path, "m/44");
+  assert.equal(evmDerived?.addresses?.evm, "0xabc");
+
+  const btcDerived = result.tree.find((row) => row.keyId === "k1" && row.name === "b1");
+  assert.equal(Array.isArray(btcDerived?.addresses?.btc), true);
+  assert.equal(btcDerived?.addresses?.btc[0], "bc1qxxx");
 });
 
-test("wallet-tree: 多账户按 keyName 稳定排序，同名仍有唯一 id", () => {
+test("wallet-tree: 无 derive 时只保留 orig 且地址为空", () => {
   const result = buildWalletTree({
     keys: [
-      { keyId: "k2", keyName: "beta" },
-      { keyId: "k1", keyName: "alpha" },
-      { keyId: "k3", keyName: "alpha" },
+      { keyId: "k2", keyName: "beta", keyType: "private" },
+      { keyId: "k1", keyName: "alpha", keyType: "mnemonic" },
     ],
-    addresses: [
-      { keyId: "k1", chain: "evm", address: "0x111" },
-      { keyId: "k2", chain: "evm", address: "0x222" },
-      { keyId: "k3", chain: "evm", address: "0x333" },
-    ],
+    addresses: [],
   });
 
-  assert.deepEqual(result.tree.map((item) => item.keyId), ["k1", "k3", "k2"]);
-  assert.equal(new Set(result.tree.map((item) => item.id)).size, 3);
+  assert.equal(result.counts.accounts, 2);
+  assert.equal(result.counts.chains, 0);
+  assert.equal(result.counts.addresses, 0);
+  assert.equal(result.tree.length, 2);
+  assert.equal(result.tree.every((row) => row.sourceType === "orig"), true);
+  assert.equal(result.tree.every((row) => Object.keys(row.addresses ?? {}).length === 0), true);
 });
 
 test("wallet-tree: 无效地址条目被跳过并给出 warning", () => {

@@ -82,6 +82,28 @@
 1. ex:lon 可直接调用 `wallet tree`
 2. 输出包含 account/chain/address 统计
 
+### Slice WT-4：统一 wallet tree 扁平结构（当前切片）
+
+本次只做：
+
+1. 将 `wallet.tree` 输出由 account/chain/address 树形改为扁平记录数组。
+2. 统一每条记录结构为：`{ keyId, name, keyType, sourceType, path, addresses }`。
+3. 语义约束：
+	- 文件解锁 key 记录：`sourceType="orig"`，`keyType` 保持原 key 类型，`addresses={}`。
+	- 派生地址记录：`sourceType="derive"`，`keyType="private"`，`addresses` 按链聚合。
+4. 无派生地址时，仅保留 orig 记录，`addresses` 必为空对象。
+
+本次不做：
+
+1. 修改 `wallet.status` 的输出契约。
+2. 变更 search/wallet-engine 的输入输出契约。
+
+验收标准：
+
+1. `wallet-tree` 单测覆盖 orig/derive 结构与无 derive 场景。
+2. `wallet.session` 的 `wallet.tree` 回归测试通过。
+3. 输出中无敏感字段（privateKey/mnemonic/password）。
+
 ## 4. 当前进度 / 下一步
 
 当前进度：
