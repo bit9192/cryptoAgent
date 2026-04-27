@@ -756,6 +756,27 @@ export function createWallet(options = {}) {
     };
   }
 
+  function normalizeWalletTreeObject(value) {
+    if (value && typeof value === "object" && Array.isArray(value.tree)) {
+      return value;
+    }
+    return null;
+  }
+
+  async function resolveWalletTreeForUnlock(input = {}) {
+    const fromInput = normalizeWalletTreeObject(input?.tree);
+    if (fromInput) {
+      return fromInput;
+    }
+
+    const fromCurrent = normalizeWalletTreeObject(this?.tree);
+    if (fromCurrent) {
+      return fromCurrent;
+    }
+
+    return await buildWalletTreeSnapshot();
+  }
+
   async function unlock(input = {}) {
     const record = getRecordOrThrow(input.keyId);
     if (!record.enabled) {
@@ -782,6 +803,10 @@ export function createWallet(options = {}) {
       });
 
       const session = sessions.get(record.keyId);
+      const tree = await resolveWalletTreeForUnlock.call(this, input);
+      if (this && typeof this === "object") {
+        this.tree = tree;
+      }
       return {
         ok: true,
         keyId: record.keyId,
@@ -789,6 +814,7 @@ export function createWallet(options = {}) {
         expiresAt: session.expiresAt,
         scope: session.scope,
         source: "dev",
+        tree,
       };
     }
 
@@ -825,12 +851,18 @@ export function createWallet(options = {}) {
     });
 
     const session = sessions.get(record.keyId);
+    const tree = await resolveWalletTreeForUnlock.call(this, input);
+    if (this && typeof this === "object") {
+      this.tree = tree;
+    }
+    
     return {
       ok: true,
       keyId: record.keyId,
       unlockedAt: session.unlockedAt,
       expiresAt: session.expiresAt,
       scope: session.scope,
+      tree,
     };
   }
 
@@ -1304,6 +1336,31 @@ export function createWallet(options = {}) {
       keyName: record.name,
       items,
       warnings,
+    };
+  }
+
+  async function buildWalletTreeSnapshot() {
+    const keys = [...keyCatalog.values()]
+      .map((record) => ({
+        keyId: record.keyId,
+        name: record.name,
+        keyType: record.type,
+        sourceType: "orig",
+        path: null,
+        addresses: {},
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name) || a.keyId.localeCompare(b.keyId));
+
+    return {
+      ok: true,
+      action: "wallet.tree",
+      tree: keys,
+      counts: {
+        accounts: keys.length,
+        chains: 0,
+        addresses: 0,
+      },
+      warnings: [],
     };
   }
 
