@@ -116,7 +116,6 @@ function queryKeysWithDataEngine(rows = [], request = {}) {
 async function resolveAddressesForKey(key, requestedChains = [], wallet = null) {
   const existing = key?.addresses && typeof key.addresses === "object" ? key.addresses : {};
   const result = {};
-  let addressesGenerated = false;  // Track if new addresses were generated
 
   for (const { chain, addressTypes } of requestedChains) {
     const hasTypedMode = Array.isArray(addressTypes) && addressTypes.length > 0;
@@ -139,11 +138,6 @@ async function resolveAddressesForKey(key, requestedChains = [], wallet = null) 
             const addr = await signer.getAddress({});
             const text = String(addr ?? "").trim();
             const value = text || [];
-            // 写回 tree（key.addresses 与原始 tree row 共享引用）
-            if (text) {
-              existing[chain] = text;
-              addressesGenerated = true;  // Mark that we generated a new address
-            }
             result[chain] = value;
             continue;
           }
@@ -184,11 +178,6 @@ async function resolveAddressesForKey(key, requestedChains = [], wallet = null) 
               // 跳过单个 addressType 失败
             }
           }
-          // 写回 tree 缓存
-          if (generated.length > 0) {
-            existing[chain] = generated;
-            addressesGenerated = true;  // Mark that we generated new addresses
-          }
           result[chain] = generated;
           continue;
         }
@@ -200,7 +189,7 @@ async function resolveAddressesForKey(key, requestedChains = [], wallet = null) 
     result[chain] = [];
   }
 
-  return { addresses: result, addressesGenerated };
+  return result;
 }
 
 async function pickWallet(request = {}, tree = {}, wallet = null) {
@@ -212,15 +201,9 @@ async function pickWallet(request = {}, tree = {}, wallet = null) {
 
   const keysToProcess = scope === "all" ? selectedKeys : selectedKeys.slice(0, 1);
 
-  let anyAddressesGenerated = false;
-
   const results = await Promise.all(
     keysToProcess.map(async (key) => {
-      const result = await resolveAddressesForKey(key, requestedChains, wallet);
-      const addresses = result.addresses;
-      if (result.addressesGenerated) {
-        anyAddressesGenerated = true;
-      }
+      const addresses = await resolveAddressesForKey(key, requestedChains, wallet);
       return {
         keyId: key.keyId,
         name: key.name,
@@ -231,11 +214,6 @@ async function pickWallet(request = {}, tree = {}, wallet = null) {
       };
     })
   );
-
-  // Invalidate tree cache if any new addresses were generated
-  if (anyAddressesGenerated && wallet && typeof wallet.invalidateTreeCache === "function") {
-    wallet.invalidateTreeCache();
-  }
 
   return results;
 }
