@@ -109,28 +109,46 @@ asset 和 wallet 组合
 还差 contract search ，其他已完成，但是 价格获取 token 查询还是有限制，后期可以优化
 
 ## 数据结构讨论
-数据数 + 数据操作，在缓存中维护一颗 wallet tree ，每个 钱包的 name 地址 余额 交易记录 等 放到 tree 里，再提供一系列操作接口修改 tree
-类似前端 的 数据绑定 ui 的思路，以 tree 为 核心维护
-wallet 应当是一个 树形结构，hd 可以衍生出 key ，特别是有key 里配置的情况
+### 已完成
+已完成了 tree 的简单版本
+还有 inputs 负责传递 wallet 给其他 函数
 
-实现 可以 根据 Wallet tree 上的 数据，通过 名称 获取地址 用来查询余额 或后面的 send  swap 等 操作，应当怎么设计？
-用命令 嵌套？比如 tree name=aa | assets ？
-或者 一个命令，可以作为 inputs 的挂载，先 wallet inputs ，然后 选择要用的 key ，挂载到 inputs 上，再执行 其他命令，其他命令 可以 用 inputs作为输入？
-还有其他方法，你推荐啥？
+### 接下来的思路
+如果站在更全局一点的思考，可以把一次任务设置为一个标准流程：
+1. 数据准备，用户意图 输入，给定 inputs ， 准备钱包 或 直接提供了 地址
+2. 设置 inputs ，确定 接口
+3. 执行 接口 ，结果 和 inputs 二次加工
+4. 下一个任务，重复上述操作
+
+如此将一个复杂任务拆除多个任务标准流程 逐步执行，这样合理吗？
+
+基于上述想法，wallet 得数据 应当做个 wallet 引擎，主要功能是 根据用户意图 和 接口要求 提供数据，wallet 只会输出两类数据，地址 或 signer，都是从 wallet tree 里面查找，用户 无非就是 通过 name 或 指定地址 从wallet tree 上选择 一个或多个 key 生成 address 和 signer，所以这个引擎并不用很复杂的检索。
+
+key 分为 hd 和 privatekey，且 hd 密钥如果配置了 @address-config 就可以直接衍生出子 privatekey, 同时 hd 的操作还有给定 path 生成 新的 private key
+
+对于钱包的下游接口，就是 address 和 signer 两种类型
+这个钱包引擎就对 input output 做了限制
+我的预期是 一个下游接口有 参数数说明，wallet engine 的 input 就是 (key的检索范围, 输出要求[根据下游接口]) -> 运算 -> 输出
+而 engine 在 wallet unlcok 后，建立 wallet tree ，建立时如果有 @address-config 的 hd ，就直接 derive ，一次性配置完成
+
+每次任务流程就是：
+用户意图 -> 分析 -> wallet inputs + 下游接口 -> wallet engine -> 接口执行 -> 返回 结果 和 inputs -> 下一个任务
+
+
+
+
+
 
 
 ## cli 界面修改
 分为 上下部分，上面 显示结果，下面负责输入，显示面板 可以在一些情况下提供输入，比如配置私钥时
 
 
-## 开发计划
+## 一些想到的点子
 
-## 数据结构开发
-- 构建 wallet tree，实现钱包余额查询
-- 构建 自动配置多链的模版
-
-### network 自动配置
+### 自动配置多链的模版 network 自动配置
 根据 net name 自动 配置 各种地址 在 evm的config 里，包括 dex stable coin ，multi 等
 是否可以 给出一个 模版生成程序，输入 链 name 以后，把 浏览器 rpc 接口查好，在 env 给出配置项，在 apps 下建好config ，在 test/apps/ 下建好 文件，并把 各种 标准 provide 得开发接口统一标准写好，甚至直接把接口 和 文件目录生成好，然后 ai 就可以 根据 dev 开始自动开发，可以做到不？
 
- task assets:query assets.token-price --query 0xb45e6dd851df10961d1aad912baf220168fcaa25 --network bsc --forceRemote true --debugStats true
+### 地址个性画像
+输入一个地址后 根据 地址的资产，对各资产的检测后汇总，给出这个地址的投资风格，用于娱乐

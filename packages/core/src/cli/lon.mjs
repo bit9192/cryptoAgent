@@ -34,6 +34,8 @@ import {
   clearRegistryCache,
 } from "../execute/index.mjs";
 import { walletSessionActionList } from "../tasks/wallet/index.mjs";
+import { resolveSearchAddressRequest } from "../modules/wallet-engine/index.mjs";
+import { showInputs } from "../modules/inputs/index.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -333,12 +335,22 @@ async function runScriptWithExecHandlers(session, scriptPath) {
     throw new Error("run 脚本需要导出 run(options) 或 default(options) 函数");
   }
 
+  // 获取当前 session 的 inputs
+  let inputsData = null;
+  try {
+    inputsData = await showInputs();
+  } catch {
+    inputsData = { count: 0, items: [] };
+  }
+
   const data = await runner({
     source: "cli",
     network: session.network,
     wallet: session.wallet,
     confirm: makeConfirmHandler(session),
     interact: makeInteractHandler(session),
+    inputs: inputsData.items?.length > 0 ? inputsData.items[0]?.data : null,
+    inputsData, // 完整的 inputs 信息
   });
 
   if (data !== undefined) {
@@ -808,7 +820,10 @@ async function readWalletInputs(session, scope = "wallet") {
     );
     
     if (result?.ok) {
-      return result.data ?? {};
+      const payload = result.data ?? {};
+      const items = Array.isArray(payload?.items) ? payload.items : [];
+      const hit = items.find((item) => String(item?.scope ?? "") === scope);
+      return hit?.data ?? {};
     }
     return {};
   } catch {
@@ -816,15 +831,93 @@ async function readWalletInputs(session, scope = "wallet") {
   }
 }
 
+async function resolveAddressFromInputsKeys(session, scope = "wallet") {
+  try {
+    const result = await execute(
+      {
+        task: "wallet:session",
+        args: { action: "wallet.status", useInputs: true, scope },
+        source: "cli",
+        network: session.network,
+      },
+      {
+        registry: session.registry,
+        wallet: session.wallet,
+        confirm: async () => true,
+        interact: async () => null,
+        checkpointStore: session.checkpointStore,
+      },
+    );
+
+    if (!result?.ok) return null;
+    const addresses = Array.isArray(result?.data?.addresses) ? result.data.addresses : [];
+    const first = addresses[0] ?? null;
+    return String(first?.address ?? "").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveAddressUsingWalletEngine(session, inputs = {}, walletStatus = {}) {
+  try {
+    // 尝试使用 wallet-engine 解析地址
+    const resolved = resolveSearchAddressRequest({
+      inputs,
+      requirement: { kind: "address", cardinality: "single" },
+      walletStatus,
+    });
+    
+    if (resolved?.ok && resolved?.query) {
+      return resolved.query;
+    }
+  } catch {
+    // wallet-engine 解析失败，继续使用原有方法
+  }
+  return null;
+}
+
 async function queryInputsAssets(session, domain = "token", network = null) {
   const inputs = await readWalletInputs(session);
   
-  // 尝试提取第一个有效地址
+  // 第一步：尝试直接从 inputs 中提取地址
   let targetAddress = null;
   if (inputs?.address) {
     targetAddress = inputs.address;
   } else if (Array.isArray(inputs?.targets) && inputs.targets.length > 0) {
     targetAddress = inputs.targets[0].address;
+  }
+
+  // 第二步：尝试使用 wallet-engine 解析（支持 keyId、name 等）
+  if (!targetAddress) {
+    try {
+      const statusResult = await execute(
+        {
+          task: "wallet:session",
+          args: { action: "wallet.status", useInputs: true, scope: "wallet" },
+          source: "cli",
+          network: session.network,
+        },
+        {
+          registry: session.registry,
+          wallet: session.wallet,
+          confirm: async () => true,
+          interact: async () => null,
+          checkpointStore: session.checkpointStore,
+        },
+      );
+
+      if (statusResult?.ok) {
+        const walletStatus = statusResult.data ?? {};
+        targetAddress = await resolveAddressUsingWalletEngine(session, inputs, walletStatus);
+      }
+    } catch {
+      // wallet-engine 失败，继续尝试其他方法
+    }
+  }
+
+  // 第三步：inputs 可能只有 keyId/keyIds（无 address），尝试通过 wallet.status + useInputs 反查地址
+  if (!targetAddress) {
+    targetAddress = await resolveAddressFromInputsKeys(session, "wallet");
   }
   
   if (!targetAddress) {

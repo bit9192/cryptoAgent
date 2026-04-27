@@ -1,6 +1,16 @@
+/**
+ * src/run/test.mjs  —  Wallet-Engine 测试工具
+ * 
+ * 可在 Lon REPL 中运行: run test
+ * 或使用完整路径:      n packages/core/src/run/test.mjs
+ */
 
-import { retrieveWalletCandidates, generateAddressFromCandidates, generateSignerFromCandidates } from "../modules/wallet-engine/index.mjs";
-import { showInputs } from "../modules/inputs/index.mjs";
+import { 
+  retrieveWalletCandidates, 
+  generateAddressFromCandidates, 
+  generateSignerFromCandidates 
+} from "../../packages/core/src/modules/wallet-engine/index.mjs";
+import { showInputs } from "../../packages/core/src/modules/inputs/index.mjs";
 
 // ─── 工具函数 ───────────────────────────────────────────────
 
@@ -24,22 +34,15 @@ function info(msg) {
 
 // ─── 测试 1：查看当前 inputs ───────────────────────────────────
 
-async function testShowInputs() {
+async function testShowInputs(inputs) {
   divider("测试 1: 查看当前 inputs");
   
-  try {
-    // 从全局 inputs store 读取
-    const inputsData = await showInputs();
-    
-    if (inputsData.count === 0) {
-      info("当前没有设置 inputs，可以先运行：");
-      info("  wallet inputs.set wallet --data '{\"address\":\"0x...\",\"chain\":\"evm\"}'");
-    } else {
-      success(`找到 ${inputsData.count} 个 inputs`);
-      console.log(JSON.stringify(inputsData.items, null, 2));
-    }
-  } catch (err) {
-    error(`${err.message}`);
+  if (inputs) {
+    success("从 run() 上下文中找到 inputs");
+    console.log(JSON.stringify(inputs, null, 2));
+  } else {
+    info("当前没有设置 inputs，可以先运行：");
+    info("  wallet inputs.set wallet --data '{\"address\":\"0x...\",\"chain\":\"evm\"}'");
   }
 }
 
@@ -230,11 +233,14 @@ async function testRetrieveCombinations(walletStatus) {
 
 // ─── 主程序 ───────────────────────────────────────────────────
 
-export async function run(options) {
+export async function run(options = {}) {
   console.log("\n🔧 Wallet-Engine 测试工具\n");
   
+  // 提取 inputs（如果有的话）
+  const inputs = options.inputs;
+  
   // 测试 1：查看 inputs
-  await testShowInputs();
+  await testShowInputs(inputs);
   
   // 创建 mock 钱包状态（后续测试用）
   const walletStatus = createMockWalletStatus();
@@ -260,5 +266,3 @@ export async function run(options) {
   console.log("  2. 如果你已设置 wallet inputs，可以修改测试代码来使用真实数据");
   console.log("  3. 在 REPL 中运行: run test 来执行这个脚本\n");
 }
-
-run({})

@@ -215,6 +215,23 @@ async function unlockOneToCache(ctx) {
     });
   }
 
+  let derivedImported = 0;
+  let deriveWarnings = [];
+  if (typeof wallet.deriveConfiguredAddresses === "function") {
+    await ensureDefaultProviders(wallet);
+    const derived = await wallet.deriveConfiguredAddresses({ strict: true });
+    const items = Array.isArray(derived?.items) ? derived.items : [];
+
+    for (const item of items) {
+      const normalized = normalizeConfiguredAddress(item);
+      if (!normalized.keyId || !normalized.chain || !normalized.address) continue;
+      upsertAddress(session, normalized);
+      derivedImported += 1;
+    }
+
+    deriveWarnings = Array.isArray(derived?.warnings) ? derived.warnings : [];
+  }
+
   return {
     ok: Boolean(unlocked?.ok),
     action: "wallet.unlock",
@@ -224,13 +241,15 @@ async function unlockOneToCache(ctx) {
       abs: selected.abs,
     },
     totalUnlocked: Number(unlocked?.totalUnlocked ?? entries.length ?? 0),
-    warnings: asArray(unlocked?.warnings),
+    derivedImported,
+    warnings: [...asArray(unlocked?.warnings), ...deriveWarnings],
     data: snapshotSession(session),
   };
 }
 
 async function clearCache(ctx) {
   const session = clearSession("default");
+  clearInputs("default", {});
   const wallet = ctx?.wallet;
   if (wallet && typeof wallet.lockAll === "function") {
     await wallet.lockAll();
@@ -409,7 +428,7 @@ export const walletSessionActionObject = Object.freeze({
     taskId: WALLET_SESSION_TASK_ID,
     sub: "unlock",
     usage: "wallet unlock",
-    description: "固定解锁流程：选择钱包 -> 输入密码 -> 解锁",
+    description: "固定解锁流程：选择钱包 -> 输入密码 -> 解锁并自动派生 configured 地址",
     argsSchema: {
       required: [],
       properties: {},

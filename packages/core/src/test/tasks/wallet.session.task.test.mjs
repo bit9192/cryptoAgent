@@ -53,6 +53,18 @@ test("wallet:session wallet.deriveConfigured stores configured addresses", async
 
 test("wallet:session wallet.clear clears cached data", async () => {
   await task.run(createCtx({ action: "wallet.clear" }, {}));
+  await task.run(createCtx({
+    action: "wallet.inputs.set",
+    scope: "wallet",
+    data: {
+      keyId: "k9",
+      keyName: "main",
+    },
+  }, {}));
+
+  const beforeInputs = await task.run(createCtx({ action: "wallet.inputs.show", scope: "wallet" }, {}));
+  assert.equal(beforeInputs.count, 1);
+
   const wallet = {
     async listKeys() {
       return {
@@ -79,6 +91,9 @@ test("wallet:session wallet.clear clears cached data", async () => {
   assert.equal(cleared.ok, true);
   assert.equal(cleared.data.counts.keys, 0);
   assert.equal(cleared.data.counts.addresses, 0);
+
+  const afterInputs = await task.run(createCtx({ action: "wallet.inputs.show", scope: "wallet" }, {}));
+  assert.equal(afterInputs.count, 0);
 });
 
 test("wallet:session wallet.clear also clears wallet unlock sessions", async () => {
@@ -124,6 +139,7 @@ test("wallet:session wallet.unlock uses select + password and upserts key cache"
 
   process.chdir(root);
   try {
+    let deriveCalled = 0;
     const wallet = {
       async listKeys() {
         return { items: [] };
@@ -155,6 +171,22 @@ test("wallet:session wallet.unlock uses select + password and upserts key cache"
           },
         };
       },
+      async deriveConfiguredAddresses() {
+        deriveCalled += 1;
+        return {
+          items: [
+            {
+              keyId: "k-unlock-1",
+              chain: "evm",
+              address: "0x1111111111111111111111111111111111111111",
+              name: "main-0",
+              path: "m/44'/60'/0'/0/0",
+              addressType: null,
+            },
+          ],
+          warnings: [],
+        };
+      },
     };
 
     const ctx = {
@@ -176,8 +208,12 @@ test("wallet:session wallet.unlock uses select + password and upserts key cache"
     assert.equal(res.ok, true);
     assert.equal(res.action, "wallet.unlock");
     assert.equal(res.selected.shortName, "demo");
+    assert.equal(deriveCalled, 1);
+    assert.equal(res.derivedImported, 1);
     assert.equal(res.data.counts.keys, 1);
+    assert.equal(res.data.counts.addresses, 1);
     assert.equal(res.data.keys[0].keyId, "k-unlock-1");
+    assert.equal(res.data.addresses[0].address, "0x1111111111111111111111111111111111111111");
   } finally {
     process.chdir(cwd);
     await fs.rm(root, { recursive: true, force: true });
