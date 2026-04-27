@@ -101,6 +101,9 @@ export function createTrxProvider(options = {}) {
         throw new Error("keyId 不能为空");
       }
 
+      // ── getAddress 缓存 ──────────────────────────────────────────
+      const addressCache = {}; // { "path": address }
+
       async function getPrimaryPrivateKey(operation, deriveOptions = {}, target = null) {
         const derivePath = String(deriveOptions.path ?? DEFAULT_TRX_PATH);
 
@@ -138,8 +141,19 @@ export function createTrxProvider(options = {}) {
             const addresses = await walletContext.withUnlockedSecret(
               { keyId, chain: "trx", operation: "getAddress", target: null },
               async (secret) => rawPaths.map((path) => {
+                // 检查缓存
+                if (path in addressCache) {
+                  return { path, address: addressCache[path] };
+                }
+                
+                // 计算地址
                 const privateKeyHex = derivePrivateKeyFromSecret(secret, path);
-                return { path, address: deriveTrxAddress(privateKeyHex) };
+                const address = deriveTrxAddress(privateKeyHex);
+                
+                // 写入缓存
+                addressCache[path] = address;
+                
+                return { path, address };
               }),
             );
 
@@ -151,8 +165,25 @@ export function createTrxProvider(options = {}) {
             return { address: addresses[0]?.address, addresses };
           }
 
+          const derivePath = String(getAddressOptions?.path ?? DEFAULT_TRX_PATH);
+          
+          // 检查缓存
+          if (derivePath in addressCache) {
+            await walletContext.audit?.({
+              at: new Date().toISOString(),
+              keyId,
+              chain: "trx",
+              operation: "getAddress",
+              status: "ok",
+            });
+            return addressCache[derivePath];
+          }
+          
           const material = await walletContext.deriveKeyMaterial({ operation: "getAddress", ...getAddressOptions });
           const address = deriveTrxAddress(normalizePrivateKeyHex(material.privateKeyHex));
+          
+          // 写入缓存
+          addressCache[derivePath] = address;
 
           await walletContext.audit?.({
             at: new Date().toISOString(),

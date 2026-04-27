@@ -215,6 +215,9 @@ export function createBtcProvider(options = {}) {
           target,
         });
 
+      // ── getAddress 缓存 ──────────────────────────────────────────
+      const addressCache = {}; // { "addressType:path": address }
+
       return {
         chain: "btc",
         keyId,
@@ -232,12 +235,25 @@ export function createBtcProvider(options = {}) {
 
           const items = await withSecret("getAddress", null, (secret) => {
             const paths = rawPaths ?? [defaultDerivationPath(addressType, networkName)];
-            return paths.map((p) => ({
-              path: p,
-              address: btcAddressFromPrivKey(
+            return paths.map((p) => {
+              // 构建缓存键
+              const cacheKey = `${addressType}:${p}`;
+              
+              // 检查缓存
+              if (cacheKey in addressCache) {
+                return { path: p, address: addressCache[cacheKey] };
+              }
+              
+              // 计算地址
+              const address = btcAddressFromPrivKey(
                 derivePrivKeyBuffer(secret, p), addressType, btcJsNet,
-              ),
-            }));
+              );
+              
+              // 写入缓存
+              addressCache[cacheKey] = address;
+              
+              return { path: p, address };
+            });
           });
 
           await auditOk("getAddress");

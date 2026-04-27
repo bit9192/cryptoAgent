@@ -110,6 +110,9 @@ export function createEvmProvider(options = {}) {
         };
       }
 
+      // ── getAddress 缓存 ──────────────────────────────────────────
+      const addressCache = {}; // { "path": address }
+
       return {
         chain: "evm",
         keyId,
@@ -123,17 +126,45 @@ export function createEvmProvider(options = {}) {
 
           const items = Array.isArray(material?.items) ? material.items : [];
           if (items.length > 1 || getAddressOptions.returnAll === true) {
-            const addresses = items.map((item) => ({
-              path: item.path,
-              address: new Wallet(item.privateKeyHex).address,
-            }));
+            const addresses = items.map((item) => {
+              // 检查缓存
+              if (item.path in addressCache) {
+                return { path: item.path, address: addressCache[item.path] };
+              }
+              
+              // 计算地址
+              const address = new Wallet(item.privateKeyHex).address;
+              
+              // 写入缓存
+              addressCache[item.path] = address;
+              
+              return { path: item.path, address };
+            });
             return {
               address: addresses[0]?.address,
               addresses,
             };
           }
 
+          const derivePath = String(material?.path ?? material?.items?.[0]?.path ?? "m/44'/60'/0'/0/0");
+          
+          // 检查缓存
+          if (derivePath in addressCache) {
+            await walletContext.audit?.({
+              at: new Date().toISOString(),
+              keyId,
+              chain: "evm",
+              operation: "getAddress",
+              status: "ok",
+            });
+            return addressCache[derivePath];
+          }
+          
           const address = new Wallet(material.privateKeyHex).address;
+          
+          // 写入缓存
+          addressCache[derivePath] = address;
+          
           await walletContext.audit?.({
             at: new Date().toISOString(),
             keyId,
