@@ -135,3 +135,26 @@
 - 期望：打印旧/新结果并抛错
 - 验证：终端可明确定位迁移不一致
 
+---
+
+## 测试场景：S-W-5 pickWallet path 透传与默认匹配
+
+### Happy Path
+
+#### H1：有 path 时透传到 getAddress
+- 操作：树行含 `path=m/.../3`，调用 `wallet.pickWallet`
+- 期望：`signer.getAddress` 收到 `{ path }`（typed 时为 `{ addressType, path }`）
+- 验证：mock signer 记录入参包含 path
+
+### Edge Cases
+
+#### E1：无 path 时保持默认匹配
+- 操作：树行 path 为空，调用 `wallet.pickWallet`
+- 期望：不传 path，让 provider 自行使用默认路径
+- 验证：mock signer 记录入参不含 path
+
+#### E2：typed 模式多 addressType 都透传同一 path
+- 操作：BTC typed 请求含两个 addressType
+- 期望：每次 getAddress 入参均包含同一 path
+- 验证：调用数组中每项都含 path 且 addressType 正确
+

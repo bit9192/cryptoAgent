@@ -141,3 +141,21 @@
 2. run/test 输出包含迁移一致性检查结果
 3. 旧逻辑输出与新接口输出在同参数下完全一致
 4. 不修改业务入参结构（继续兼容 outputs/outps）
+
+## 新增切片：S-W-5 pickWallet path 透传修复
+
+### 背景
+
+在 `wallet.pickWallet` 中调用 `signer.getAddress` 时，未把树行的 `path` 透传给 provider，导致不同 path 行可能得到相同地址（尤其 BTC typed 与 EVM fallback 场景）。
+
+### 本次目标（只做一个切片）
+
+1. 当 key 行存在 `path` 时，将其透传给 `signer.getAddress`
+2. 当 key 行不存在 `path` 时，不强制传 path，保持 provider 默认路径匹配行为
+3. typed 与非 typed 两种分支均遵循该规则
+
+### 验收标准
+
+1. 同 keyId 不同 path 行在 BTC typed 模式下地址可正确分离
+2. 无 path 行调用时，`getAddress` 入参不含 path 字段
+3. 新增测试覆盖“有 path 透传 / 无 path 自动匹配”两类场景

@@ -89,6 +89,7 @@ function queryKeysWithDataEngine(rows = [], request = {}) {
 async function resolveAddressesForKey(key, requestedChains = [], deps = {}) {
   const existing = key?.addresses && typeof key.addresses === "object" ? key.addresses : {};
   const result = {};
+  const rowPath = key?.path == null ? null : String(key.path);
 
   for (const { chain, addressTypes } of requestedChains) {
     const hasTypedMode = Array.isArray(addressTypes) && addressTypes.length > 0;
@@ -107,7 +108,8 @@ async function resolveAddressesForKey(key, requestedChains = [], deps = {}) {
         try {
           const signer = await deps.getSigner({ chain, keyId: key.keyId });
           if (signer && typeof signer.getAddress === "function") {
-            const addr = await signer.getAddress({});
+            const getAddressOptions = rowPath ? { path: rowPath } : {};
+            const addr = await signer.getAddress(getAddressOptions);
             const text = String(addr ?? "").trim();
             result[chain] = text || [];
             continue;
@@ -128,7 +130,10 @@ async function resolveAddressesForKey(key, requestedChains = [], deps = {}) {
           const generated = [];
           for (const addressType of addressTypes) {
             try {
-              const addr = await signer.getAddress({ addressType });
+              const getAddressOptions = rowPath
+                ? { addressType, path: rowPath }
+                : { addressType };
+              const addr = await signer.getAddress(getAddressOptions);
               const text = String(addr ?? "").trim();
               if (text && !generated.some((item) => item.address === text && item.type === addressType)) {
                 generated.push({ address: text, type: addressType });
@@ -167,6 +172,7 @@ export function createPickWalletOps(deps = {}) {
         return {
           keyId: key.keyId,
           name: key.name,
+          sourceName: key.sourceName ?? null,
           keyType: key.keyType,
           sourceType: key.sourceType,
           path: key.path ?? null,

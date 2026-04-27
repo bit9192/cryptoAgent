@@ -79,7 +79,7 @@ async function testDebugPickAddressFromInputs(options) {
     selectors: {
       // keyId: options?.inputs?.keyId,
       // name: String(options?.inputs?.name ?? "").trim(),
-      name: "m",
+      name: "x",
     //   sourceName: "k",
       // nameExact: Boolean(options?.inputs?.nameExact),
       // keyType: options?.inputs?.keyType,
@@ -87,17 +87,18 @@ async function testDebugPickAddressFromInputs(options) {
     },
     outps: {
       signer: true,
-      chains: [
-        "evm",
-        "trx",
-        {
-          chain: "btc",
-          addressTypes: ["p2wpkh", "p2tr"],
-          // addressTypes: Array.isArray(options?.inputs?.addressTypes)
-          //   ? options.inputs.addressTypes
-          //   : undefined,
-        },
-      ],
+      chains: ["btc"]
+    //   chains: [
+    //     "evm",
+    //     "trx",
+    //     {
+    //       chain: "btc",
+    //       addressTypes: ["p2wpkh", "p2tr"],
+    //       // addressTypes: Array.isArray(options?.inputs?.addressTypes)
+    //       //   ? options.inputs.addressTypes
+    //       //   : undefined,
+    //     },
+    //   ],
     },
   };
 
