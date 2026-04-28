@@ -297,3 +297,24 @@ export async function revealStoredFileContent(options = {}) {
     await fs.rm(workDir, { recursive: true, force: true });
   }
 }
+
+const STORAGE_DIRS = [
+  "key",
+  "key/imports",
+  "backup/sss",
+  "export",
+  "apps/evm",
+  "apps/btc",
+];
+
+/**
+ * 确保 storage 目录结构完整。首次运行或新机器恢复时调用，幂等安全。
+ *
+ * @param {string} [storageRoot='storage']
+ */
+export async function ensureStorageStructure(storageRoot = "storage") {
+  const root = path.resolve(process.cwd(), String(storageRoot));
+  for (const dir of STORAGE_DIRS) {
+    await fs.mkdir(path.join(root, dir), { recursive: true });
+  }
+}

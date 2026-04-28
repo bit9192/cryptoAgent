@@ -9,6 +9,7 @@ import {
   readEncryptedPath,
   storeEncryptedPath,
   verifyStoredFilePassword,
+  ensureStorageStructure,
 } from "../../../modules/key/store.mjs";
 
 async function mkTmpDir() {
@@ -135,4 +136,33 @@ test("校验密码：错误密码应立即失败", async () => {
     password: "wrong-pass-123",
   });
   assert.equal(bad.ok, false);
+});
+
+test("ensureStorageStructure：首次运行建好全部目录", async () => {
+  const tmp = await mkTmpDir();
+  const storageRoot = path.join(tmp, "storage");
+
+  await ensureStorageStructure(storageRoot);
+
+  const expectedDirs = [
+    "key",
+    path.join("key", "imports"),
+    path.join("backup", "sss"),
+    "export",
+    path.join("apps", "evm"),
+    path.join("apps", "btc"),
+  ];
+
+  for (const dir of expectedDirs) {
+    const stat = await fs.stat(path.join(storageRoot, dir));
+    assert.ok(stat.isDirectory(), `目录应存在：${dir}`);
+  }
+});
+
+test("ensureStorageStructure：幂等，重复调用不报错", async () => {
+  const tmp = await mkTmpDir();
+  const storageRoot = path.join(tmp, "storage");
+
+  await ensureStorageStructure(storageRoot);
+  await assert.doesNotReject(() => ensureStorageStructure(storageRoot));
 });

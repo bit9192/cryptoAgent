@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { verifyStoredFilePassword } from "../modules/key/store.mjs";
+import { ensureStorageStructure } from "../modules/key/store.mjs";
 import { keyCreate } from "../tasks/key/create.mjs";
 import { keyAdd } from "../tasks/key/add.mjs";
 import { keyBackup } from "../tasks/key/backup.mjs";
@@ -415,6 +416,8 @@ async function resolveRestorePassphraseIfNeeded(backupPath, args) {
 
 async function main() {
   const { com, args } = parseCliCommand(process.argv.slice(2));
+
+  await ensureStorageStructure(args.storageRoot);
 
   if (com !== "create" && com !== "import" && com !== "imports" && com !== "add" && com !== "edit" && com !== "view" && com !== "backup" && com !== "restore" && com !== "page-import" && com !== "derive-config") {
     printUsage();

@@ -87,16 +87,29 @@
 2. key view 可用同一密码解密
 3. key 相关后续切片均复用该基线
 
+### Slice S-6：首次运行自动建好 storage 目录结构
+
+本次只做：
+
+1. `store.mjs` 导出 `ensureStorageStructure(storageRoot?)` 函数
+2. 创建全套 storage 子目录（key/imports, backup/sss, export, apps/evm, apps/btc）
+3. `key.mjs` CLI 入口顶部调用，确保每次运行前目录就绪
+
+验收标准：
+
+1. store.test.mjs 新增用例：首次调用后目录全部存在
+2. 幂等：重复调用不报错
+
 ## 4. 当前进度 / 下一步
 
 当前进度：
 
-1. 已完成 S-1 ~ S-4（解析、加密、存储、SSS）
-2. 已完成一次 testdata 导入基线：wallet-tree-dev
+1. 已完成 S-1 ~ S-5（解析、加密、存储、SSS、基线固化）
+2. S-6 待实现：storage 目录结构初始化
 
 下一步：
 
-1. 完成 S-5 后，仅维护 key 导入/存储基线
+1. 实现 S-6
 2. wallet tree 开发在 src/test/modules/wallet-tree 独立推进
 
 ## 5. 开发门禁（执行前检查）
