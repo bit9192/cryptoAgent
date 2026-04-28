@@ -95,7 +95,7 @@ async function runAssetSearchDemoFromPicked(pickedWallets = [], options = {}) {
   info(`asset-search requests: ${searchInputs.length}`);
   console.log("\n--- Parametrized asset-search requests ---");
   console.log(toJsonSafe(searchInputs));
-  return
+//   return
   const searchEngine = options.searchEngine ?? createDefaultSearchEngine();
   const search = typeof searchEngine?.search === "function" ? searchEngine.search.bind(searchEngine) : null;
   if (!search) {
@@ -217,10 +217,10 @@ async function testDebugPickAddressFromInputs(options) {
     //   chains: ["evm"]
       chains: [
         "trx",
-        {
-          chain: "btc",
-          addressTypes: "all",
-        },
+        // {
+        //   chain: "btc",
+        //   addressTypes: "all",
+        // },
       ],
     },
   };
@@ -234,12 +234,7 @@ async function testDebugPickAddressFromInputs(options) {
   const pickedWalletsAllChains = await options.wallet.pickWallet(pickRequestAllChains, tree);
   const pickedWalletsBtcAllTypes = await options.wallet.pickWallet(pickRequestBtcAllTypes, tree);
   info("pickWallet migration parity: REMOVED (direct wallet.pickWallet)");
-console.log(
-    toJsonSafe(pickedWalletsBtcAllTypes),
-    "123213"
-  )
 
-  return 
   info(`wallet.tree rows: ${Array.isArray(tree?.tree) ? tree.tree.length : 0}`);
   info(`pickWallet rows (chains=all): ${pickedWalletsAllChains.length}`);
   console.log("\n--- Result: chains=all ---");
