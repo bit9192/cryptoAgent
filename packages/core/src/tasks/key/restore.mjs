@@ -98,7 +98,8 @@ export async function inspectBackupManifest(backupPath) {
  * @param {string} [options.outputPath] - 恢复目标目录
  * @param {string} [options.passphrase]
  * @param {string} [options.storageRoot='storage']
- * @returns {Promise<{backupPath:string,outputPath:string,sourceType:string,sourcePath:string,restoredFileCount:number,usedShares:number,threshold:number}>}
+ * @param {boolean} [options.toKey=false] - 直接恢复到 storage/key/，已存在同名文件则跳过
+ * @returns {Promise<{backupPath:string,outputPath:string,sourceType:string,sourcePath:string,restoredFileCount:number,skippedFiles:string[],usedShares:number,threshold:number}>}
  */
 export async function keyRestore(options = {}) {
   const {
@@ -106,6 +107,7 @@ export async function keyRestore(options = {}) {
     outputPath,
     passphrase = "",
     storageRoot = "storage",
+    toKey = false,
   } = options;
 
   if (!backupPath) {
@@ -156,12 +158,15 @@ export async function keyRestore(options = {}) {
     throw new Error("恢复失败：备份 bundle 格式非法");
   }
 
-  const restoreRoot = outputPath
-    ? path.resolve(process.cwd(), String(outputPath))
-    : path.resolve(process.cwd(), storageRoot, "restore", `key-restore-${toStamp()}`);
+  const restoreRoot = toKey
+    ? path.resolve(process.cwd(), storageRoot, "key")
+    : outputPath
+      ? path.resolve(process.cwd(), String(outputPath))
+      : path.resolve(process.cwd(), storageRoot, "restore", `key-restore-${toStamp()}`);
 
   await fs.mkdir(restoreRoot, { recursive: true });
 
+  const skippedFiles = [];
   for (const item of bundle.files) {
     const rel = String(item?.relativePath ?? "");
     if (!rel || rel.includes("..")) {
@@ -172,6 +177,13 @@ export async function keyRestore(options = {}) {
       throw new Error(`恢复失败：文件校验失败 ${rel}`);
     }
     const target = path.join(restoreRoot, rel);
+    if (toKey) {
+      const exists = await fs.access(target).then(() => true).catch(() => false);
+      if (exists) {
+        skippedFiles.push(path.relative(process.cwd(), target));
+        continue;
+      }
+    }
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, raw);
   }
@@ -181,7 +193,8 @@ export async function keyRestore(options = {}) {
     outputPath: path.relative(process.cwd(), restoreRoot),
     sourceType: bundle.sourceType,
     sourcePath: bundle.sourcePath,
-    restoredFileCount: bundle.files.length,
+    restoredFileCount: bundle.files.length - skippedFiles.length,
+    skippedFiles,
     usedShares: usedShares.length,
     threshold: Number(manifest.threshold),
   };

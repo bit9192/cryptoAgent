@@ -51,6 +51,7 @@ function printUsage() {
   console.log("  pnpm key backup --file storage/key/wallet-main.enc.json [--dest ./my-backup-dir] [--threshold 2] [--shares 3] [--passphrase <password>]");
   console.log("  pnpm key backup --all   # 交互选择 threshold/shares，并输入备份 password（可留空）");
   console.log("  pnpm key restore --backup storage/backup/key-sss-backup-20260101010101 [--out ./restore-dir] [--passphrase <password>]");
+  console.log("  pnpm key restore --backup storage/backup/key-sss-backup-20260101010101 --to-key [--passphrase <password>]   # 直接恢复到 storage/key/，已存在文件自动跳过");
   console.log("  pnpm key import --password <password>   # 交互选择：文件路径 / 直接输入文档内容");
   console.log("提示：密钥行支持占位符 PRIVATE_KEY_PLACEHOLDER / MNEMONIC_PLACEHOLDER(12词) / MNEMONIC_24_PLACEHOLDER(24词)，导入时自动替换为随机密钥。\n");
 }
@@ -525,6 +526,7 @@ async function main() {
       outputPath: args.out ? String(args.out) : undefined,
       passphrase,
       storageRoot: String(args.storageRoot ?? "storage"),
+      toKey: Boolean(args["to-key"] ?? args.toKey),
     });
 
     console.log(JSON.stringify({ ok: true, action: "key.restore", result }, null, 2));

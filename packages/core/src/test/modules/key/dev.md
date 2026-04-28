@@ -109,8 +109,23 @@
 
 下一步：
 
-1. 实现 S-6
-2. wallet tree 开发在 src/test/modules/wallet-tree 独立推进
+1. 实现 S-6 ✅
+2. 实现 S-7
+3. wallet tree 开发在 src/test/modules/wallet-tree 独立推进
+
+### Slice S-7：restore --to-key 直接恢复到 storage/key
+
+本次只做：
+
+1. `keyRestore` 支持 `toKey: true` 选项，输出目录改为 `storage/key/`
+2. 已存在同名文件时自动跳过（`skippedFiles` 列表返回），不覆盖
+3. CLI `restore` 支持 `--to-key` 标志，透传 `toKey: true`
+
+验收标准：
+
+1. `--to-key` 时恢复的 `.enc.json` 直接出现在 `storage/key/`
+2. 同名文件跳过且结果中有 `skippedFiles` 列表
+3. 不传 `--to-key` 时行为与现在完全一致
 
 ## 5. 开发门禁（执行前检查）
 
