@@ -159,3 +159,88 @@
 1. 同 keyId 不同 path 行在 BTC typed 模式下地址可正确分离
 2. 无 path 行调用时，`getAddress` 入参不含 path 字段
 3. 新增测试覆盖“有 path 透传 / 无 path 自动匹配”两类场景
+
+## 新增切片：S-W-6 wallet.getAddressTypes
+
+### 背景
+
+各链 provider 已提供 `getAddressTypes`。wallet 层需要统一查询入口，供 pickWallet 与上层调用获取链能力。
+
+### 本次目标（只做一个切片）
+
+1. 在 wallet 暴露 `getAddressTypes` 接口
+2. 支持按单链查询：`wallet.getAddressTypes({ chain })`
+3. 支持全链查询：`wallet.getAddressTypes()` 返回所有已注册链能力
+4. provider 未实现时使用默认 `default`
+
+### 验收标准
+
+1. 单链查询返回 `{ ok, chain, addressTypes }`
+2. 全链查询返回 `{ ok, items: [{ chain, addressTypes }] }`
+3. 未注册链查询明确报错
+4. 不影响现有 wallet/provider 功能
+
+## 新增切片：S-W-7 pickWallet chains=all 与 addressTypes=all
+
+### 背景
+
+pickWallet 需要支持两种能力展开：
+
+1. `chains: "all"`：按已注册链能力展开
+2. `{ chain, addressTypes: "all" }`：按该链支持的全部地址类型展开
+
+### 本次目标（只做一个切片）
+
+1. 在 `wallet.pickWallet` 内部支持 `chains: "all"`
+2. 支持单链 `addressTypes: "all"`
+3. 对 `default` 类型做非 typed 处理（避免 evm/trx 被当作 typed）
+4. 保持 path 透传规则不变（有 path 透传，无 path 默认匹配）
+
+### 验收标准
+
+1. `chains: "all"` 能返回所有已注册链结果
+2. `btc + addressTypes: "all"` 返回 BTC 全类型地址数组
+3. evm/trx 的 `default` 不走 typed 分支
+4. 现有 pickWallet 相关测试继续通过
+
+## 新增切片：S-W-8 pickWallet 输出参数化到资产搜索入参
+
+### 背景
+
+当前已可通过 `pickWallet` 获得可操作地址集合。下一步需要一个最小参数化函数，把 pick 结果转换为下游资产搜索接口可直接消费的请求结构。
+
+### 本次目标（只做一个切片）
+
+1. 在 `src/run/test.mjs` 增加 `buildAssetSearchInputsFromPicked`（纯函数）
+2. 支持 `addresses[chain]` 两种结构：
+   - 单地址字符串（evm/trx）
+   - typed 地址数组（btc）
+3. 统一产出搜索请求：`{ domain: "address", query, network, limit, chain, addressType }`
+4. 在 `src/run/test.mjs` 增加最小演示调用：从 `pickedWalletsBtcAllTypes` 构建并执行资产搜索
+
+### 验收标准
+
+1. 参数化函数对字符串地址和 typed 地址都可产出有效请求
+2. 同地址请求去重（按 `network + query`）
+3. 资产搜索调用失败不阻断主流程（仅记录 warning）
+4. 调试输出可见：请求列表 + 每条请求返回数量
+
+## 新增切片：S-W-9 chains=default 只读已有地址
+
+### 背景
+
+当前 `pickWallet` 在非 typed 链请求下，如果树中该链地址缺失，会回退到 `getSigner().getAddress()` 自动补算地址。现在需要按 `chains` 配置区分语义：`chains: "all"` 与显式链数组（如 `["evm","trx"]`）都允许生成；只有 `chains: "default"` 时只读取 tree 上已有地址，不新增地址。
+
+### 本次目标（只做一个切片）
+
+1. 当 `chains: "default"` 时，只返回 tree 中已有地址
+2. 若该链无已有地址，则返回空数组，不调用 `getSigner`
+3. `chains: "all"` 与显式链数组继续按链能力生成结果
+4. typed 模式（如 BTC 多地址类型）保持现有生成逻辑不变
+
+### 验收标准
+
+1. `chains: "default"` 且树中已有地址时，直接返回已有地址
+2. `chains: "default"` 且树中无已有地址时，返回空数组
+3. `chains: ["evm","trx"]` 与 `chains: "all"` 时，default 链仍可生成
+4. `btc + addressTypes: "all"` 仍可按 typed 模式生成

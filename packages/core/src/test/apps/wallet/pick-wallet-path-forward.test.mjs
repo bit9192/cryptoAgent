@@ -6,6 +6,13 @@ import { createPickWalletOps } from "../../../apps/wallet/pick-wallet.mjs";
 test("pickWallet: 透传 path，缺失 path 时保持默认匹配", async () => {
   const calls = [];
   const ops = createPickWalletOps({
+    getAddressTypes: async () => ({
+      ok: true,
+      items: [
+        { chain: "evm", addressTypes: ["default"] },
+        { chain: "btc", addressTypes: ["p2wpkh", "p2tr"] },
+      ],
+    }),
     getSigner: async () => ({
       async getAddress(options = {}) {
         calls.push(options);
@@ -21,10 +28,7 @@ test("pickWallet: 透传 path，缺失 path 时保持默认匹配", async () => 
     scope: "all",
     selectors: { keyId: "k-1" },
     outps: {
-      chains: [
-        "evm",
-        { chain: "btc", addressTypes: ["p2wpkh", "p2tr"] },
-      ],
+      chains: "all",
     },
   };
 
@@ -35,7 +39,7 @@ test("pickWallet: 透传 path，缺失 path 时保持默认匹配", async () => 
         name: "n",
         sourceName: "s",
         keyType: "private",
-        sourceType: "derive",
+        sourceType: "import",
         path: "m/44'/60'/0'/0/3",
         addresses: {},
       },
@@ -44,7 +48,7 @@ test("pickWallet: 透传 path，缺失 path 时保持默认匹配", async () => 
         name: "n",
         sourceName: "s",
         keyType: "private",
-        sourceType: "derive",
+        sourceType: "import",
         path: null,
         addresses: {},
       },

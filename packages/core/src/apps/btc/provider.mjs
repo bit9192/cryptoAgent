@@ -170,6 +170,7 @@ function psbtBase64ToHex(psbtBase64) {
 // ── Provider 工厂 ──────────────────────────────────────────────────────────────
 export function createBtcProvider(options = {}) {
   const version = String(options.version ?? "1.0.0");
+  const addressTypes = ["p2pkh", "p2sh-p2wpkh", "p2wpkh", "p2tr"];
   const operations = Array.from(new Set([
     "getAddress",
     "getPublicKey",
@@ -184,6 +185,9 @@ export function createBtcProvider(options = {}) {
     chain: "btc",
     version,
     operations,
+    getAddressTypes() {
+      return [...addressTypes];
+    },
     supports(operation) {
       return operations.includes(String(operation ?? ""));
     },

@@ -128,6 +128,42 @@ export function createWallet(options = {}) {
   const listChains = providerOps.listChains;
   const supports = providerOps.supports;
 
+  function normalizeAddressTypesFromProvider(provider) {
+    if (provider && typeof provider.getAddressTypes === "function") {
+      const types = provider.getAddressTypes();
+      if (Array.isArray(types)) {
+        return Array.from(new Set(types.map((v) => String(v).trim()).filter(Boolean)));
+      }
+    }
+    return ["default"];
+  }
+
+  async function getAddressTypes(input = {}) {
+    const chain = String(input?.chain ?? "").trim().toLowerCase();
+
+    if (chain) {
+      const provider = providerRegistry.get(chain);
+      if (!provider) {
+        throw new Error(`chain provider 未注册: ${chain}`);
+      }
+      return {
+        ok: true,
+        chain,
+        addressTypes: normalizeAddressTypesFromProvider(provider),
+      };
+    }
+
+    const items = [...providerRegistry.entries()].map(([registeredChain, provider]) => ({
+      chain: registeredChain,
+      addressTypes: normalizeAddressTypesFromProvider(provider),
+    }));
+
+    return {
+      ok: true,
+      items,
+    };
+  }
+
   function getAddressCacheBucket(keyId, chain) {
     const bucketId = `${keyId}:${chain}`;
     let bucket = signerAddressCache.get(bucketId);
@@ -444,6 +480,7 @@ export function createWallet(options = {}) {
       const { signer } = await getSigner({ chain, keyId });
       return signer;
     },
+    getAddressTypes: async (input = {}) => getAddressTypes(input),
   });
 
   async function pickWallet(request = {}, tree = {}) {
@@ -870,6 +907,7 @@ export function createWallet(options = {}) {
     registerProvider,
     listChains,
     supports,
+    getAddressTypes,
     getSigner,
     pickWallet,
     deriveConfiguredAddresses,

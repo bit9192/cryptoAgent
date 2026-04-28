@@ -78,6 +78,7 @@ function localSignTrxTransaction(tx, privateKeyHex) {
 
 export function createTrxProvider(options = {}) {
   const version = String(options.version ?? "1.0.0");
+  const addressTypes = ["default"];
   const operationList = ["getAddress", "signMessage", "signTransaction", "sendTransaction"];
   const operations = Array.from(new Set([...(options.operations ?? operationList)]));
 
@@ -85,6 +86,9 @@ export function createTrxProvider(options = {}) {
     chain: "trx",
     version,
     operations,
+    getAddressTypes() {
+      return [...addressTypes];
+    },
     supports(operation) {
       return operations.includes(String(operation ?? ""));
     },

@@ -67,6 +67,7 @@ export function wrapEvmSignerAsEthersSigner(input = {}) {
 
 export function createEvmProvider(options = {}) {
   const version = String(options.version ?? "1.0.0");
+  const addressTypes = ["default"];
   const operationList = [
     "getAddress",
     "signMessage",
@@ -79,6 +80,9 @@ export function createEvmProvider(options = {}) {
     chain: "evm",
     version,
     operations,
+    getAddressTypes() {
+      return [...addressTypes];
+    },
     supports(operation) {
       return operations.includes(String(operation ?? ""));
     },
