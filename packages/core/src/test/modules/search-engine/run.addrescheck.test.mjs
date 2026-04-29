@@ -7,7 +7,7 @@
 
 import { readFileSync } from "node:fs";
 
-import { searchAddressCheckTask } from "../../../tasks/search/index.mjs";
+import { createDefaultSearchEngine } from "../../../modules/search-engine/index.mjs";
 
 function parseAddressSection(text) {
 	const lines = String(text ?? "").split(/\r?\n/);
@@ -57,6 +57,7 @@ function formatTopCandidate(row) {
 }
 
 async function main() {
+	const engine = createDefaultSearchEngine();
 	const raw = readFileSync(new URL("./test.data.md", import.meta.url), "utf8");
 	const addresses = parseAddressSection(raw);
 
@@ -65,17 +66,16 @@ async function main() {
 
 	for (const address of addresses) {
 		try {
-			const result = await searchAddressCheckTask({
+			const result = await engine.resolveAddressContext({
 				query: address,
-				timeoutMs: 15000,
 			});
 
-			if (!result?.ok) {
+			if (result?.ok === false) {
 				console.log(`✗ ${shortAddress(address)} error=${String(result?.error ?? "unknown")}`);
 				continue;
 			}
 
-			const candidates = Array.isArray(result.candidates) ? result.candidates : [];
+			const candidates = Array.isArray(result?.items) ? result.items : [];
 			const top = candidates[0] ?? null;
 			console.log(`✓ ${shortAddress(address)} hits=${candidates.length} top=${formatTopCandidate(top)}`);
 		} catch (error) {

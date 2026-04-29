@@ -135,6 +135,36 @@
    - `fork -> [nile]`
 7. search/task/run 统一通过注册链接口拿 networks，不再自己拼默认值
 
+执行子步骤（防遗忘，按顺序推进；每次开发只做一个子步骤）：
+
+1. S-18.1：定义公共接口与注册表
+   - 定义 `ChainNetworkScopeProvider` 结构与校验
+   - 提供 `register/list/get` 三个注册表 API
+2. S-18.2：各链实现 provider（链内实现，不进 search/task）
+   - EVM provider：从 `apps/evm/configs/networks.js` 动态解析 `mainnet/testnet/fork`
+   - BTC provider：从 `apps/btc/config/networks.js` 解析 `mainnet/testnet/fork`
+   - TRX provider：从 `apps/trx/config/networks.js` 解析 `mainnet/testnet/fork`
+3. S-18.3：替换 task/search 的中心硬编码
+   - 移除 task/search 中 `btc/evm/trx` 分支网络映射
+   - 改为 `chain -> registry provider -> resolveScopeNetworks(scope)`
+4. S-18.4：run 与测试回归
+   - run/test 输入只传 `chain + scope` 或标准 network
+   - 不再在 run/test 内写链默认值
+
+架构禁止项（必须长期满足）：
+
+1. `search`/`wallet`/`task` 中禁止出现硬编码链名分支（`if chain===btc/evm/trx`、固定链集合）。
+2. `search`/`wallet` 中禁止实现链专属 network 解释逻辑。
+3. 新增链时禁止改 search/wallet 中央逻辑；仅允许新增链模块与注册。
+4. `mainnet/testnet/fork` 解释必须在各链 network 配置与该链接口内完成。
+
+本阶段回归清单（每个子步骤完成后都要跑）：
+
+1. `src/test/tasks/search/search.test.mjs`
+2. `src/test/modules/search-engine/address-assets-batch.task.test.mjs`
+3. `src/test/modules/search-engine/address-context.test.mjs`
+4. `src/test/modules/search-engine/token-search/token-search.test.mjs`
+
 本次不做：
 
 1. facade 下沉或 task 重构
@@ -161,6 +191,7 @@
 3. search/task/run 不再保留 `evm -> bsc`、`btc/trx -> mainnet` 这类硬编码默认值
 4. 后续 `build-from-picked` 只消费链接口结果，不理解链细节
 5. 理论上新增新链只需新增并注册一个 `ChainNetworkScopeProvider`
+6. 对三链 network 配置的读取是动态的，不依赖 task/search 中央常量
 
 ### Slice S-7：EVM search provider 注册注入到中心 SearchEngine
 
@@ -386,6 +417,23 @@
 1. `searchAddressAssetsTaskWithEngine` 默认不会调用价格查询函数。
 2. `searchAddressValuationTask*` 和 `searchPortfolioValuationTask*` 可返回估值结果。
 3. `searchPortfolioTaskWithEngine(withPrice=true)` 在多地址场景下只触发一次价格批量查询。
+
+### Slice S-19：run 脚本切换到 search-engine 直连入口（当前切片）
+
+本次只做：
+
+1. 将 `run.addrescheck.test.mjs` 从 `tasks/search` 入口切换到 `createDefaultSearchEngine().resolveAddressContext()`。
+2. 保持脚本输出结构兼容（`hits/top`）。
+
+本次不做：
+
+1. 将所有 run 脚本一次性迁移到 search-engine。
+2. 改动价格/估值/批量余额 task 入口。
+
+验收标准：
+
+1. `node src/test/modules/search-engine/run.addrescheck.test.mjs` 可执行。
+2. 地址判定输出保持可读，且不依赖 `searchAddressCheckTask`。
 
 ### Slice S-22：地址批量资产列表查询专用脚本（run.asset）
 
