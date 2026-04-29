@@ -305,10 +305,21 @@ function normalizeBalanceValue(value) {
   return text === "" ? null : text;
 }
 
+function resolveBatchReaderOverride(options = {}, chain) {
+  const directReaders = options?.batchReaders && typeof options.batchReaders === "object"
+    ? options.batchReaders
+    : null;
+  const directHit = directReaders?.[chain];
+  if (typeof directHit === "function") {
+    return directHit;
+  }
+
+  const legacyKey = `${chain}BatchReader`;
+  return typeof options?.[legacyKey] === "function" ? options[legacyKey] : null;
+}
+
 async function runEvmBatchBalance(rows, options = {}) {
-  const reader = typeof options?.evmBatchReader === "function"
-    ? options.evmBatchReader
-    : queryEvmTokenBalanceBatch;
+  const reader = resolveBatchReaderOverride(options, "evm") ?? queryEvmTokenBalanceBatch;
   const payload = rows.map((row) => ({
     address: row.address,
     token: row.token,
@@ -332,9 +343,7 @@ async function runEvmBatchBalance(rows, options = {}) {
 }
 
 async function runTrxBatchBalance(rows, options = {}) {
-  const reader = typeof options?.trxBatchReader === "function"
-    ? options.trxBatchReader
-    : queryTrxTokenBalanceBatch;
+  const reader = resolveBatchReaderOverride(options, "trx") ?? queryTrxTokenBalanceBatch;
   const payload = rows.map((row) => ({
     address: row.address,
     token: row.token,
@@ -358,9 +367,7 @@ async function runTrxBatchBalance(rows, options = {}) {
 }
 
 async function runBtcBatchBalance(rows, options = {}) {
-  const reader = typeof options?.btcBatchReader === "function"
-    ? options.btcBatchReader
-    : brc20BalanceBatchGet;
+  const reader = resolveBatchReaderOverride(options, "btc") ?? brc20BalanceBatchGet;
   const payload = rows.map((row) => ({
     address: row.address,
     token: row.token,
@@ -382,6 +389,12 @@ async function runBtcBatchBalance(rows, options = {}) {
     };
   });
 }
+
+const BATCH_BALANCE_RUNNERS = Object.freeze({
+  evm: runEvmBatchBalance,
+  trx: runTrxBatchBalance,
+  btc: runBtcBatchBalance,
+});
 
 export async function searchAddressTokenBalancesBatchTaskWithEngine(input = {}, _engine, options = {}) {
   const pairs = normalizeBatchPairs(input);
@@ -405,14 +418,10 @@ export async function searchAddressTokenBalancesBatchTaskWithEngine(input = {}, 
   const output = new Array(pairs.length);
   for (const [key, rows] of grouped.entries()) {
     const [chain] = key.split(":");
-    let results = [];
-    if (chain === "evm") {
-      results = await runEvmBatchBalance(rows, options);
-    } else if (chain === "trx") {
-      results = await runTrxBatchBalance(rows, options);
-    } else {
-      results = await runBtcBatchBalance(rows, options);
-    }
+    const runner = BATCH_BALANCE_RUNNERS[chain];
+    const results = typeof runner === "function"
+      ? await runner(rows, options)
+      : [];
 
     for (let i = 0; i < rows.length; i += 1) {
       const index = rows[i].index;
