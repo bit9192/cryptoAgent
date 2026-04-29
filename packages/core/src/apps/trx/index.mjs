@@ -39,3 +39,4 @@ export {
 	resolveTrxToken,
 } from "./config/tokens.js";
 export { runTrxAddressPipeline } from "./search/address-pipeline.mjs";
+export { buildTrxAssetValuationInput } from "./search/valuation.mjs";

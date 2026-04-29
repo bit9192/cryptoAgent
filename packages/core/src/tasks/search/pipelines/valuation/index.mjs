@@ -1,16 +1,20 @@
 import { buildEvmAssetValuationInput } from "./evm.mjs";
 import { buildBtcAssetValuationInput } from "./btc.mjs";
-import { buildTrxAssetValuationInput } from "./trx.mjs";
+import { buildTrxAssetValuationInput } from "../../../../apps/trx/search/valuation.mjs";
 
 function normalizeLower(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
+const VALUATION_BUILDERS = Object.freeze({
+  evm: buildEvmAssetValuationInput,
+  btc: buildBtcAssetValuationInput,
+  trx: buildTrxAssetValuationInput,
+});
+
 export function buildAssetValuationInput(chain, asset = {}, network = null) {
-  const c = normalizeLower(chain);
-  if (c === "evm") return buildEvmAssetValuationInput(asset, network);
-  if (c === "btc") return buildBtcAssetValuationInput(asset, network);
-  if (c === "trx") return buildTrxAssetValuationInput(asset, network);
+  const builder = VALUATION_BUILDERS[normalizeLower(chain)];
+  if (typeof builder === "function") return builder(asset, network);
 
   return {
     quantity: 0,
