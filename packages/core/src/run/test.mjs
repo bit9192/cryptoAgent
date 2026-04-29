@@ -25,113 +25,83 @@ function toJsonSafe(value) {
   );
 }
 
-function mapChainToSearchNetwork(chain) {
-  const normalized = String(chain ?? "").trim().toLowerCase();
-  if (normalized === "evm") return "eth";
-  return normalized;
-}
-
-function buildAssetSearchInputsFromPicked(pickedWallets = [], options = {}) {
-  const limit = Number(options.limit ?? 20);
-  const rows = [];
+async function runAssetSearchDemoFromPicked(pickedWallets = []) {
+  let requests = [];
   const dedup = new Set();
-
   for (const picked of Array.isArray(pickedWallets) ? pickedWallets : []) {
     const addresses = picked?.addresses && typeof picked.addresses === "object" ? picked.addresses : {};
-    for (const [chain, value] of Object.entries(addresses)) {
-      const network = mapChainToSearchNetwork(chain);
-
+    for (const value of Object.values(addresses)) {
       if (typeof value === "string") {
         const query = value.trim();
-        if (!query) continue;
-        const dedupKey = `${network}:${query}`;
-        if (dedup.has(dedupKey)) continue;
-        dedup.add(dedupKey);
-        rows.push({
-          domain: "address",
-          query,
-          network,
-          limit,
-          chain,
-          keyId: picked?.keyId,
-          name: picked?.name,
-          sourceName: picked?.sourceName,
-        });
+        if (!query || dedup.has(query)) continue;
+        dedup.add(query);
+        requests.push({ query });
         continue;
       }
-
       if (Array.isArray(value)) {
         for (const item of value) {
           const query = String(item?.address ?? "").trim();
-          if (!query) continue;
-          const addressType = String(item?.type ?? "").trim() || undefined;
-          const dedupKey = `${network}:${query}`;
-          if (dedup.has(dedupKey)) continue;
-          dedup.add(dedupKey);
-          rows.push({
-            domain: "address",
-            query,
-            network,
-            limit,
-            chain,
-            addressType,
-            keyId: picked?.keyId,
-            name: picked?.name,
-            sourceName: picked?.sourceName,
-          });
+          if (!query || dedup.has(query)) continue;
+          dedup.add(query);
+          requests.push({ query });
         }
       }
     }
   }
 
-  return rows;
-}
+  requests = requests.slice(0, 1);
+  info(`address-search requests: ${requests.length}`);
 
-async function runAssetSearchDemoFromPicked(pickedWallets = [], options = {}) {
-  const searchInputs = buildAssetSearchInputsFromPicked(pickedWallets, {
-    limit: options.limit ?? 20,
-  });
+  const engine = createDefaultSearchEngine();
+  const settled = await Promise.allSettled(
+    requests.map((req) => engine.search({
+      domain: "address",
+      query: req.query,
+      limit: 200,
+      timeoutMs: 10000,
+    })),
+  );
 
-  info(`asset-search requests: ${searchInputs.length}`);
-  console.log("\n--- Parametrized asset-search requests ---");
-  console.log(toJsonSafe(searchInputs));
-//   return
-  const searchEngine = options.searchEngine ?? createDefaultSearchEngine();
-  const search = typeof searchEngine?.search === "function" ? searchEngine.search.bind(searchEngine) : null;
-  if (!search) {
-    error("searchEngine.search 不可用，跳过下游资产搜索");
-    return [];
-  }
-
-  const maxRequests = Number(options.maxRequests ?? 3);
-  const requests = searchInputs.slice(0, Math.max(0, maxRequests));
-  const settled = await Promise.allSettled(requests.map((input) => search(input)));
-
-  const summary = settled.map((item, index) => {
-    const req = requests[index];
-    if (item.status === "fulfilled") {
-      const result = item.value;
-      const count = Array.isArray(result?.items) ? result.items.length : 0;
+  const items = settled.map((result, index) => {
+    const req = requests[index] ?? { query: "" };
+    if (result.status === "rejected") {
       return {
-        ok: true,
-        network: req.network,
+        ok: false,
         query: req.query,
-        addressType: req.addressType,
-        count,
+        network: null,
+        assets: [],
+        totalValueUsd: 0,
+        error: result.reason?.message ?? String(result.reason ?? "unknown"),
       };
     }
+
+    const candidates = Array.isArray(result.value?.candidates) ? result.value.candidates : [];
     return {
-      ok: false,
-      network: req.network,
+      ok: true,
       query: req.query,
-      addressType: req.addressType,
-      error: item.reason?.message ?? String(item.reason ?? "unknown error"),
+      network: candidates[0]?.network ?? null,
+      assets: candidates,
+      totalValueUsd: 0,
+      error: null,
     };
   });
 
-  console.log("\n--- Asset-search result summary ---");
-  console.log(toJsonSafe(summary));
-  return summary;
+  const success = items.filter((item) => item?.ok).length;
+  const failed = items.length - success;
+  const batchResult = {
+    ok: failed === 0,
+    items,
+    summary: {
+      total: items.length,
+      success,
+      failed,
+    },
+  };
+
+  console.log("\n--- search(address) batch result ---");
+  const result = batchResult;
+  console.log(toJsonSafe(result));
+  return result;
 }
 
 async function resolveWalletTree(options = {}) {
@@ -206,22 +176,23 @@ async function testDebugPickAddressFromInputs(options) {
     scope: "all",
     selectors: {
     //   name: "",
-    sourceName: "meer",
-      source: "derive"
+        // sourceName: "meer",
+        // source: "derive"
     },
     outps: {
       signer: true,
     //   existingOnly: false,
     //   chains: "all"
     //   chains: "default"
-    //   chains: ["evm"]
-      chains: [
-        "trx",
-        // {
-        //   chain: "btc",
-        //   addressTypes: "all",
-        // },
-      ],
+      chains: ["evm"]
+    //   chains: [
+    //     // "trx",
+    //     "evm"
+    //     // {
+    //     //   chain: "btc",
+    //     //   addressTypes: "all",
+    //     // },
+    //   ],
     },
   };
 
@@ -245,11 +216,7 @@ async function testDebugPickAddressFromInputs(options) {
   console.log(toJsonSafe(pickedWalletsBtcAllTypes));
 
   divider("调试 C: pick 结果参数化并调用资产搜索");
-  await runAssetSearchDemoFromPicked(pickedWalletsBtcAllTypes, {
-    searchEngine: options?.searchEngine,
-    limit: 20,
-    maxRequests: 2,
-  });
+  await runAssetSearchDemoFromPicked(pickedWalletsBtcAllTypes);
 }
 
 // ─── 主程序 ───────────────────────────────────────────────────
