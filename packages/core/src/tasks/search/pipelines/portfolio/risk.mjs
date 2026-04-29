@@ -1,36 +1,36 @@
+import { extractEvmPortfolioRiskFlags } from "../../../../apps/evm/search/risk.mjs";
+
 function normalizeLower(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-function toNumber(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
+const PORTFOLIO_RISK_EXTRACTORS = Object.freeze({
+  evm: extractEvmPortfolioRiskFlags,
+});
 
 export function extractPortfolioRiskFlags(payload = {}) {
-  const address = String(payload?.address ?? "").trim() || null;
   const assets = Array.isArray(payload?.assets) ? payload.assets : [];
-  const out = [];
+  if (assets.length === 0) {
+    return [];
+  }
 
+  const grouped = new Map();
   for (const asset of assets) {
     const chain = normalizeLower(asset?.chain);
-    if (chain !== "evm") continue;
+    if (!chain) continue;
+    const list = grouped.get(chain) ?? [];
+    list.push(asset);
+    grouped.set(chain, list);
+  }
 
-    const valuation = asset?.extra?.valuation && typeof asset.extra.valuation === "object"
-      ? asset.extra.valuation
-      : {};
-    const quantity = toNumber(valuation?.quantity);
-    const priceUsd = toNumber(valuation?.priceUsd);
-    if (quantity > 0 && priceUsd === 0) {
-      out.push({
-        chain,
-        network: String(asset?.network ?? "").trim() || null,
-        address,
-        asset: String(asset?.symbol ?? asset?.title ?? "ASSET").trim(),
-        tokenAddress: String(asset?.tokenAddress ?? "").trim() || null,
-        reason: "price=0",
-      });
-    }
+  const out = [];
+  for (const [chain, chainAssets] of grouped.entries()) {
+    const extractor = PORTFOLIO_RISK_EXTRACTORS[chain];
+    if (typeof extractor !== "function") continue;
+    out.push(...extractor({
+      ...payload,
+      assets: chainAssets,
+    }));
   }
 
   return out;
