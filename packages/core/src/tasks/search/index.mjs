@@ -231,6 +231,19 @@ const BATCH_CHAIN_NETWORK_RESOLVERS = Object.freeze({
   }),
 });
 
+const DEFAULT_BATCH_NETWORK_BY_CHAIN = Object.freeze(
+  Object.fromEntries(
+    Object.entries(BATCH_CHAIN_NETWORK_RESOLVERS).map(([chain, resolver]) => [
+      chain,
+      resolveFirstNetworkByScope(resolver, "default"),
+    ]),
+  ),
+);
+
+function resolveBatchDefaultNetwork(chain) {
+  return DEFAULT_BATCH_NETWORK_BY_CHAIN[chain] || "";
+}
+
 function resolveFirstNetworkByScope(chainResolver, scope) {
   const networks = chainResolver.listNetworksByScope(scope);
   if (Array.isArray(networks) && networks.length > 0) {
@@ -300,7 +313,7 @@ async function runEvmBatchBalance(rows, options = {}) {
     address: row.address,
     token: row.token,
   }));
-  const res = await reader(payload, { network: rows[0]?.network || "eth" });
+  const res = await reader(payload, { network: rows[0]?.network || resolveBatchDefaultNetwork("evm") });
   const items = Array.isArray(res?.items) ? res.items : [];
   return rows.map((row, i) => {
     const item = items[i] ?? null;
@@ -326,7 +339,7 @@ async function runTrxBatchBalance(rows, options = {}) {
     address: row.address,
     token: row.token,
   }));
-  const res = await reader(payload, { network: rows[0]?.network || "mainnet" });
+  const res = await reader(payload, { network: rows[0]?.network || resolveBatchDefaultNetwork("trx") });
   const items = Array.isArray(res?.items) ? res.items : [];
   return rows.map((row, i) => {
     const item = items[i] ?? null;
@@ -352,7 +365,7 @@ async function runBtcBatchBalance(rows, options = {}) {
     address: row.address,
     token: row.token,
   }));
-  const res = await reader(payload, rows[0]?.network || "mainnet");
+  const res = await reader(payload, rows[0]?.network || resolveBatchDefaultNetwork("btc"));
   const items = Array.isArray(res?.items) ? res.items : [];
   return rows.map((row, i) => {
     const item = items[i] ?? null;
@@ -886,7 +899,18 @@ export async function searchTokenPriceBatchTask(input = {}) {
 
 // ─── Token Fuzzy Search ───────────────────────────────────────────────────────
 
-const DEFAULT_FUZZY_NETWORKS = ["eth", "bsc", "mainnet"];
+function listDefaultFuzzyNetworks() {
+  const merged = [
+    ...listEvmNetworksByScope("default"),
+    ...listBtcNetworksByScope("default"),
+    ...listTrxNetworksByScope("default"),
+  ]
+    .map((item) => normalizeString(item))
+    .filter(Boolean);
+  return [...new Set(merged)];
+}
+
+const DEFAULT_FUZZY_NETWORKS = Object.freeze(listDefaultFuzzyNetworks());
 
 /**
  * 模糊跨链 token 发现
