@@ -1,6 +1,6 @@
 import { resolveAddressPipelineConfig } from "./config.mjs";
 import { runEvmAddressPipeline } from "./evm.mjs";
-import { runTrxAddressPipeline } from "./trx.mjs";
+import { runTrxAddressPipeline } from "../../../../apps/trx/search/address-pipeline.mjs";
 import { runBtcAddressPipeline } from "./btc.mjs";
 
 function normalizeLower(value) {
