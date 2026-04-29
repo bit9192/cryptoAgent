@@ -36,10 +36,18 @@
 2. `search.test.mjs` 的批量余额相关测试继续通过。
 3. 受影响的 search task 回归无新增失败。
 
-### Slice TS-2：估值 helper 注册表化
+### Slice TS-2：批量余额实现下沉到链模块（当前切片）
 
-1. 将 task 层对各链 valuation helper 的依赖统一收敛到注册表。
-2. 保持 `buildAssetValuationInput()` 为链无关分发表达。
+本次只做：
+
+1. 将 EVM / BTC / TRX 的 batch-balance 实现迁移到各自 `apps/*/search/`。
+2. task 层只保留 reader override 解析与按 `chain` 分发。
+3. 保留现有批量余额测试和 mock 注入方式。
+
+验收标准：
+
+1. `tasks/search/index.mjs` 不再包含三链 batch-balance 具体实现。
+2. `search.test.mjs` 相关测试继续通过。
 
 ### Slice TS-3：portfolio risk extractor 注册表化
 
@@ -52,8 +60,10 @@
 
 1. ✅ address pipeline 已迁移到 `apps/evm|btc|trx/search/address-pipeline.mjs`
 2. ✅ valuation builder 已迁移到 `apps/evm|btc|trx/search/valuation.mjs`
-3. 🔄 当前切片：TS-1 批量余额 reader 注册表化
+3. ✅ TS-1 完成：批量余额 runner 注册表化
+4. ✅ TS-3 完成：portfolio risk extractor 注册表化
+5. 🔄 当前切片：TS-2 批量余额实现下沉到链模块
 
 下一步：
 
-1. 完成 TS-1 后，进入 TS-2（估值 helper 注册表化的 task 清理）
+1. 完成 TS-2 后，继续清理 task 层其余链实现残留

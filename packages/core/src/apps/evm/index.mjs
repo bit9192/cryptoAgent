@@ -54,5 +54,6 @@ export {
 	queryAddressBalance,
 } from "./search/address-search.mjs";
 export { runEvmAddressPipeline } from "./search/address-pipeline.mjs";
+export { runEvmBatchBalance } from "./search/batch-balance.mjs";
 export { buildEvmAssetValuationInput } from "./search/valuation.mjs";
 export { extractEvmPortfolioRiskFlags } from "./search/risk.mjs";

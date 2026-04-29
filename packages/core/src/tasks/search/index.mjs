@@ -1,8 +1,8 @@
 import { createDefaultSearchEngine } from "../../modules/search-engine/index.mjs";
 import { queryTokenPriceLiteBatchByQuery } from "../../apps/offchain/token-price/query-token-price.mjs";
-import { queryEvmTokenBalanceBatch } from "../../apps/evm/assets/balance-batch.mjs";
-import { queryTrxTokenBalanceBatch } from "../../apps/trx/assets/balance-batch.mjs";
-import { brc20BalanceBatchGet } from "../../apps/btc/assets/brc20-balance-batch.mjs";
+import { runEvmBatchBalance } from "../../apps/evm/search/batch-balance.mjs";
+import { runTrxBatchBalance } from "../../apps/trx/search/batch-balance.mjs";
+import { runBtcBatchBalance } from "../../apps/btc/search/batch-balance.mjs";
 import { normalizeEvmNetworkName, listEvmNetworksByScope } from "../../apps/evm/configs/networks.js";
 import { normalizeBtcNetworkName, listBtcNetworksByScope } from "../../apps/btc/config/networks.js";
 import { normalizeTrxNetworkName, listTrxNetworksByScope } from "../../apps/trx/config/networks.js";
@@ -298,13 +298,6 @@ function normalizeBatchPairs(input = {}) {
   });
 }
 
-function normalizeBalanceValue(value) {
-  if (typeof value === "bigint") return value.toString();
-  if (value == null) return null;
-  const text = String(value).trim();
-  return text === "" ? null : text;
-}
-
 function resolveBatchReaderOverride(options = {}, chain) {
   const directReaders = options?.batchReaders && typeof options.batchReaders === "object"
     ? options.batchReaders
@@ -316,78 +309,6 @@ function resolveBatchReaderOverride(options = {}, chain) {
 
   const legacyKey = `${chain}BatchReader`;
   return typeof options?.[legacyKey] === "function" ? options[legacyKey] : null;
-}
-
-async function runEvmBatchBalance(rows, options = {}) {
-  const reader = resolveBatchReaderOverride(options, "evm") ?? queryEvmTokenBalanceBatch;
-  const payload = rows.map((row) => ({
-    address: row.address,
-    token: row.token,
-  }));
-  const res = await reader(payload, { network: rows[0]?.network || resolveBatchDefaultNetwork("evm") });
-  const items = Array.isArray(res?.items) ? res.items : [];
-  return rows.map((row, i) => {
-    const item = items[i] ?? null;
-    return {
-      ok: true,
-      chain: "evm",
-      network: row.network,
-      address: row.address,
-      token: row.token,
-      ownerAddress: item?.ownerAddress ?? row.address,
-      tokenAddress: item?.tokenAddress ?? row.token,
-      rawBalance: normalizeBalanceValue(item?.balance),
-      error: null,
-    };
-  });
-}
-
-async function runTrxBatchBalance(rows, options = {}) {
-  const reader = resolveBatchReaderOverride(options, "trx") ?? queryTrxTokenBalanceBatch;
-  const payload = rows.map((row) => ({
-    address: row.address,
-    token: row.token,
-  }));
-  const res = await reader(payload, { network: rows[0]?.network || resolveBatchDefaultNetwork("trx") });
-  const items = Array.isArray(res?.items) ? res.items : [];
-  return rows.map((row, i) => {
-    const item = items[i] ?? null;
-    return {
-      ok: item?.ok !== false,
-      chain: "trx",
-      network: row.network,
-      address: row.address,
-      token: row.token,
-      ownerAddress: item?.ownerAddress ?? row.address,
-      tokenAddress: item?.tokenAddress ?? row.token,
-      rawBalance: normalizeBalanceValue(item?.balance),
-      error: item?.ok === false ? (item?.error ?? "unknown") : null,
-    };
-  });
-}
-
-async function runBtcBatchBalance(rows, options = {}) {
-  const reader = resolveBatchReaderOverride(options, "btc") ?? brc20BalanceBatchGet;
-  const payload = rows.map((row) => ({
-    address: row.address,
-    token: row.token,
-  }));
-  const res = await reader(payload, rows[0]?.network || resolveBatchDefaultNetwork("btc"));
-  const items = Array.isArray(res?.items) ? res.items : [];
-  return rows.map((row, i) => {
-    const item = items[i] ?? null;
-    return {
-      ok: item?.ok !== false,
-      chain: "btc",
-      network: row.network,
-      address: row.address,
-      token: row.token,
-      ownerAddress: item?.address ?? row.address,
-      tokenAddress: item?.tokenAddress ?? row.token,
-      rawBalance: normalizeBalanceValue(item?.balance),
-      error: item?.ok === false ? (item?.error ?? "unknown") : null,
-    };
-  });
 }
 
 const BATCH_BALANCE_RUNNERS = Object.freeze({
@@ -420,7 +341,10 @@ export async function searchAddressTokenBalancesBatchTaskWithEngine(input = {}, 
     const [chain] = key.split(":");
     const runner = BATCH_BALANCE_RUNNERS[chain];
     const results = typeof runner === "function"
-      ? await runner(rows, options)
+      ? await runner(rows, {
+        batchReader: resolveBatchReaderOverride(options, chain),
+        defaultNetwork: resolveBatchDefaultNetwork(chain),
+      })
       : [];
 
     for (let i = 0; i < rows.length; i += 1) {

@@ -40,4 +40,5 @@ export {
 	createBrc20,
 } from "./brc20.mjs";
 export { runBtcAddressPipeline } from "./search/address-pipeline.mjs";
+export { runBtcBatchBalance } from "./search/batch-balance.mjs";
 export { buildBtcAssetValuationInput } from "./search/valuation.mjs";
