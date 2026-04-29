@@ -100,3 +100,36 @@ bsc: usdt bnb folk cake
 
 ## fuzzy
 fxs, cvx, aave
+
+## network scope config
+
+### chain provider contract
+
+- input: `chain + scope`
+- output: `networks[]`
+- search/task/run must not map scope by chain themselves
+
+### btc provider
+
+- mainnet -> [mainnet]
+- testnet -> [testnet]
+- fork -> [regtest]
+
+### trx provider
+
+- mainnet -> [mainnet]
+- testnet -> [nile]
+- fork -> [nile]
+
+### evm provider
+
+- mainnet -> from config dynamic list, expected includes eth / bsc
+- testnet -> [fork]
+- fork -> [fork]
+
+### config rules
+
+- per-chain scope expansion belongs to chain provider, not search central switch
+- EVM mainnet networks must be generated from config metadata, not hardcoded in task/run/search
+- scope means environment class, not always equal to final network name
+- adding a new chain should require provider registration only

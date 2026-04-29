@@ -205,3 +205,27 @@ description: "Use when continuing module development, adding new features, or im
 @@  └─ 是 → 只记录 public 字段
 @@
 @@详见：[SECURITY_STANDARDS.md](../../packages/core/SECURITY_STANDARDS.md)
+
+@@---
+@@
+@@# Search / Wallet 架构硬约束（强制）
+@@
+@@以下约束适用于 `packages/core/src/**` 中所有 search/wallet 相关实现与重构：
+@@
+@@1. search 与 wallet 必须是链无关聚合层：只负责接收 `chain`、查注册列表、分发调用、统一包装输出。
+@@2. search 与 wallet 中禁止实现任何单链业务功能（例如 btc/evm/trx 的链上细节、网络映射、字段特化逻辑）。
+@@3. search 与 wallet 中禁止写死链名分支（如 `if (chain === "btc")`、`switch(chain){case "evm"...}`）。
+@@4. 链差异必须下沉到各链独立模块接口中（每条链独立开发、独立暴露统一接口）。
+@@5. `mainnet/testnet/fork` 分类必须定义在各链自己的 network 配置中，由各链接口解释并返回具体 networks。
+@@6. task/run 只能做更高一层编排，不得回填链级实现；最多允许按 `chain` 做参数分组批量分发，不得写死链名集合。
+@@7. 新增链时，允许改动范围仅为：
+@@   - 新增链模块与注册声明
+@@   - 必要的配置文件
+@@   - 测试与样本
+@@   不允许修改 search/wallet 的中心分支逻辑。
+@@
+@@开发前自检（任何一项不满足都要先修设计）：
+@@
+@@1. search/wallet 代码中是否出现硬编码链名？出现即不通过。
+@@2. 链网络分类是否在各链 network 配置中定义？若在中心层定义则不通过。
+@@3. 新增链是否只需注册而无需改 search/wallet 逻辑？若否则不通过。

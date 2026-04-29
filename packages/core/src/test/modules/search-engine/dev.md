@@ -113,8 +113,54 @@
 1. ~~进入 S-12：EVM tokenAddress 先做网络归属验证（仅非 fork 网络）再查价~~ ✅
 2. ~~S-13：公共层预验证下沉~~ ✅
 3. ~~S-14：预验证命中统计注入 debugStats + 监测报告~~ ✅
-4. 进入各链真实 provider 替换切片（先 EVM contract/address）
-5. 进入 tasks/search 接入统一 SearchEngine 入口
+4. 先进入 S-18：统一各链网络分类配置（mainnet / testnet / fork）
+5. 在网络配置稳定后，再进入各链真实 provider 替换切片（先 EVM contract/address）
+6. 最后进入 tasks/search 接入统一 SearchEngine 入口
+
+### Slice S-18：提取每链统一的 network-scope 注册接口
+
+本次只做：
+
+1. 定义每条链统一的 `ChainNetworkScopeProvider` 接口，search 只通过 `chain` 取对应链接口
+2. 每条链各自实现 `resolveScopeNetworks(scope)`，统一处理 `mainnet` / `testnet` / `fork`
+3. 建立中心注册列表，例如 `getChainNetworkScopeProvider(chain)` / `listChainNetworkScopeProviders()`
+4. EVM 链接口内部从现有 config 动态生成 scope 对应 networks，如 `mainnet -> [eth, bsc, polygon, ...]`
+5. BTC 链接口内部处理：
+   - `mainnet -> [mainnet]`
+   - `testnet -> [testnet]`
+   - `fork -> [regtest]`
+6. TRX 链接口内部处理：
+   - `mainnet -> [mainnet]`
+   - `testnet -> [nile]`
+   - `fork -> [nile]`
+7. search/task/run 统一通过注册链接口拿 networks，不再自己拼默认值
+
+本次不做：
+
+1. facade 下沉或 task 重构
+2. pickedWallets 参数化
+3. provider 实际查询接线
+4. 多链业务查询逻辑改造
+
+设计约束：
+
+1. search 不保存“某链该怎么展开 scope”的分支逻辑，只负责按 `chain` 调注册链接口
+2. 新增链时，只允许新增一个链接口对象并注册，不能回到 search/task 中央追加 `if chain===...`
+3. EVM network 列表只能来自 config，如 `listEvmNetworks()` / network config 元数据
+4. `scope` 是环境分类，最终 networks 由各链自己决定，允许 `fork -> regtest`、`testnet -> nile` 这类映射
+5. 接口最小建议形态：
+   - `chain`
+   - `supportedScopes`
+   - `resolveScopeNetworks(scope, options?)`
+   - `resolveDefaultScope?(options?)`
+
+验收标准：
+
+1. 给定 `chain + scope`，可通过统一链接口返回该链的 network plan
+2. EVM `mainnet` 展开结果随 config 变化自动更新
+3. search/task/run 不再保留 `evm -> bsc`、`btc/trx -> mainnet` 这类硬编码默认值
+4. 后续 `build-from-picked` 只消费链接口结果，不理解链细节
+5. 理论上新增新链只需新增并注册一个 `ChainNetworkScopeProvider`
 
 ### Slice S-7：EVM search provider 注册注入到中心 SearchEngine
 
