@@ -453,6 +453,24 @@
 1. `node src/test/modules/search-engine/run.balances.test.mjs` 可执行。
 2. 脚本仍输出 token 映射与批量余额结果，且不依赖 `searchAddressCheckTask/searchTask`。
 
+### Slice S-21：run.price 脚本 fuzzy 查询切换到 engine（当前切片）
+
+本次只做：
+
+1. 将 `run.price.test.mjs` 的 fuzzy 查询从 `searchTokenFuzzyTask` 切换到 `engine.search({ domain: "token" })`。
+2. 在脚本内按 `chain` 分组生成 `byChain` 结构，保持原输出格式习惯。
+3. 保留 `searchTokenPriceBatchTask` 作为价格批量查询入口。
+
+本次不做：
+
+1. 去除 `searchTokenPriceBatchTask` 依赖。
+2. 改动 token 价格 task 编排逻辑。
+
+验收标准：
+
+1. `node src/test/modules/search-engine/run.price.test.mjs` 可执行。
+2. fuzzy 输出包含 `total` 与 `chains`，并可继续批量查价。
+
 ### Slice S-22：地址批量资产列表查询专用脚本（run.asset）
 
 本次只做：

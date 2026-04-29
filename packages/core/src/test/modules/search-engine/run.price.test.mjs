@@ -13,8 +13,8 @@ import { readFileSync } from "node:fs";
 
 import {
   searchTokenPriceBatchTask,
-  searchTokenFuzzyTask,
 } from "../../../tasks/search/index.mjs";
+import { createDefaultSearchEngine } from "../../../modules/search-engine/index.mjs";
 
 // ─── 解析 ## token price ──────────────────────────────────────────────────────
 //
@@ -110,9 +110,23 @@ function shortAddr(addr) {
   return `${text.slice(0, 8)}…${text.slice(-4)}`;
 }
 
+function groupCandidatesByChain(candidates = []) {
+  const byChain = {};
+  for (const candidate of (Array.isArray(candidates) ? candidates : [])) {
+    const chain = String(candidate?.chain ?? "").trim().toLowerCase();
+    if (!chain) continue;
+    if (!Array.isArray(byChain[chain])) {
+      byChain[chain] = [];
+    }
+    byChain[chain].push(candidate);
+  }
+  return byChain;
+}
+
 // ─── main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
+  const engine = createDefaultSearchEngine();
   const raw = readFileSync(new URL("./test.data.md", import.meta.url), "utf8");
 
   const priceItems = parseTokenPriceSection(raw);
@@ -150,10 +164,20 @@ async function main() {
     console.log(`关键词: ${fuzzyQueries.join(", ")}\n`);
 
     for (const query of fuzzyQueries) {
-      const res = await searchTokenFuzzyTask({ query });
+      const searchResult = await engine.search({
+        domain: "token",
+        query,
+        limit: 15,
+      });
+      const fuzzyCandidates = Array.isArray(searchResult?.candidates) ? searchResult.candidates : [];
+      const res = {
+        ok: searchResult?.ok !== false,
+        candidates: fuzzyCandidates,
+        byChain: groupCandidatesByChain(fuzzyCandidates),
+      };
       const chains = Object.keys(res.byChain ?? {});
       const total = res.candidates?.length ?? 0;
-        console.log(`"${query}" → total=${total} chains=[${chains.join(",")}]`);
+      console.log(`"${query}" → total=${total} chains=[${chains.join(",")}]`);
 
       // 批量查询 fuzzy 候选的价格
       const pricedCandidates = res.candidates
