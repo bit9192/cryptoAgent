@@ -3,6 +3,9 @@ import { queryTokenPriceLiteBatchByQuery } from "../../apps/offchain/token-price
 import { queryEvmTokenBalanceBatch } from "../../apps/evm/assets/balance-batch.mjs";
 import { queryTrxTokenBalanceBatch } from "../../apps/trx/assets/balance-batch.mjs";
 import { brc20BalanceBatchGet } from "../../apps/btc/assets/brc20-balance-batch.mjs";
+import { normalizeEvmNetworkName, listEvmNetworksByScope } from "../../apps/evm/configs/networks.js";
+import { normalizeBtcNetworkName, listBtcNetworksByScope } from "../../apps/btc/config/networks.js";
+import { normalizeTrxNetworkName, listTrxNetworksByScope } from "../../apps/trx/config/networks.js";
 import { runAddressPipeline } from "./pipelines/address/index.mjs";
 import { buildAssetValuationInput } from "./pipelines/valuation/index.mjs";
 import { createPortfolioSummaryState, addAddressAssetsToSummary } from "./pipelines/portfolio/summary.mjs";
@@ -210,21 +213,48 @@ function normalizeBatchChain(value) {
   return raw;
 }
 
+const BATCH_CHAIN_NETWORK_RESOLVERS = Object.freeze({
+  evm: Object.freeze({
+    aliases: Object.freeze(["evm"]),
+    normalizeNetworkName: normalizeEvmNetworkName,
+    listNetworksByScope: listEvmNetworksByScope,
+  }),
+  btc: Object.freeze({
+    aliases: Object.freeze(["btc", "bitcoin"]),
+    normalizeNetworkName: normalizeBtcNetworkName,
+    listNetworksByScope: listBtcNetworksByScope,
+  }),
+  trx: Object.freeze({
+    aliases: Object.freeze(["trx", "tron"]),
+    normalizeNetworkName: normalizeTrxNetworkName,
+    listNetworksByScope: listTrxNetworksByScope,
+  }),
+});
+
+function resolveFirstNetworkByScope(chainResolver, scope) {
+  const networks = chainResolver.listNetworksByScope(scope);
+  if (Array.isArray(networks) && networks.length > 0) {
+    return networks[0];
+  }
+  throw new Error(`scope 未映射到可用网络: ${scope ?? ""}`);
+}
+
 function normalizeBatchNetwork(chain, value) {
+  const chainResolver = BATCH_CHAIN_NETWORK_RESOLVERS[chain];
+  if (!chainResolver) {
+    return normalizeString(value).toLowerCase();
+  }
+
   const raw = normalizeString(value).toLowerCase();
-  if (chain === "btc") {
-    if (!raw || raw === "btc") return "mainnet";
-    return raw;
+  if (!raw || chainResolver.aliases.includes(raw)) {
+    return resolveFirstNetworkByScope(chainResolver, "default");
   }
-  if (chain === "trx") {
-    if (!raw || raw === "trx" || raw === "tron") return "mainnet";
-    return raw;
+
+  try {
+    return chainResolver.normalizeNetworkName(raw);
+  } catch {
+    return resolveFirstNetworkByScope(chainResolver, raw);
   }
-  if (chain === "evm") {
-    if (!raw || raw === "evm") return "eth";
-    return raw;
-  }
-  return raw;
 }
 
 function normalizeBatchPairs(input = {}) {
@@ -235,7 +265,7 @@ function normalizeBatchPairs(input = {}) {
     const address = normalizeString(pair?.address);
     const token = normalizeString(pair?.token ?? pair?.tokenAddress);
 
-    if (!["btc", "trx", "evm"].includes(chain)) {
+    if (!(chain in BATCH_CHAIN_NETWORK_RESOLVERS)) {
       throw new TypeError(`pairs[${index}].chain 非法`);
     }
     if (!address) {
