@@ -1,5 +1,5 @@
 import { resolveAddressPipelineConfig } from "./config.mjs";
-import { runEvmAddressPipeline } from "./evm.mjs";
+import { runEvmAddressPipeline } from "../../../../apps/evm/search/address-pipeline.mjs";
 import { runTrxAddressPipeline } from "../../../../apps/trx/search/address-pipeline.mjs";
 import { runBtcAddressPipeline } from "../../../../apps/btc/search/address-pipeline.mjs";
 
