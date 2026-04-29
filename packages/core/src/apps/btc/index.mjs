@@ -39,3 +39,4 @@ export {
 	brc20BalanceBatchGet,
 	createBrc20,
 } from "./brc20.mjs";
+export { runBtcAddressPipeline } from "./search/address-pipeline.mjs";
