@@ -3,6 +3,8 @@ export { createBtcProvider as default } from "./provider.mjs";
 export {
 	btcNetworks,
 	defaultBtcNetworkName,
+	normalizeBtcNetworkScope,
+	listBtcNetworksByScope,
 	normalizeBtcNetworkName,
 	getBtcNetworkConfig,
 } from "./config/networks.js";

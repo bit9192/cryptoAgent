@@ -141,9 +141,30 @@ export const btcNetworks = Object.freeze({
 
 export const defaultBtcNetworkName = String(process.env.BTC_NETWORK || "regtest").trim().toLowerCase();
 
+export const btcNetworkScopeMap = Object.freeze({
+	mainnet: "mainnet",
+	testnet: "testnet",
+	fork: "regtest",
+	default: "mainnet",
+});
+
+export function normalizeBtcNetworkScope(scope) {
+	const raw = String(scope ?? "default").trim().toLowerCase();
+	if (!raw) return btcNetworkScopeMap.default;
+	if (raw in btcNetworkScopeMap) return btcNetworkScopeMap[raw];
+	throw new Error(`不支持的 BTC scope: ${scope ?? ""}`);
+}
+
+export function listBtcNetworksByScope(scope = "default") {
+	const normalizedScope = normalizeBtcNetworkScope(scope);
+	if (normalizedScope in btcNetworks) return [normalizedScope];
+	return [];
+}
+
 export function normalizeBtcNetworkName(value) {
 	const raw = String(value ?? "").trim().toLowerCase();
 	if (raw === "" || raw === "regtest") return "regtest";
+	if (raw === "fork") return "regtest";
 	if (raw === "main" || raw === "mainnet" || raw === "btc" || raw === "bitcoin") return "mainnet";
 	if (raw === "test" || raw === "testnet") return "testnet";
 	if (raw === "sig" || raw === "signet") return "signet";

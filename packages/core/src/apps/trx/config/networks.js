@@ -71,9 +71,30 @@ export const trxNetworks = Object.freeze({
 
 export const defaultTrxNetworkName = String(process.env.TRX_NETWORK || "mainnet").trim().toLowerCase();
 
+export const trxNetworkScopeMap = Object.freeze({
+	mainnet: "mainnet",
+	testnet: "nile",
+	fork: "nile",
+	default: "mainnet",
+});
+
+export function normalizeTrxNetworkScope(scope) {
+	const raw = String(scope ?? "default").trim().toLowerCase();
+	if (!raw) return trxNetworkScopeMap.default;
+	if (raw in trxNetworkScopeMap) return trxNetworkScopeMap[raw];
+	throw new Error(`不支持的 TRX scope: ${scope ?? ""}`);
+}
+
+export function listTrxNetworksByScope(scope = "default") {
+	const normalizedScope = normalizeTrxNetworkScope(scope);
+	if (normalizedScope === "mainnet") return ["mainnet"];
+	return trxNetworks.nile ? ["nile"] : [];
+}
+
 export function normalizeTrxNetworkName(value) {
 	const raw = String(value ?? "").trim().toLowerCase();
 	if (raw === "" || raw === "main" || raw === "mainnet") return "mainnet";
+	if (raw === "testnet" || raw === "fork") return "nile";
 	if (raw === "nile") return "nile";
 	if (raw === "shasta" || raw === "sha") return "shasta";
 	if (raw === "local" || raw === "dev") return "local";

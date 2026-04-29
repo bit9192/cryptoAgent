@@ -28,6 +28,8 @@ export {
 export {
 	trxNetworks,
 	defaultTrxNetworkName,
+	normalizeTrxNetworkScope,
+	listTrxNetworksByScope,
 	normalizeTrxNetworkName,
 	getTrxNetworkConfig,
 } from "./config/networks.js";

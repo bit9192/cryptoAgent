@@ -60,6 +60,39 @@ export const evmNetworks = Object.freeze({
 
 export const defaultEvmNetworkName = String(process.env.EVM_NETWORK || "bsc").trim().toLowerCase();
 
+const DEFULE = Object.values(evmNetworks).filter(v => v.network !== "fork").map(v => v.network)
+export const evmNetworkScopeMap = Object.freeze({
+	mainnet: DEFULE,
+	testnet: "fork",
+	fork: "fork",
+	default: DEFULE,
+});
+
+function listEvmNetworkEntries() {
+	return Object.entries(evmNetworks);
+}
+
+function listMainnetNetworkNames() {
+	return listEvmNetworkEntries()
+		.filter(([, config]) => Boolean(config?.isMainnet))
+		.map(([name]) => name);
+}
+
+function resolvePrimaryMainnetNetwork() {
+	const mainnets = listMainnetNetworkNames();
+	if (mainnets.length > 0) return mainnets[0];
+	const all = listEvmNetworks();
+	if (all.length > 0) return all[0];
+	return "bsc";
+}
+
+function normalizeMappedNetworks(value) {
+	const values = Array.isArray(value) ? value : [value];
+	return values
+		.map((item) => String(item ?? "").trim().toLowerCase())
+		.filter((item) => item && item in evmNetworks);
+}
+
 function readForkRuntimeMeta() {
 	const state = readEvmForkStateSync();
 	const sourceNetwork = String(process.env.EVM_FORK_SOURCE_NETWORK || state?.sourceNetwork || "").trim().toLowerCase();
@@ -79,10 +112,42 @@ function readForkRuntimeMeta() {
 
 export function normalizeEvmNetworkName(value) {
 	const raw = String(value ?? "").trim().toLowerCase();
-	if (!raw || raw === "default" || raw === "bsc") return "bsc";
-	if (["eth", "mainnet", "ethereum"].includes(raw)) return "eth";
+	if (!raw) return resolvePrimaryMainnetNetwork();
+	if (raw in evmNetworks) return raw;
+	if (raw in evmNetworkScopeMap) {
+		const mapped = evmNetworkScopeMap[raw];
+		if (Array.isArray(mapped)) {
+			const list = normalizeMappedNetworks(mapped);
+			return list[0] ?? resolvePrimaryMainnetNetwork();
+		}
+		return mapped;
+	}
+	if (raw === "ethereum") return "eth";
 	if (["fork", "local", "hardhat"].includes(raw)) return "fork";
 	throw new Error(`不支持的 EVM 网络: ${value ?? ""}`);
+}
+
+export function normalizeEvmNetworkScope(scope) {
+	const raw = String(scope ?? "default").trim().toLowerCase();
+	if (!raw || raw === "default") return "mainnet";
+	if (raw === "mainnet") return "mainnet";
+	if (raw in evmNetworkScopeMap) {
+		const mapped = evmNetworkScopeMap[raw];
+		if (Array.isArray(mapped)) return "mainnet";
+		return mapped;
+	}
+	throw new Error(`不支持的 EVM scope: ${scope ?? ""}`);
+}
+
+export function listEvmNetworksByScope(scope = "default") {
+	const normalizedScope = normalizeEvmNetworkScope(scope);
+	if (normalizedScope === "mainnet") {
+		const fromMap = normalizeMappedNetworks(evmNetworkScopeMap.mainnet);
+		if (fromMap.length > 0) return fromMap;
+		return listMainnetNetworkNames();
+	}
+	if (normalizedScope in evmNetworks) return [normalizedScope];
+	return [];
 }
 
 export function getEvmNetworkConfig(networkName) {

@@ -7,6 +7,8 @@ import {
 
 import {
   getEvmNetworkConfig,
+  listEvmNetworksByScope,
+  normalizeEvmNetworkScope,
   normalizeEvmNetworkName,
   getEvmContractBook,
   resolveEvmContract,
@@ -17,20 +19,33 @@ import {
 } from "../../apps/evm/index.mjs";
 import {
   getBtcNetworkConfig,
+  listBtcNetworksByScope,
+  normalizeBtcNetworkScope,
   normalizeBtcNetworkName,
   getBtcTokenBook,
   resolveBtcToken,
 } from "../../apps/btc/index.mjs";
 import {
   getTrxNetworkConfig,
+  listTrxNetworksByScope,
+  normalizeTrxNetworkScope,
   normalizeTrxNetworkName,
   getTrxTokenBook,
   resolveTrxToken,
 } from "../../apps/trx/index.mjs";
 
 test("evm config: 支持网络名归一化与默认网络读取", async () => {
+  assert.equal(normalizeEvmNetworkScope("mainnet"), "mainnet");
+  assert.equal(normalizeEvmNetworkScope("testnet"), "fork");
+  assert.equal(normalizeEvmNetworkScope("fork"), "fork");
   assert.equal(normalizeEvmNetworkName("mainnet"), "eth");
+  assert.equal(normalizeEvmNetworkName("testnet"), "fork");
   assert.equal(normalizeEvmNetworkName("hardhat"), "fork");
+  assert.deepEqual(listEvmNetworksByScope("testnet"), ["fork"]);
+
+  const evmMainnets = listEvmNetworksByScope("mainnet");
+  assert.ok(evmMainnets.includes("eth"));
+  assert.ok(evmMainnets.includes("bsc"));
 
   const bsc = getEvmNetworkConfig("bsc");
   assert.equal(bsc.chainId, 56);
@@ -130,6 +145,23 @@ test("evm fork config: 31337 作为虚拟链时应继承源链 token/contract �
 });
 
 test("btc/trx config: 支持网络名归一化和配置读取", async () => {
+  assert.equal(normalizeBtcNetworkScope("mainnet"), "mainnet");
+  assert.equal(normalizeBtcNetworkScope("testnet"), "testnet");
+  assert.equal(normalizeBtcNetworkScope("fork"), "regtest");
+  assert.deepEqual(listBtcNetworksByScope("mainnet"), ["mainnet"]);
+  assert.deepEqual(listBtcNetworksByScope("testnet"), ["testnet"]);
+  assert.deepEqual(listBtcNetworksByScope("fork"), ["regtest"]);
+  assert.equal(normalizeBtcNetworkName("fork"), "regtest");
+
+  assert.equal(normalizeTrxNetworkScope("mainnet"), "mainnet");
+  assert.equal(normalizeTrxNetworkScope("testnet"), "nile");
+  assert.equal(normalizeTrxNetworkScope("fork"), "nile");
+  assert.deepEqual(listTrxNetworksByScope("mainnet"), ["mainnet"]);
+  assert.deepEqual(listTrxNetworksByScope("testnet"), ["nile"]);
+  assert.deepEqual(listTrxNetworksByScope("fork"), ["nile"]);
+  assert.equal(normalizeTrxNetworkName("testnet"), "nile");
+  assert.equal(normalizeTrxNetworkName("fork"), "nile");
+
   assert.equal(normalizeBtcNetworkName("main"), "mainnet");
   assert.equal(normalizeTrxNetworkName("sha"), "shasta");
 

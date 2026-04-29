@@ -8,7 +8,9 @@ export {
 export {
 	evmNetworks,
 	defaultEvmNetworkName,
+	normalizeEvmNetworkScope,
 	normalizeEvmNetworkName,
+	listEvmNetworksByScope,
 	getEvmNetworkConfig,
 	listEvmNetworks,
 } from "./configs/networks.js";
