@@ -54,6 +54,18 @@
 1. 把 EVM 特有 risk flag 判断下沉到链模块。
 2. task 层仅做聚合。
 
+### Slice TS-4：估值拼装逻辑抽离（当前切片）
+
+本次只做：
+
+1. 将 `enrichAssetsWithValuation()` 与 `sumAssetValuationValue()` 从 `tasks/search/index.mjs` 抽到 `pipelines/valuation/enrich.mjs`。
+2. 保持估值行为、价格批量查询去重逻辑与现有测试兼容。
+
+验收标准：
+
+1. `tasks/search/index.mjs` 不再内联估值拼装实现。
+2. 估值相关 `search.test.mjs` 测试继续通过。
+
 ## 4. 当前进度 / 下一步
 
 当前进度：
@@ -62,8 +74,9 @@
 2. ✅ valuation builder 已迁移到 `apps/evm|btc|trx/search/valuation.mjs`
 3. ✅ TS-1 完成：批量余额 runner 注册表化
 4. ✅ TS-3 完成：portfolio risk extractor 注册表化
-5. 🔄 当前切片：TS-2 批量余额实现下沉到链模块
+5. ✅ TS-2 完成：批量余额实现下沉到链模块
+6. 🔄 当前切片：TS-4 估值拼装逻辑抽离
 
 下一步：
 
-1. 完成 TS-2 后，继续清理 task 层其余链实现残留
+1. 完成 TS-4 后，继续清理 task 层其余通用编排残留
