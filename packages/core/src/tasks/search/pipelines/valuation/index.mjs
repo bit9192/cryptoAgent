@@ -1,5 +1,5 @@
 import { buildEvmAssetValuationInput } from "./evm.mjs";
-import { buildBtcAssetValuationInput } from "./btc.mjs";
+import { buildBtcAssetValuationInput } from "../../../../apps/btc/search/valuation.mjs";
 import { buildTrxAssetValuationInput } from "../../../../apps/trx/search/valuation.mjs";
 
 function normalizeLower(value) {
