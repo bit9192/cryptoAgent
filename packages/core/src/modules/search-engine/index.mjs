@@ -17,19 +17,35 @@ function normalizeLower(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-function normalizeRequestedChain(value) {
+function resolveChainHint(value, providers = []) {
   const raw = normalizeLower(value);
   if (!raw) return "";
-  if (["btc", "bitcoin"].includes(raw)) return "btc";
-  if (["trx", "tron"].includes(raw)) return "trx";
-  if (["evm", "eth", "ethereum", "bsc", "fork", "base", "polygon", "arb", "arbitrum", "op", "optimism"].includes(raw)) return "evm";
+
+  const chains = new Set(
+    (Array.isArray(providers) ? providers : [])
+      .map((provider) => normalizeLower(provider?.chain))
+      .filter(Boolean),
+  );
+  if (chains.has(raw)) return raw;
+
+  const matchedChains = new Set();
+  for (const provider of (Array.isArray(providers) ? providers : [])) {
+    const chain = normalizeLower(provider?.chain);
+    if (!chain) continue;
+    const networks = normalizeProviderNetworks(provider).map((net) => normalizeLower(net));
+    if (networks.includes(raw)) matchedChains.add(chain);
+  }
+  if (matchedChains.size === 1) {
+    return [...matchedChains][0];
+  }
+
   return raw;
 }
 
 function detectAddressContextItems(query, providers = [], filter = {}) {
   const items = [];
   const rawQuery = String(query ?? "").trim();
-  const requestedChain = normalizeRequestedChain(filter.chain);
+  const requestedChain = resolveChainHint(filter.chain, providers);
 
   const addressProviders = providers.filter((provider) => provider.capabilities.includes("address"));
 
@@ -57,12 +73,7 @@ function normalizeDomain(domain) {
 }
 
 function normalizeNetworkHint(value) {
-  const raw = normalizeLower(value);
-  if (!raw) return "";
-  if (["eth", "ethereum", "mainnet", "evm"].includes(raw)) return raw;
-  if (["trx", "tron"].includes(raw)) return "trx";
-  if (["btc", "bitcoin"].includes(raw)) return "btc";
-  return raw;
+  return normalizeLower(value);
 }
 
 function stableStringify(value) {
@@ -186,9 +197,7 @@ function resolveCandidateRank(candidate, input = {}, rankConfig = {}) {
   if (inputChain && inputChain === chain) rank += 200;
   if (inputNetwork) {
     if (inputNetwork === network) rank += 160;
-    if (inputNetwork === "trx" && chain === "trx") rank += 150;
-    if (inputNetwork === "btc" && chain === "btc") rank += 150;
-    if (inputNetwork === "evm" && chain === "evm") rank += 150;
+    if (inputNetwork === chain) rank += 150;
   }
 
   if (network === "mainnet") rank += 6;
@@ -295,8 +304,10 @@ function pickProviderMethod(provider, domain) {
   return null;
 }
 
-function isProviderMatch(provider, filter = {}) {
-  if (filter.chain && normalizeLower(provider.chain) !== normalizeLower(filter.chain)) {
+function isProviderMatch(provider, filter = {}, providers = []) {
+  const filterChain = resolveChainHint(filter.chain, providers);
+
+  if (filterChain && normalizeLower(provider.chain) !== filterChain) {
     return false;
   }
   if (filter.domain && !provider.capabilities.includes(normalizeDomain(filter.domain))) {
@@ -305,15 +316,7 @@ function isProviderMatch(provider, filter = {}) {
   if (filter.network) {
     const wanted = normalizeNetworkHint(filter.network);
     let hit = provider.networks.some((net) => normalizeLower(net) === wanted);
-    if (!hit && wanted === "trx") {
-      hit = normalizeLower(provider.chain) === "trx";
-    }
-    if (!hit && wanted === "btc") {
-      hit = normalizeLower(provider.chain) === "btc";
-    }
-    if (!hit && wanted === "evm") {
-      hit = normalizeLower(provider.chain) === "evm";
-    }
+    if (!hit && wanted) hit = normalizeLower(provider.chain) === wanted;
     if (!hit) return false;
   }
   return true;
@@ -386,7 +389,7 @@ export function createSearchEngine(options = {}) {
 
   function listProviders(filter = {}) {
     const providers = [...providerMap.values()];
-    return providers.filter((provider) => isProviderMatch(provider, filter));
+    return providers.filter((provider) => isProviderMatch(provider, filter, providers));
   }
 
   async function resolveAddressContext(input = {}) {
