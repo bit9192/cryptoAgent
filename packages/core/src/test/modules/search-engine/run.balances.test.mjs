@@ -8,10 +8,9 @@
 import { readFileSync } from "node:fs";
 
 import {
-  searchAddressCheckTask,
   searchAddressTokenBalancesBatchTask,
-  searchTask,
 } from "../../../tasks/search/index.mjs";
+import { createDefaultSearchEngine } from "../../../modules/search-engine/index.mjs";
 import { resolveEvmToken } from "../../../apps/evm/configs/tokens.js";
 import { resolveTrxToken } from "../../../apps/trx/config/tokens.js";
 import { resolveBtcToken } from "../../../apps/btc/config/tokens.js";
@@ -102,8 +101,8 @@ function pickNetworksFromAddressCheck(chain, checkResult) {
   return [];
 }
 
-async function fallbackResolveBySearch(symbol, network, chain) {
-  const result = await searchTask({
+async function fallbackResolveBySearch(engine, symbol, network, chain) {
+  const result = await engine.search({
     domain: "token",
     query: symbol,
     network,
@@ -116,7 +115,7 @@ async function fallbackResolveBySearch(symbol, network, chain) {
   return String(hit.tokenAddress ?? hit.address ?? "").trim() || null;
 }
 
-async function resolveTokenRef(chain, network, symbol) {
+async function resolveTokenRef(engine, chain, network, symbol) {
   const key = String(symbol ?? "").trim().toLowerCase();
   if (!key) return null;
 
@@ -127,7 +126,7 @@ async function resolveTokenRef(chain, network, symbol) {
     try {
       return resolveEvmToken({ symbol: key, network }).address;
     } catch {
-      return await fallbackResolveBySearch(key, network, "evm");
+      return await fallbackResolveBySearch(engine, key, network, "evm");
     }
   }
 
@@ -138,7 +137,7 @@ async function resolveTokenRef(chain, network, symbol) {
     } catch {
       const fallback = TRX_SYMBOL_FALLBACKS?.[network]?.[key];
       if (fallback) return fallback;
-      return await fallbackResolveBySearch(key, network, "trx");
+      return await fallbackResolveBySearch(engine, key, network, "trx");
     }
   }
 
@@ -161,6 +160,7 @@ function shortAddress(value) {
 }
 
 async function main() {
+  const engine = createDefaultSearchEngine();
   const raw = readFileSync(new URL("./test.data.md", import.meta.url), "utf8");
   const groups = parseAddressAssetGroups(raw);
 
@@ -173,7 +173,7 @@ async function main() {
     const chain = inferChainByAddress(firstAddress);
     if (!chain) continue;
 
-    const checkResult = await searchAddressCheckTask({ query: firstAddress });
+    const checkResult = await engine.resolveAddressContext({ query: firstAddress });
     const networks = pickNetworksFromAddressCheck(chain, checkResult);
 
     console.log(`\n组: chain=${chain} symbols=${group.symbols.join(",")} addresses=${group.addresses.length}`);
@@ -182,7 +182,7 @@ async function main() {
     for (const network of networks) {
       const resolvedTokens = [];
       for (const symbol of group.symbols) {
-        const tokenRef = await resolveTokenRef(chain, network, symbol);
+        const tokenRef = await resolveTokenRef(engine, chain, network, symbol);
         if (!tokenRef) continue;
         resolvedTokens.push({ symbol, tokenRef });
       }

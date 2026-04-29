@@ -435,6 +435,24 @@
 1. `node src/test/modules/search-engine/run.addrescheck.test.mjs` 可执行。
 2. 地址判定输出保持可读，且不依赖 `searchAddressCheckTask`。
 
+### Slice S-20：run.balances 脚本半迁移（当前切片）
+
+本次只做：
+
+1. `run.balances.test.mjs` 的地址判定从 `searchAddressCheckTask` 切到 `engine.resolveAddressContext()`。
+2. token fallback 从 `searchTask(domain=token)` 切到 `engine.search(domain=token)`。
+3. 继续保留 `searchAddressTokenBalancesBatchTask` 作为批量余额 task 编排入口。
+
+本次不做：
+
+1. 批量余额逻辑改成 engine 原生接口（当前无等价 facade）。
+2. run.asset/run.test 的 portfolio 与估值调用迁移。
+
+验收标准：
+
+1. `node src/test/modules/search-engine/run.balances.test.mjs` 可执行。
+2. 脚本仍输出 token 映射与批量余额结果，且不依赖 `searchAddressCheckTask/searchTask`。
+
 ### Slice S-22：地址批量资产列表查询专用脚本（run.asset）
 
 本次只做：
