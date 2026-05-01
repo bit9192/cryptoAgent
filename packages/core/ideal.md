@@ -121,10 +121,143 @@ asset 和 wallet 组合
 
 提供一个 按地址 查询钱包名称的接口，一遍通过地址判断是哪个账户
 
+查余额
+发送交易
+    普通交易
+    合约交互
+        c20
+        泛合约交互
 
+form
+chains : netmwork : address [token, contract, address]
 
+所有链上交互要素
+form to chain network 
 
+form : unll all names addresses derive 
+to : unll all names addresses
+chain: unll all default
+    network: null main test fork networks
 
+### 用户意图拆解成任务的流程
+wallet + 用户意图参数
+
+wallet 获得地址 ((mnemonic + path) | key) + chain + addressType
+{
+    chains: [
+        "evm",
+        {
+            btc: {
+                networks: [],
+                addressType: []
+            }
+        },
+        trx: {
+            networks: ["main"]
+        }
+    ]
+}
+chains: null -> 报错 让前端确认 选择 chain, all -> 支持的全部配置, default -> 根据 wallet 配置的 derive 生成
+
+rc20 的配置地址 chains : netmwork : tokens
+{
+    chains: [
+        evm: {
+            mainnet: [token1, token2, ...]
+        },
+        btc: {
+            mainnet: default
+        },
+        trx: {
+            mainnet: fork
+        }
+    ]
+}
+chains: null -> 根据 from 地址自动判断，networks 为 null
+        default -> 根据 from 地址自动判断, networks 为 default
+networksName: (null | mainnet) -> mainnet, ["bsc", "eth", "testnet"] -> 为每条链上的 配置的 token, bsc: ["token1"]
+
+inputs -> from addresses
+from 地址推到 chain ，用 chain 从 chains 中找到相应配置
+
+最后 输出 form:to:chains:network 给到 下游接口
+
+### 场景推演
+用户意图： a 钱包有多少 usdt
+提供信息：name: a, tokens usdt , actions balances
+接口要求：balances -> address chains network tokens
+信息补全：chains null, 用户没有提供，默认 全连，network 没有提供，默认 mainnet
+补全后：wallet a , chains all, networks all , tokens usdt
+
+用户意图：a 有多少 bsc usdt
+提供信息：name: a, tokens usdt , networks bsc, actions balances
+接口要求：balances -> address chains netwrok tokens
+信息补全：networks = bsc -> 现在配置中只有 evm 有该网络，所以 chains = evm
+补全后：wallet a , chains evm, networks bsc, tokens usdt, actions balances
+
+用户意图：a 和 b 用多少 usdt
+提供信息：names a b, tokens usdt , actions balances
+
+用户意图：a 和 b 用多少 usdt，在看下 b 的 gas 还有多少
+提供信息：[ "names a b, tokens usdt , actions balances", "b native balances"] 
+
+#### ai bridge for api on balances
+用户意图：a 和 b 用多少 usdt，在看下 b 的 gas 还有多少
+ai parse： [ "names a b, tokens usdt , actions balances", "b native balances"] 
+bridge ：转化 1. [
+        name:a chains:all networks:mainnet tokens:usdt actions:balances, 
+        name:b chains:all networks:mainnet tokens:usdt actions:balances, 
+        name:b chains:all networks:mainnet tokens:native actions:balances, 
+    ]
+    2. a b 根据 chains 用 pick 转 地址
+    3. 组合最终输出 {
+        actions: balances
+        arg: [
+            {chain, netwokrs, address, tokens}
+        ]
+    } 
+api： 内部 合并 同链 操作
+
+#### balances bridge 接口设计
+处理查询任务
+输入：[
+    {
+        formWallets: [],
+        fromAddress: [],
+        chains,
+        networks,
+        tokens
+    }
+]
+输出 {
+    action: balances
+    arg: [
+       {address, chain, network, tokens},
+       {address, chain, network, tokens},
+       {address, chain, network, tokens},
+       ....
+   ]
+}
+
+处理流程
+1. 先确定每一条的 chains networks tokens
+2. 每一条根据 chains 等 和 name 用 pick 取出 地址
+3. 按地址拆分输入拼接 输出
+
+##### 逐条处理函数
+参数 wallet derive, [name, address] , chains [], networks, tokens
+
+wallet 有 配置模式 全链模式
+tokens 有 all 和 setted
+
+1. chains 确认
+
+chains 存在 
+如果是 address ，根据 address 推断 chains ，不一致时 以 address 为准，提示用户已修改
+如果不是 address 看 networks
+    networks 存在，用 networks 检索
+
+chains networks tokens
 
 ## cli 界面修改
 分为 上下部分，上面 显示结果，下面负责输入，显示面板 可以在一些情况下提供输入，比如配置私钥时

@@ -70,6 +70,86 @@
 2. 并发相同查询触发 in-flight 合并
 3. forceRemote=true 可跳过缓存
 
+### Slice TS-7：search 模块提供 address-assets 单地址 facade
+
+本次只做：
+
+1. 将 `searchAddressAssetsTaskWithEngine` 的核心搜索聚合逻辑下沉到 search 模块 facade
+2. facade 直接复用已注册的默认 search providers，不在 task 内分发链逻辑
+3. task 层改为薄包装，仅转调 facade
+
+本次不做：
+
+1. wallet.pickWallet 串联
+2. batch 接口迁移
+3. valuation / portfolio 重构
+
+验收标准：
+
+1. 单地址 address-assets 查询可不经过 task 直接走 search facade
+2. task 返回结构保持兼容
+3. task 内不再包含 address-assets 的链级执行分支
+
+### Slice TS-8：search 模块提供 address-assets 批量 facade
+
+本次只做：
+
+1. 将 `searchAddressAssetsBatchTaskWithEngine` 的批量执行逻辑下沉到 search 模块 facade
+2. batch facade 仅接收标准 `items` 输入并返回 `items + summary`
+3. task 层改为薄包装，仅负责调用 facade
+
+本次不做：
+
+1. pickedWallets 参数化
+2. token balance batch 迁移
+3. portfolio 汇总
+
+验收标准：
+
+1. `searchAddressAssetsBatchTask` 仅作为 facade 的兼容包装存在
+2. task 内不再保留批量 address-assets 的执行细节
+3. 原有 address-assets batch 返回结构不变
+
+### Slice TS-9：task 层新增 build-from-picked 参数化函数
+
+本次只做：
+
+1. 新增 `pickedWallets -> searchAddressAssetsBatchTask.items` 的参数化函数
+2. 参数化函数只做地址提取、chain->network 配置展开、去重
+3. 保留 trace/context 信息，便于下游结果反查来源 key/addressType
+
+本次不做：
+
+1. task 内直接执行 search
+2. token 列表展开
+3. execute 层接入
+
+验收标准：
+
+1. run/test 可通过参数化函数直接拿到 `searchAddressAssetsBatchTask` 所需 `items`
+2. 参数化函数不包含 RPC 或 provider 调用
+3. 参数化规则由 plan/config 驱动，而不是 run/test 手写
+
+### Slice TS-10：wallet + search 的 task 仅保留调度骨架
+
+本次只做：
+
+1. task 形成 `pickWallet -> buildFromPicked -> search facade` 的固定骨架
+2. task 只保留跨模块编排，不再持有链级 reader / switch 分支
+3. run/test 改为调用该骨架，验证端到端最小闭环
+
+本次不做：
+
+1. portfolio / valuation 大一统
+2. execute 层意图解析
+3. 多 task 合并抽象
+
+验收标准：
+
+1. task 代码中不再出现按 `evm/trx/btc` 分支执行具体 reader 的逻辑
+2. run/test 只保留调试输入和结果打印
+3. wallet 与 search 的职责边界清晰：wallet 选地址，search 查资产，task 只调度
+
 ## 3. 当前进度 / 下一步
 
 当前进度：
@@ -81,8 +161,12 @@
 5. 已完成 TS-3：request-engine queryShared 去重缓存接入
 6. 已完成 TS-4：接入 trx provider 与多链排序优先级
 7. 已完成 TS-6（架构收口）：默认 provider 装配迁移至 composition root
+8. 已明确下一阶段重构方向：search 下沉链聚合、task 退回调度
 
 下一步：
 
-1. TS-7：search task 接入统一 SearchEngine 入口
-2. TS-8：token domain 逐链真实 provider 扩展（evm/btc/trx 统一注册）
+1. TS-7：先迁移 address-assets 单地址 facade 到 search 模块
+2. TS-8：再迁移 address-assets batch facade，task 改成薄包装
+3. TS-9：新增 build-from-picked 参数化函数，承接 wallet.pickWallet 到 search batch 入参
+4. TS-10：收口 wallet + search task 骨架，run/test 只做调试调用
+5. TS-11：在上述边界稳定后，再继续 token domain 逐链真实 provider 扩展（evm/btc/trx 统一注册）

@@ -1,5 +1,5 @@
 
-import { createDefaultSearchEngine } from "../modules/search-engine/index.mjs";
+import { searchAddressAssetsBatchTask } from "../tasks/search/index.mjs";
 
 // ─── 工具函数 ───────────────────────────────────────────────
 
@@ -49,56 +49,28 @@ async function runAssetSearchDemoFromPicked(pickedWallets = []) {
     }
   }
 
-  requests = requests.slice(0, 1);
+  requests = requests.slice(0, 10);
+  console.log(requests);
   info(`address-search requests: ${requests.length}`);
+  const targetNetworks = ["eth", "bsc"];
 
-  const engine = createDefaultSearchEngine();
-  const settled = await Promise.allSettled(
-    requests.map((req) => engine.search({
-      domain: "address",
-      query: req.query,
-      limit: 200,
-      timeoutMs: 10000,
-    })),
+  const batchResult = await searchAddressAssetsBatchTask(
+    {
+      items: requests.flatMap((req) =>
+        targetNetworks.map((network) => ({
+          query: req.query,
+          network,
+          limit: 200,
+          timeoutMs: 10000,
+        })),
+      ),
+    },
+    {
+      _withPrice: true,
+    },
   );
 
-  const items = settled.map((result, index) => {
-    const req = requests[index] ?? { query: "" };
-    if (result.status === "rejected") {
-      return {
-        ok: false,
-        query: req.query,
-        network: null,
-        assets: [],
-        totalValueUsd: 0,
-        error: result.reason?.message ?? String(result.reason ?? "unknown"),
-      };
-    }
-
-    const candidates = Array.isArray(result.value?.candidates) ? result.value.candidates : [];
-    return {
-      ok: true,
-      query: req.query,
-      network: candidates[0]?.network ?? null,
-      assets: candidates,
-      totalValueUsd: 0,
-      error: null,
-    };
-  });
-
-  const success = items.filter((item) => item?.ok).length;
-  const failed = items.length - success;
-  const batchResult = {
-    ok: failed === 0,
-    items,
-    summary: {
-      total: items.length,
-      success,
-      failed,
-    },
-  };
-
-  console.log("\n--- search(address) batch result ---");
+  console.log("\n--- search(address-valuation) batch result ---");
   const result = batchResult;
   console.log(toJsonSafe(result));
   return result;
