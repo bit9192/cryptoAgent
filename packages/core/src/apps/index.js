@@ -79,3 +79,7 @@ export {
 	getTrxTokenBook,
 	resolveTrxToken,
 } from "./trx/config/tokens.js";
+export {
+	createSearchEngine,
+	createDefaultSearchEngine,
+} from "./search/engine.mjs";
