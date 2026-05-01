@@ -26,9 +26,10 @@ export function createTrxTokenSearchProvider(options = {}) {
 
     const network = normalizeNetwork(input?.network);
     const limit = normalizeLimit(input?.limit);
+    const matchMode = String(input?.matchMode ?? "").trim().toLowerCase() || "fuzzy";
 
     try {
-      const tokens = await resolver.resolve({ query, network });
+      const tokens = await resolver.resolve({ query, network, limit, matchMode });
       return tokens
         .slice(0, limit)
         .map((token) => toTokenSearchItem(token, network));

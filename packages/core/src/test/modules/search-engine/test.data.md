@@ -78,6 +78,8 @@ bc1ps793rn2savj7u7stawzly7uua62nuay7pzq027ck8hfrdzffdnnqf3gegf
 
 ## address assets test
 
+### happy
+
 SUN USDT TRX
 TPsMJ3BE9ixSQ7guFbVLZ4eou6SATBSqHH
 TLaGjwhvA8XQYSxFAcAXy7Dvuue9eGYitv
@@ -90,6 +92,20 @@ bc1p8w6zr5e2q60s0r8al4tvmsfer77c0eqc8j55gk8r7hzv39zhs2lqa8p0k6
 usdt bnb eth 
 0x6Fb8aa6fc6f27e591423009194529aE126660027
 0x436693FF266F9E495dbD1DCa2f48B65B03Dc0198
+
+### edge
+
+BTC
+04bff063a080c07aa9d8e7038c9d1bd7e5076fc28dd3e905b76517ad958e9df65e83abefcdbdcd7310231aaaf16a53e9bc24598826a3291e5dab338675618e7f12
+
+ETH
+0x63320F728777d332a1F1031019481A94144779fB
+
+### invalid
+
+not-an-address
+0x1234
+T111111111111111111111111111111111
 
 ## token price
 

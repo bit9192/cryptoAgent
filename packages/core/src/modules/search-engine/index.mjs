@@ -1,46 +1,34 @@
 import { createRequestEngine } from "../request-engine/index.mjs";
-import { ADDRESS_CONTEXT_CHECKERS } from "./address-context-checkers.mjs";
+
 import {
   createDefaultSearchProviders,
   registerSearchProviders,
+  ADDRESS_CONTEXT_CHECKERS
 } from "./composition-root.mjs";
 
-const SUPPORTED_DOMAINS = new Set(["token", "trade", "contract", "address"]);
+import {
+  assertNonEmptyString,
+  buildSearchRequestKey,
+  detectQueryKind,
+  normalizeDomain,
+  normalizeLower,
+} from "./utils.mjs";
 
-function assertNonEmptyString(value, fieldName) {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new TypeError(`${fieldName} 必须是非空字符串`);
-  }
-}
+import {
+  normalizeProviderNetworks,
+  normalizeProviderCapabilities,
+  assertValidProvider,
+  normalizeProviderDefinition,
+  pickProviderMethod,
+  resolveChainHint,
+  isProviderMatch,
+  toCandidateNetwork,
+} from "./provider.mjs";
 
-function normalizeLower(value) {
-  return String(value ?? "").trim().toLowerCase();
-}
-
-function resolveChainHint(value, providers = []) {
-  const raw = normalizeLower(value);
-  if (!raw) return "";
-
-  const chains = new Set(
-    (Array.isArray(providers) ? providers : [])
-      .map((provider) => normalizeLower(provider?.chain))
-      .filter(Boolean),
-  );
-  if (chains.has(raw)) return raw;
-
-  const matchedChains = new Set();
-  for (const provider of (Array.isArray(providers) ? providers : [])) {
-    const chain = normalizeLower(provider?.chain);
-    if (!chain) continue;
-    const networks = normalizeProviderNetworks(provider).map((net) => normalizeLower(net));
-    if (networks.includes(raw)) matchedChains.add(chain);
-  }
-  if (matchedChains.size === 1) {
-    return [...matchedChains][0];
-  }
-
-  return raw;
-}
+import {
+  normalizeCandidate,
+  dedupeAndSortCandidates,
+} from "./candidate.mjs";
 
 function detectAddressContextItems(query, providers = [], filter = {}) {
   const items = [];
@@ -64,273 +52,6 @@ function detectAddressContextItems(query, providers = [], filter = {}) {
   return items;
 }
 
-function normalizeDomain(domain) {
-  const value = normalizeLower(domain || "token") || "token";
-  if (!SUPPORTED_DOMAINS.has(value)) {
-    throw new TypeError(`不支持的 search domain: ${String(domain ?? "")}`);
-  }
-  return value;
-}
-
-function normalizeNetworkHint(value) {
-  return normalizeLower(value);
-}
-
-function stableStringify(value) {
-  if (value == null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
-  }
-  const keys = Object.keys(value).sort();
-  const entries = keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`);
-  return `{${entries.join(",")}}`;
-}
-
-function buildSearchRequestKey(input = {}) {
-  const {
-    cacheNamespace,
-    domain,
-    query,
-    queryKind,
-    chain,
-    network,
-    limit,
-    cursor,
-    providerIds,
-  } = input;
-  const payload = {
-    domain,
-    query: normalizeLower(query),
-    queryKind,
-    chain: normalizeLower(chain || "*"),
-    network: normalizeLower(network || "*"),
-    limit,
-    cursor: normalizeLower(cursor || ""),
-    providerIds: Array.isArray(providerIds) ? [...providerIds].sort() : [],
-  };
-  return `${cacheNamespace}:${stableStringify(payload)}`;
-}
-
-function detectQueryKind(input = {}) {
-  if (input.kind && input.kind !== "auto") return input.kind;
-  const query = String(input.query ?? "").trim();
-  if (/^0x[0-9a-fA-F]{40}$/.test(query)) return "address";
-  if (/^[a-zA-Z0-9._-]{2,64}$/.test(query)) return "symbol";
-  return "name";
-}
-
-function normalizeProviderNetworks(provider) {
-  if (Array.isArray(provider.networks) && provider.networks.length > 0) {
-    return provider.networks
-      .map((x) => String(x ?? "").trim())
-      .filter(Boolean);
-  }
-  const fallback = String(provider.network ?? "").trim();
-  return fallback ? [fallback] : [];
-}
-
-function normalizeProviderCapabilities(provider) {
-  const raw = Array.isArray(provider.capabilities) && provider.capabilities.length > 0
-    ? provider.capabilities
-    : ["token"];
-  return raw
-    .map((x) => normalizeDomain(x))
-    .filter((x, index, arr) => arr.indexOf(x) === index);
-}
-
-function normalizeCandidate(raw, defaults = {}) {
-  if (!raw || typeof raw !== "object") return null;
-  const chain = String(raw.chain ?? defaults.chain ?? "").trim();
-  const network = String(raw.network ?? defaults.network ?? "").trim();
-  const address = String(raw.address ?? raw.tokenAddress ?? "").trim();
-  const tokenAddress = String(raw.tokenAddress ?? address).trim();
-  if (!chain || !network || !address) return null;
-  const domain = normalizeDomain(raw.domain ?? defaults.domain ?? "token");
-
-  const confidenceNum = Number(raw.confidence);
-  const confidence = Number.isFinite(confidenceNum)
-    ? Math.max(0, Math.min(1, confidenceNum))
-    : 0.5;
-
-  const normalizedId = String(raw.id ?? `${normalizeLower(domain)}:${normalizeLower(chain)}:${normalizeLower(network)}:${normalizeLower(address)}`);
-  const title = raw.title != null
-    ? String(raw.title)
-    : String(raw.name ?? raw.symbol ?? raw.tokenAddress ?? raw.address ?? "");
-
-  let extra = {};
-  if (raw.extra && typeof raw.extra === "object" && !Array.isArray(raw.extra)) {
-    extra = { ...raw.extra };
-  }
-  if (raw.txHash != null) extra.txHash = raw.txHash;
-  if (raw.routeSummary != null) extra.routeSummary = raw.routeSummary;
-  if (raw.riskLevel != null) extra.riskLevel = raw.riskLevel;
-  if (raw.tags != null) extra.tags = raw.tags;
-  if (raw.score != null) extra.score = raw.score;
-
-  return {
-    domain,
-    id: normalizedId,
-    title,
-    chain,
-    network,
-    address,
-    tokenAddress,
-    symbol: raw.symbol == null ? null : String(raw.symbol),
-    name: raw.name == null ? null : String(raw.name),
-    decimals: raw.decimals == null ? null : Number(raw.decimals),
-    source: String(raw.source ?? defaults.source ?? "provider"),
-    providerId: String(raw.providerId ?? defaults.providerId ?? "unknown"),
-    confidence,
-    extra,
-  };
-}
-
-function resolveCandidateRank(candidate, input = {}, rankConfig = {}) {
-  let rank = 0;
-  const chain = normalizeLower(candidate.chain);
-  const network = normalizeLower(candidate.network);
-  const inputChain = normalizeLower(input.chain);
-  const inputNetwork = normalizeNetworkHint(input.network);
-
-  if (inputChain && inputChain === chain) rank += 200;
-  if (inputNetwork) {
-    if (inputNetwork === network) rank += 160;
-    if (inputNetwork === chain) rank += 150;
-  }
-
-  if (network === "mainnet") rank += 6;
-
-  const chainPriority = rankConfig.chainPriority && typeof rankConfig.chainPriority === "object"
-    ? rankConfig.chainPriority
-    : {};
-  const networkPriority = rankConfig.networkPriority && typeof rankConfig.networkPriority === "object"
-    ? rankConfig.networkPriority
-    : {};
-
-  const chainWeight = Number(chainPriority[chain]);
-  const networkWeight = Number(networkPriority[network]);
-
-  if (Number.isFinite(chainWeight)) rank += chainWeight;
-  if (Number.isFinite(networkWeight)) rank += networkWeight;
-
-  return rank;
-}
-
-function dedupeAndSortCandidates(candidates, query, input = {}, rankConfig = {}) {
-  const dedupMap = new Map();
-  const queryLower = normalizeLower(query);
-
-  for (const row of candidates) {
-    const key = String(row.id ?? `${normalizeLower(row.chain)}:${normalizeLower(row.network)}:${normalizeLower(row.address ?? row.tokenAddress)}`);
-    const old = dedupMap.get(key);
-    if (!old || row.confidence > old.confidence) {
-      dedupMap.set(key, row);
-    }
-  }
-
-  const list = [...dedupMap.values()];
-  list.sort((a, b) => {
-    const aExact = normalizeLower(a.symbol) === queryLower ? 1 : 0;
-    const bExact = normalizeLower(b.symbol) === queryLower ? 1 : 0;
-    if (aExact !== bExact) return bExact - aExact;
-    const aRank = resolveCandidateRank(a, input, rankConfig);
-    const bRank = resolveCandidateRank(b, input, rankConfig);
-    if (aRank !== bRank) return bRank - aRank;
-    if (a.confidence !== b.confidence) return b.confidence - a.confidence;
-    return normalizeLower(a.tokenAddress).localeCompare(normalizeLower(b.tokenAddress));
-  });
-
-  return list;
-}
-
-function assertValidProvider(provider, index) {
-  if (!provider || typeof provider !== "object") {
-    throw new TypeError(`providers[${index}] 必须是对象`);
-  }
-  assertNonEmptyString(String(provider.id ?? ""), `providers[${index}].id`);
-  assertNonEmptyString(String(provider.chain ?? ""), `providers[${index}].chain`);
-  const networks = normalizeProviderNetworks(provider);
-  if (networks.length === 0) {
-    throw new TypeError(`providers[${index}].networks 必须包含至少一个网络`);
-  }
-
-  const capabilities = normalizeProviderCapabilities(provider);
-  if (capabilities.length === 0) {
-    throw new TypeError(`providers[${index}].capabilities 不能为空`);
-  }
-
-  const hasGenericSearch = typeof provider.search === "function";
-  const hasDomainSearch = capabilities.some((domain) => {
-    const fnName = `search${domain[0].toUpperCase()}${domain.slice(1)}`;
-    return typeof provider[fnName] === "function";
-  });
-
-  if (!hasGenericSearch && !hasDomainSearch) {
-    throw new TypeError(`providers[${index}] 必须实现 search 或对应 domain 的 searchXxx`);
-  }
-}
-
-function normalizeProviderDefinition(rawProvider) {
-  const networks = normalizeProviderNetworks(rawProvider);
-  const capabilities = normalizeProviderCapabilities(rawProvider);
-
-  return {
-    ...rawProvider,
-    id: String(rawProvider.id).trim(),
-    chain: String(rawProvider.chain).trim(),
-    networks,
-    capabilities,
-  };
-}
-
-function pickProviderMethod(provider, domain) {
-  if (typeof provider.search === "function") {
-    return provider.search.bind(provider);
-  }
-  if (domain === "token" && typeof provider.searchToken === "function") {
-    return provider.searchToken.bind(provider);
-  }
-  if (domain === "trade" && typeof provider.searchTrade === "function") {
-    return provider.searchTrade.bind(provider);
-  }
-  if (domain === "contract" && typeof provider.searchContract === "function") {
-    return provider.searchContract.bind(provider);
-  }
-  if (domain === "address" && typeof provider.searchAddress === "function") {
-    return provider.searchAddress.bind(provider);
-  }
-  return null;
-}
-
-function isProviderMatch(provider, filter = {}, providers = []) {
-  const filterChain = resolveChainHint(filter.chain, providers);
-
-  if (filterChain && normalizeLower(provider.chain) !== filterChain) {
-    return false;
-  }
-  if (filter.domain && !provider.capabilities.includes(normalizeDomain(filter.domain))) {
-    return false;
-  }
-  if (filter.network) {
-    const wanted = normalizeNetworkHint(filter.network);
-    let hit = provider.networks.some((net) => normalizeLower(net) === wanted);
-    if (!hit && wanted) hit = normalizeLower(provider.chain) === wanted;
-    if (!hit) return false;
-  }
-  return true;
-}
-
-function toCandidateNetwork(row, provider, input) {
-  if (row?.network) return String(row.network).trim();
-  if (input?.network) {
-    const wanted = normalizeLower(input.network);
-    const hit = provider.networks.find((net) => normalizeLower(net) === wanted);
-    if (hit) return hit;
-  }
-  return provider.networks[0] ?? "default";
-}
 
 export function createSearchEngine(options = {}) {
   const providerMap = new Map();

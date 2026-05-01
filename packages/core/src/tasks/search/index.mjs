@@ -1,5 +1,3 @@
-import { createDefaultSearchEngine } from "../../modules/search-engine/index.mjs";
-import { queryTokenPriceLiteBatchByQuery } from "../../apps/offchain/token-price/query-token-price.mjs";
 import { runEvmBatchBalance } from "../../apps/evm/search/batch-balance.mjs";
 import { runTrxBatchBalance } from "../../apps/trx/search/batch-balance.mjs";
 import { runBtcBatchBalance } from "../../apps/btc/search/batch-balance.mjs";
@@ -10,26 +8,13 @@ import { runAddressPipeline } from "./pipelines/address/index.mjs";
 import { enrichAssetsWithValuation, sumAssetValuationValue } from "./pipelines/valuation/enrich.mjs";
 import { createPortfolioSummaryState, addAddressAssetsToSummary } from "./pipelines/portfolio/summary.mjs";
 import { extractPortfolioRiskFlags } from "./pipelines/portfolio/risk.mjs";
+import { getSearchEngineSingleton, normalizeString, resolveContextItem } from "./runtime.mjs";
+import { searchTokenPriceBatchTask, searchTokenPriceBatchTaskWithEngine } from "./token-price.mjs";
 
 const VALID_DOMAINS = ["token", "trade", "address"];
 
-// 进程内单例，首次调用后缓存，避免重复装配 provider
-let _engine = null;
-
 function getEngine() {
-  if (!_engine) {
-    _engine = createDefaultSearchEngine();
-  }
-  return _engine;
-}
-
-function normalizeString(value) {
-  return String(value ?? "").trim();
-}
-
-function resolveContextItem(context) {
-  const items = Array.isArray(context?.items) ? context.items : [];
-  return items[0] ?? null;
+  return getSearchEngineSingleton();
 }
 
 async function searchAddressWithPipeline(engine, input) {
@@ -700,58 +685,6 @@ export async function searchPortfolioValuationTask(input = {}) {
   return await searchPortfolioValuationTaskWithEngine(input, getEngine());
 }
 
-// ─── Token Price Batch ────────────────────────────────────────────────────────
-
-/**
- * 精确 token 价格查询（批量）
- *
- * @param {{ items: Array<{ query: string, network: string, chain: string }> }} input
- *   - 对象格式：`{ query, network, chain }`
- * @returns {Promise<{ ok: boolean, items: object[], error?: string }>}
- */
-export async function searchTokenPriceBatchTaskWithEngine(input = {}, _engine) {
-  const rawItems = Array.isArray(input?.items) ? input.items : [];
-  if (rawItems.length === 0) {
-    return { ok: false, items: [], error: "items 不能为空" };
-  }
-
-  let normalized;
-  try {
-    normalized = rawItems.map((item, i) => {
-      if (item && typeof item === "object") {
-        const query = normalizeString(item.query ?? item.symbol ?? item.name ?? "");
-        const network = normalizeString(item.network) || null;
-        const chain = normalizeString(item.chain) || null;
-        if (!query) throw new TypeError(`items[${i}].query 不能为空`);
-        if (!network) throw new TypeError(`items[${i}].network 不能为空`);
-        if (!chain) throw new TypeError(`items[${i}].chain 不能为空`);
-        return { query, network, chain };
-      }
-      throw new TypeError(`items[${i}] 格式非法：必须是 { query, network, chain }`);
-    });
-  } catch (err) {
-    return { ok: false, items: [], error: err?.message ?? String(err) };
-  }
-
-  try {
-    const res = await queryTokenPriceLiteBatchByQuery(normalized);
-    return {
-      ok: true,
-      items: Array.isArray(res?.items) ? res.items : [],
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      items: [],
-      error: error?.message ?? String(error),
-    };
-  }
-}
-
-export async function searchTokenPriceBatchTask(input = {}) {
-  return await searchTokenPriceBatchTaskWithEngine(input, getEngine());
-}
-
 // ─── Token Fuzzy Search ───────────────────────────────────────────────────────
 
 function listDefaultFuzzyNetworks() {
@@ -840,6 +773,11 @@ export async function searchTokenFuzzyTaskWithEngine(input = {}, engine) {
 export async function searchTokenFuzzyTask(input = {}) {
   return await searchTokenFuzzyTaskWithEngine(input, getEngine());
 }
+
+export {
+  searchTokenPriceBatchTask,
+  searchTokenPriceBatchTaskWithEngine,
+};
 
 export default {
   searchTask,

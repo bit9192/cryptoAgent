@@ -1,5 +1,5 @@
 
-import { searchAddressAssetsBatchTask } from "../tasks/search/index.mjs";
+import { createDefaultSearchEngine } from "../apps/search/engine.mjs";
 
 // ─── 工具函数 ───────────────────────────────────────────────
 
@@ -49,31 +49,23 @@ async function runAssetSearchDemoFromPicked(pickedWallets = []) {
     }
   }
 
-  requests = requests.slice(0, 10);
+  requests = requests.slice(0, 2);
   console.log(requests);
   info(`address-search requests: ${requests.length}`);
   const targetNetworks = ["eth", "bsc"];
 
-  const batchResult = await searchAddressAssetsBatchTask(
-    {
-      items: requests.flatMap((req) =>
-        targetNetworks.map((network) => ({
-          query: req.query,
-          network,
-          limit: 200,
-          timeoutMs: 10000,
-        })),
-      ),
-    },
-    {
-      _withPrice: true,
-    },
+  const engine = createDefaultSearchEngine();
+  const pairs = requests.flatMap((req) =>
+    targetNetworks.map((network) => ({ address: req.query, chain: "evm", network, limit: 200 })),
+  );
+
+  const batchResult = await Promise.all(
+    pairs.map((input) => engine.asset.byAddress(input)),
   );
 
   console.log("\n--- search(address-valuation) batch result ---");
-  const result = batchResult;
-  console.log(toJsonSafe(result));
-  return result;
+  console.log(toJsonSafe(batchResult));
+  return batchResult;
 }
 
 async function resolveWalletTree(options = {}) {

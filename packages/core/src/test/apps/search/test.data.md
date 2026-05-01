@@ -76,7 +76,40 @@ bc1ps793rn2savj7u7stawzly7uua62nuay7pzq027ck8hfrdzffdnnqf3gegf
 
 
 
-## address assets test
+## token risk test
+
+### happy (EVM)
+# ETH mainnet - USDT (大市值稳定币，low risk)
+chain: evm
+network: eth
+tokenAddress: 0xdac17f958d2ee523a2206206994597c13d831ec7
+
+# BSC mainnet - USDT (已知安全)
+chain: evm
+network: bsc
+tokenAddress: 0x55d398326f99059ff775485246999027b3197955
+
+### edge (unsupported chain)
+# BTC → 不支持，返回 notSupported
+chain: btc
+network: mainnet
+tokenAddress: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+
+# TRX → 不支持，返回 notSupported
+chain: trx
+network: mainnet
+tokenAddress: TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
+
+### invalid
+# 缺少 tokenAddress → 应抛错或返回 error
+chain: evm
+network: eth
+tokenAddress: (empty)
+
+# 非法地址格式 → 应抛错
+chain: evm
+network: eth
+tokenAddress: not-an-address
 
 ### happy
 

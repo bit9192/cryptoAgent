@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createTrxTokenSearchProvider } from "../../../../../apps/trx/search/token-provider.mjs";
+import { createTrxDexScreenerTokenSource } from "../../../../../apps/trx/search/sources/dexscreener-token-source.mjs";
 
 test("trx-token-search: H1-1 symbol 命中 mainnet USDT", async () => {
   const provider = createTrxTokenSearchProvider();
@@ -113,6 +114,141 @@ test("trx-token-search: I1-3 无匹配返回 []", async () => {
   const items = await provider.searchToken({ query: "nonexistent_token_xyz", network: "mainnet" });
 
   assert.deepEqual(items, []);
+});
+
+test("trx-token-search: 本地 miss 时 mainnet 走远程兜底", async () => {
+  const provider = createTrxTokenSearchProvider({
+    tokenBookReader() {
+      return { tokens: {} };
+    },
+    remoteSource: {
+      async search() {
+        return [{
+          name: "Sun Token",
+          symbol: "SUN",
+          address: "TUjwNG28iEa18s8WVnbxChu7g6SN2VCxUP",
+          source: "remote-dexscreener",
+          confidence: 0.78,
+        }];
+      },
+    },
+  });
+
+  const items = await provider.searchToken({ query: "SUN", network: "mainnet" });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].symbol, "SUN");
+  assert.equal(items[0].source, "remote-dexscreener");
+});
+
+test("trx-token-search: 非 mainnet 本地 miss 不走远程", async () => {
+  const provider = createTrxTokenSearchProvider({
+    tokenBookReader() {
+      return { tokens: {} };
+    },
+    remoteSource: {
+      async search() {
+        throw new Error("should-not-be-called");
+      },
+    },
+  });
+
+  const items = await provider.searchToken({ query: "SUN", network: "nile" });
+  assert.deepEqual(items, []);
+});
+
+test("trx-token-search: 可禁用远程兜底", async () => {
+  const provider = createTrxTokenSearchProvider({
+    disableRemote: true,
+    tokenBookReader() {
+      return { tokens: {} };
+    },
+    remoteSource: {
+      async search() {
+        return [{
+          name: "Sun Token",
+          symbol: "SUN",
+          address: "TUjwNG28iEa18s8WVnbxChu7g6SN2VCxUP",
+        }];
+      },
+    },
+  });
+
+  const items = await provider.searchToken({ query: "SUN", network: "mainnet" });
+  assert.deepEqual(items, []);
+});
+
+test("trx-token-search: 远程候选只保留精确匹配 token", async () => {
+  const remoteSource = createTrxDexScreenerTokenSource({
+    source: {
+      async init() {},
+      async getTokenCandidates() {
+        return [
+          {
+            chain: "trx",
+            network: "mainnet",
+            tokenAddress: "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+            symbol: "SUN",
+            name: "SUN",
+          },
+          {
+            chain: "trx",
+            network: "mainnet",
+            tokenAddress: "TNUC9Qb1rRpS5CbWLmNMxXBjyFoydXjWFR",
+            symbol: "WTRX",
+            name: "Wrapped TRX",
+          },
+          {
+            chain: "trx",
+            network: "mainnet",
+            tokenAddress: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+            symbol: "USDT",
+            name: "Tether USD",
+          },
+        ];
+      },
+    },
+  });
+
+  const provider = createTrxTokenSearchProvider({
+    tokenBookReader() {
+      return { tokens: {} };
+    },
+    remoteSource,
+  });
+
+  const items = await provider.searchToken({ query: "SUN", network: "mainnet" });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].symbol, "SUN");
+  assert.equal(items[0].address, "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S");
+});
+
+test("trx-token-search: exact/fuzzy 模式可控", async () => {
+  const provider = createTrxTokenSearchProvider({
+    tokenBookReader() {
+      return { tokens: {} };
+    },
+    remoteSource: {
+      async search(input = {}) {
+        if (String(input?.matchMode) === "exact") {
+          return [];
+        }
+        return [{
+          name: "DOG GO TO THE MOON",
+          symbol: "DOG",
+          address: "TGyZUWrL97mmmYJwrC7ZCLVrhbzvHmmWPL",
+          source: "remote-dexscreener",
+          confidence: 0.71,
+        }];
+      },
+    },
+  });
+
+  const exact = await provider.searchToken({ query: "DOGE", network: "mainnet", matchMode: "exact" });
+  assert.deepEqual(exact, []);
+
+  const fuzzy = await provider.searchToken({ query: "DOGE", network: "mainnet", matchMode: "fuzzy" });
+  assert.equal(fuzzy.length, 1);
+  assert.equal(fuzzy[0].symbol, "DOG");
 });
 
 test("trx-token-search: S1-1 resolver 抛错时降级 []", async () => {

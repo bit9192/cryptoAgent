@@ -15,6 +15,12 @@ function normalizeNetworkHint(value) {
   return raw;
 }
 
+const EVM_CHAIN_IDS = new Set(["ethereum", "eth", "bsc", "binance-smart-chain"]);
+
+function isEvmChainId(chainId) {
+  return EVM_CHAIN_IDS.has(normalizeLower(chainId));
+}
+
 function mapDexChainIdToEvmNetwork(chainId, fallbackNetwork = "eth") {
   const raw = normalizeLower(chainId);
   if (["ethereum", "eth"].includes(raw)) return "eth";
@@ -395,6 +401,8 @@ export function createEvmDexScreenerTradeProvider(options = {}) {
         network: requestedNetwork,
       });
       if (!info || !info.pairAddress) return [];
+      // DexScreener 对热门 symbol 可能返回非 EVM 链（如 Solana）结果，必须过滤
+      if (!isEvmChainId(info.chainId)) return [];
       const item = mapPairToTradeItem({
         chainId: info.chainId,
         dexId: info.dexId,

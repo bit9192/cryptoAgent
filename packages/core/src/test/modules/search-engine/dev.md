@@ -113,7 +113,8 @@
 1. ~~进入 S-12：EVM tokenAddress 先做网络归属验证（仅非 fork 网络）再查价~~ ✅
 2. ~~S-13：公共层预验证下沉~~ ✅
 3. ~~S-14：预验证命中统计注入 debugStats + 监测报告~~ ✅
-4. 先进入 S-18：统一各链网络分类配置（mainnet / testnet / fork）
+4. ~~S-R1：search-engine/index.mjs 结构重构（拆出 provider.mjs + candidate.mjs）~~ ✅（见 Slice S-R1）
+5. 先进入 S-18：统一各链网络分类配置（mainnet / testnet / fork）
 5. 在网络配置稳定后，再进入各链真实 provider 替换切片（先 EVM contract/address）
 6. 最后进入 tasks/search 接入统一 SearchEngine 入口
 
@@ -232,6 +233,52 @@
 
 1. BTC search 开发门禁文档齐备（dev.md + test-data）。
 2. 接口签名与输出字段可直接指导后续切片实现。
+
+### Slice S-19：search-engine index 结构拆分
+
+本次只做：
+
+1. ✅ 将通用工具函数抽离为 `utils.mjs`（assertNonEmptyString / normalizeLower / normalizeDomain 等）。
+2. ✅ `index.mjs` 保留引擎主流程与对外 API，不改变行为与签名。
+3. 将 provider 相关函数抽离为 `provider.mjs`：
+   - `normalizeProviderNetworks` / `normalizeProviderCapabilities`
+   - `assertValidProvider` / `normalizeProviderDefinition`
+   - `pickProviderMethod` / `resolveChainHint` / `isProviderMatch` / `toCandidateNetwork`
+4. 将候选项相关函数抽离为 `candidate.mjs`：
+   - `normalizeCandidate` / `resolveCandidateRank` / `dedupeAndSortCandidates`
+5. 不修改 provider 路由、排序、缓存策略。
+
+本次不做：
+
+1. 新增业务接口。
+2. 链路由逻辑调整。
+3. 任务层重构。
+
+验收标准：
+
+1. `index.mjs` 代码体积下降，职责集中在 engine 装配流程。
+2. search-engine 相关测试（domain-coverage + address-context + token-search）全部通过，无回归。
+
+### Slice S-20：direct engine.search 地址资产脚本
+
+本次只做：
+
+1. 使用 `test.data.md` 中 `address assets test` 样本直接驱动 `createDefaultSearchEngine().search()`。
+2. 固定调用协议为 `engine.search({ domain: "address", query })`，不经过 task 层。
+3. 输出每个地址的命中资产数量、链路、symbol 与余额摘要。
+4. 样本至少覆盖 happy / edge / invalid 三类，脚本对失败 case 继续执行并汇总。
+
+本次不做：
+
+1. 改动 address provider 实现。
+2. 增加价格估值。
+3. 把该脚本纳入 CI 强断言。
+
+验收标准：
+
+1. `node src/test/modules/search-engine/search.asset.test.mjs` 可执行。
+2. happy / edge 地址可直接通过 `engine.search()` 返回 address candidates。
+3. invalid 地址不会导致脚本崩溃，结果会以 empty / error 形式输出。
 
 ### Slice S-9：基于 test.data 的多链多接口使用测试脚本
 

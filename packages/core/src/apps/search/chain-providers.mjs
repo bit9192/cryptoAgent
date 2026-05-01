@@ -1,14 +1,17 @@
 import { createEvmTokenSearchProvider } from "../evm/search/token-provider.mjs";
 import { createEvmDexScreenerTradeProvider } from "../evm/search/trade-provider.mjs";
 import { createEvmAddressSearchProvider } from "../evm/search/address-provider.mjs";
+import { createEvmBalanceProvider } from "../evm/search/balance-provider.mjs";
 
 import { createBtcTokenSearchProvider } from "../btc/search/token-provider.mjs";
 import { createBtcAddressSearchProvider } from "../btc/search/address-provider.mjs";
 import { createBtcTradeSearchProvider } from "../btc/search/trade-provider.mjs";
+import { createBtcBalanceProvider } from "../btc/search/balance-provider.mjs";
 
 import { createTrxTokenSearchProvider } from "../trx/search/token-provider.mjs";
 import { createTrxAddressSearchProvider } from "../trx/search/address-provider.mjs";
 import { createTrxTradeSearchProvider } from "../trx/search/trade-provider.mjs";
+import { createTrxBalanceProvider } from "../trx/search/balance-provider.mjs";
 
 import { checkBtcAddressContext } from "../btc/search/address-check.mjs";
 import { checkEvmAddressContext } from "../evm/search/address-check.mjs";
@@ -25,12 +28,15 @@ export function createDefaultSearchProviders() {
     createBtcTokenSearchProvider(),
     createBtcAddressSearchProvider(),
     createBtcTradeSearchProvider(),
+    createBtcBalanceProvider(),
     createEvmTokenSearchProvider(),
     createEvmDexScreenerTradeProvider(),
     createEvmAddressSearchProvider(),
+    createEvmBalanceProvider(),
     createTrxTokenSearchProvider(),
     createTrxAddressSearchProvider(),
     createTrxTradeSearchProvider(),
+    createTrxBalanceProvider(),
   ];
 }
 

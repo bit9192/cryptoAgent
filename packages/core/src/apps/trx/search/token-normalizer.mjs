@@ -11,6 +11,11 @@ export function toTokenSearchItem(token, network) {
   const name = safeText(token?.name);
   const address = safeText(token?.address);
   const title = `${name || symbol} (${symbol})`;
+  const source = safeText(token?.source) || "config";
+  const confidence = Number.isFinite(Number(token?.confidence))
+    ? Number(token.confidence)
+    : (source === "config" ? 1 : 0.78);
+  const extra = token?.extra && typeof token.extra === "object" ? token.extra : {};
 
   return {
     domain: "token",
@@ -21,12 +26,13 @@ export function toTokenSearchItem(token, network) {
     symbol,
     name,
     address,
-    source: "config",
-    confidence: 1,
+    source,
+    confidence,
     extra: {
       name,
       decimals: Number(token?.decimals ?? 0),
       protocol: "trc20",
+      ...extra,
     },
   };
 }

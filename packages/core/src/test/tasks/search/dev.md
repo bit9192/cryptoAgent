@@ -80,3 +80,22 @@
 下一步：
 
 1. 完成 TS-4 后，继续清理 task 层其余通用编排残留
+
+### Slice TS-5：search 接口拆分（当前切片）
+
+本次只做：
+
+1. 将 token price 相关接口从 `tasks/search/index.mjs` 抽离到独立文件。
+2. `tasks/search/index.mjs` 保留聚合导出与调用兼容，不改变外部接口签名。
+3. 不修改业务行为，仅做结构拆分。
+
+本次不做：
+
+1. address/portfolio 接口拆分。
+2. search-engine 内核签名变更。
+3. 新增链接入改造。
+
+验收标准：
+
+1. `tasks/search/index.mjs` 不再内联 token price 实现。
+2. `search.test.mjs` 回归通过，无行为变化。

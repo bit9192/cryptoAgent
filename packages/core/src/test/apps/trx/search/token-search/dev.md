@@ -107,4 +107,5 @@ SearchItem 结构：
 
 ## 6. 当前进度
 
-- ⏳ TTS-1：待实现
+- ✅ TTS-1：已完成（本地配置 token-search 最小闭环）。
+- ✅ TTS-2：已完成（本地 miss 时 mainnet 远程兜底，非 mainnet 不走远程，可配置禁用远程）。

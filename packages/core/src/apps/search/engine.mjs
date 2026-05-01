@@ -4,6 +4,11 @@ import {
 	createDefaultSearchProviders,
 } from "./chain-providers.mjs";
 import { resolveAddressCheck } from "./address-check.mjs";
+import { searchTokenWithProviders } from "./token-search.mjs";
+import { resolveTokenRisk } from "./token-risk.mjs";
+import { searchAddressWithProviders } from "./address-search.mjs";
+import { searchTradeWithProviders } from "./trade-search.mjs";
+import { batchBalanceWithProviders } from "./batch-balance.mjs";
 
 function notImplemented(name) {
 	return async function pendingImplementation() {
@@ -27,19 +32,44 @@ export function createSearchEngine(options = {}) {
 		});
 	}
 
+	async function tokenSearch(input = {}) {
+		return await searchTokenWithProviders(input, {
+			providers,
+		});
+	}
+
+	async function assetByAddress(input = {}) {
+		return await searchAddressWithProviders(input, {
+			providers,
+		});
+	}
+
+	async function tradeSearch(input = {}) {
+		return await searchTradeWithProviders(input, {
+			providers,
+		});
+	}
+
+	async function balanceBatch(rows) {
+		return await batchBalanceWithProviders(rows, {
+			providers,
+		});
+	}
+
 	return {
 		addressCheck,
 		asset: {
-			byAddress: notImplemented("engine.asset.byAddress"),
+			byAddress: assetByAddress,
 		},
 		balance: {
-			batch: notImplemented("engine.balance.batch"),
+			batch: balanceBatch,
 		},
 		trade: {
-			search: notImplemented("engine.trade.search"),
+			search: tradeSearch,
 		},
 		token: {
-			search: notImplemented("engine.token.search"),
+			search: tokenSearch,
+			risk: resolveTokenRisk,
 		},
 	};
 }

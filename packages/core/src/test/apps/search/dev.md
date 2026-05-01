@@ -57,6 +57,12 @@ S-3：token.search 分发
 - 接入默认 token providers。
 - 只实现单次 search，不扩展 batch。
 
+S-3b：token.risk 分发
+- 输入：chain, tokenAddress, network?
+- 职责：路由到对应链的 risk checker
+- 约束：EVM only（BTC/TRX 返回 notSupported）
+- 出口挂在 engine.token.risk
+
 S-4：asset.byAddress 分发
 - 接入默认 address providers。
 - 返回统一 candidates。
@@ -68,6 +74,14 @@ S-6：balance.batch 分发
 - 接入各链 batch-balance 入口。
 - 按 chain 分组分发并合并结果。
 
-# 当前实现顺序
-先做 S-1（最小骨架），通过后再做 S-2。
+# 当前实现进度
+- S-1 已完成：engine 接口骨架已建立。
+- S-2 已完成：addressCheck 已独立实现并具备测试覆盖。
+- S-3 已完成：token.search 已接入 apps/search 独立分发（单次 search）。
+- S-3b 已完成：engine.token.risk 已实现（EVM only，BTC/TRX 返回 notSupported），8 个测试全过。
+- S-4 已完成：engine.asset.byAddress 已实现，7 个测试全过。
+- S-5 已完成：engine.trade.search 已实现，7 个测试全过。
+
+# 下一步
+进入 S-6：实现 engine.balance.batch 分发。
 
